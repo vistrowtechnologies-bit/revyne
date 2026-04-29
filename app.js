@@ -1,8 +1,59 @@
 const STORAGE_KEY = "revyne:mvp";
 const LEGACY_STORAGE_KEY = "reviewpilot:mvp";
+const supabaseConfig = window.REVYNE_SUPABASE || {};
+const hasSupabaseConfig = Boolean(
+  window.supabase &&
+  supabaseConfig.url &&
+  supabaseConfig.publishableKey &&
+  !supabaseConfig.publishableKey.includes("PASTE_YOUR")
+);
+const supabaseClient = hasSupabaseConfig
+  ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
+  : null;
+const PLAN_LIMITS = {
+  free: {
+    reviewGenerations: 20,
+    replyGenerations: 20
+  },
+  pro: {
+    reviewGenerations: 1000,
+    replyGenerations: 1000
+  },
+  pro_max: {
+    reviewGenerations: 2500,
+    replyGenerations: 2500
+  },
+  pro_yearly: {
+    reviewGenerations: 2500,
+    replyGenerations: 2500
+  }
+};
+
+const BUSINESS_CATEGORIES = [
+  { value: "Real Estate", typeLabel: "Property type", typePlaceholder: "plots, flats, villas, commercial spaces" },
+  { value: "Restaurant", typeLabel: "Cuisine or order type", typePlaceholder: "dine-in, takeaway, biryani, thali" },
+  { value: "Salon & Beauty", typeLabel: "Treatment type", typePlaceholder: "haircut, facial, bridal makeup" },
+  { value: "Healthcare Clinic", typeLabel: "Consultation or treatment type", typePlaceholder: "dental, physiotherapy, eye checkup" },
+  { value: "Education & Coaching", typeLabel: "Course type", typePlaceholder: "NEET, JEE, spoken English, coding" },
+  { value: "Car & Bike Service", typeLabel: "Vehicle or repair type", typePlaceholder: "car wash, detailing, battery, tyres" },
+  { value: "Electronics & Appliances", typeLabel: "Device or appliance type", typePlaceholder: "AC, refrigerator, mobile, laptop" },
+  { value: "Home Services", typeLabel: "Work type", typePlaceholder: "plumbing, painting, pest control, cleaning" },
+  { value: "Travel & Transport", typeLabel: "Trip or vehicle type", typePlaceholder: "airport pickup, outstation, tempo traveller" },
+  { value: "Hotel & Stay", typeLabel: "Room or stay type", typePlaceholder: "family room, banquet, business stay" },
+  { value: "Fitness & Gym", typeLabel: "Program type", typePlaceholder: "weight loss, personal training, yoga" },
+  { value: "Retail Store", typeLabel: "Shopping category", typePlaceholder: "clothing, footwear, groceries, accessories" },
+  { value: "Jewellery", typeLabel: "Jewellery type", typePlaceholder: "gold, diamond, bridal, repair" },
+  { value: "Event & Wedding Services", typeLabel: "Event type", typePlaceholder: "wedding, birthday, corporate event" },
+  { value: "Legal & Finance", typeLabel: "Service type", typePlaceholder: "tax filing, loan, insurance, legal consultation" },
+  { value: "IT & Digital Services", typeLabel: "Project type", typePlaceholder: "website, SEO, app, ads" },
+  { value: "Driver Service", typeLabel: "Trip type", typePlaceholder: "hourly driver, outstation, airport pickup" },
+  { value: "Other", typeLabel: "Type or requirement", typePlaceholder: "standard, premium, custom requirement" }
+];
 
 let slideDirection = null;
 let bottomNavFromIndex = 0;
+let currentSession = null;
+let isGeneratingReply = false;
 const navOrder = ["dashboard", "business", "reply", "pricing", "profile"];
 
 const defaultState = {
@@ -16,14 +67,19 @@ const defaultState = {
     email: "",
     mobile: "",
     provider: "",
-    lastLogin: ""
+    lastLogin: "",
+    plan: "free"
   },
   business: {
+    id: "",
+    publicToken: "",
     name: "Driver On Hire - Professional Driver Service in Pune",
     category: "Driver Service",
     city: "Pune",
     googleUrl: "https://www.google.com/search?q=google+business+review",
+    logo: "",
     services: "airport pickup, hourly driver, outstation trip, professional chauffeur",
+    serviceTypes: "",
     keywords: "professional driver, driver on hire, Pune driver service",
     language: "English",
     tone: "Professional",
@@ -35,7 +91,16 @@ const defaultState = {
     copied: 63
   },
   suggestions: [],
-  smartReplies: []
+  smartReplies: [],
+  reviewDraft: {
+    service: "",
+    product: "",
+    experience: ""
+  },
+  replyDraft: {
+    customerName: "",
+    reviewText: ""
+  }
 };
 
 let state = loadState();
@@ -56,7 +121,9 @@ function loadState() {
       ...parsed,
       user: { ...freshState.user, ...(parsed.user || {}) },
       business: { ...freshState.business, ...(parsed.business || {}) },
-      stats: { ...freshState.stats, ...(parsed.stats || {}) }
+      stats: { ...freshState.stats, ...(parsed.stats || {}) },
+      reviewDraft: { ...freshState.reviewDraft, ...(parsed.reviewDraft || {}) },
+      replyDraft: { ...freshState.replyDraft, ...(parsed.replyDraft || {}) }
     };
   } catch {
     return freshState;
@@ -85,16 +152,314 @@ function setView(view) {
   render();
 }
 
+function syncBottomNavPosition() {
+  const activeIndex = navOrder.indexOf(state.view);
+  bottomNavFromIndex = activeIndex === -1 ? 0 : activeIndex;
+}
+
 function updateBusinessField(field, value) {
-  state.business[field] = value;
+  state.business[field] = field === "services" ? trimToFiveList(value) : value;
+  if (field === "category") state.reviewDraft.product = "";
   if (field === "mobile") state.user.mobile = value;
   saveState();
+}
+
+function handleProfileImageUpload(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    showToast("Please choose an image file");
+    return;
+  }
+
+  if (file.size > 700 * 1024) {
+    showToast("Please upload an image under 700 KB");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.business.logo = reader.result;
+    saveState();
+    showToast("Profile picture updated");
+    render();
+  };
+  reader.onerror = () => showToast("Could not read image");
+  reader.readAsDataURL(file);
 }
 
 function updateUserField(field, value) {
   state.user[field] = value;
   if (field === "mobile") state.business.mobile = value;
   saveState();
+}
+
+function preserveReplyDraftFromDom() {
+  if (state.view !== "reply") return;
+  const customerName = document.querySelector("#customerName")?.value;
+  const reviewText = document.querySelector("#customerReview")?.value;
+  if (typeof customerName === "string") state.replyDraft.customerName = customerName;
+  if (typeof reviewText === "string") state.replyDraft.reviewText = reviewText;
+  saveState();
+}
+
+function preserveReviewDraftFromDom() {
+  const service = document.querySelector("#reviewService")?.value;
+  const product = document.querySelector("#reviewProduct")?.value;
+  const experience = document.querySelector("#reviewText")?.value;
+  if (typeof service === "string") state.reviewDraft.service = service;
+  if (typeof product === "string") state.reviewDraft.product = product;
+  if (typeof experience === "string") state.reviewDraft.experience = experience;
+  saveState();
+}
+
+function splitList(value, fallback = []) {
+  const items = String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return items.length ? items : fallback;
+}
+
+function isProMaxPlan() {
+  return state.user.plan === "pro_max" || state.user.plan === "pro_yearly";
+}
+
+function getCategoryMeta(category) {
+  return BUSINESS_CATEGORIES.find((item) => item.value === category) || BUSINESS_CATEGORIES.at(-1);
+}
+
+function trimToFiveList(value) {
+  return splitList(value).slice(0, 5).join(", ");
+}
+
+function getSupabaseUserProfile(user) {
+  const metadata = user.user_metadata || {};
+  return {
+    name: metadata.full_name || metadata.name || state.user.name,
+    email: user.email || state.user.email,
+    mobile: state.user.mobile,
+    provider: "google",
+    lastLogin: new Date().toISOString()
+  };
+}
+
+async function applySupabaseSession(session) {
+  currentSession = session;
+
+  if (!session?.user) {
+    state.isLoggedIn = false;
+    state.authMode = "signin";
+    saveState();
+    return;
+  }
+
+  state.user = { ...state.user, ...getSupabaseUserProfile(session.user) };
+  state.isLoggedIn = true;
+  state.authMode = "signin";
+  await loadSupabaseProfile();
+  await loadSupabaseBusiness();
+  saveState();
+}
+
+async function loadSupabaseProfile() {
+  if (!supabaseClient || !currentSession?.user) return;
+
+  const { data } = await supabaseClient
+    .from("profiles")
+    .select("full_name,email,mobile")
+    .eq("id", currentSession.user.id)
+    .maybeSingle();
+
+  if (!data) return;
+    state.user.name = data.full_name || state.user.name;
+    state.user.email = data.email || state.user.email;
+    state.user.mobile = data.mobile || state.user.mobile;
+    state.user.plan = data.plan || state.user.plan || "free";
+  if (data.mobile) state.business.mobile = data.mobile;
+}
+
+async function loadSupabaseBusiness() {
+  if (!supabaseClient || !currentSession?.user) return;
+
+  const { data } = await supabaseClient
+    .from("businesses")
+    .select("*")
+    .eq("owner_id", currentSession.user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return;
+  state.business = {
+    ...state.business,
+    id: data.id,
+    publicToken: data.public_token || state.business.publicToken,
+    name: data.name || state.business.name,
+    category: data.category || state.business.category,
+    city: data.city || "",
+    googleUrl: data.google_review_url || "",
+    services: data.services || "",
+    serviceTypes: state.business.serviceTypes || "",
+    keywords: data.keywords || "",
+    language: data.language || "English",
+    tone: data.tone || "Professional",
+    mobile: data.mobile || state.business.mobile
+  };
+}
+
+async function saveSupabaseProfile() {
+  if (!supabaseClient || !currentSession?.user) return true;
+
+  const { error } = await supabaseClient
+    .from("profiles")
+    .upsert({
+      id: currentSession.user.id,
+      full_name: state.user.name || null,
+      email: state.user.email || currentSession.user.email,
+      mobile: state.user.mobile || state.business.mobile || null,
+      plan: state.user.plan || "free",
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    showToast(error.message || "Could not save profile");
+    return false;
+  }
+
+  return true;
+}
+
+async function saveSupabaseBusiness() {
+  if (!supabaseClient || !currentSession?.user) return true;
+
+  const payload = {
+    owner_id: currentSession.user.id,
+    name: state.business.name.trim(),
+    category: state.business.category.trim(),
+    city: state.business.city || null,
+    google_review_url: state.business.googleUrl || null,
+    services: state.business.services || null,
+    keywords: state.business.keywords || null,
+    language: state.business.language || "English",
+    tone: state.business.tone || "Professional",
+    mobile: state.business.mobile || state.user.mobile || null,
+    updated_at: new Date().toISOString()
+  };
+
+  const query = state.business.id
+    ? supabaseClient.from("businesses").update(payload).eq("id", state.business.id).select("id,public_token").single()
+    : supabaseClient.from("businesses").insert(payload).select("id,public_token").single();
+
+  const { data, error } = await query;
+  if (error) {
+    showToast(error.message || "Could not save business");
+    return false;
+  }
+
+  if (data?.id) state.business.id = data.id;
+  if (data?.public_token) state.business.publicToken = data.public_token;
+  saveState();
+  return true;
+}
+
+async function signInWithGoogle() {
+  if (!supabaseClient) {
+    if (state.user.provider === "google" && state.user.email) {
+      state.isLoggedIn = true;
+      state.view = "dashboard";
+      state.user.lastLogin = new Date().toISOString();
+      saveState();
+      render();
+      return;
+    }
+
+    state.authMode = "google-profile";
+    saveState();
+    render();
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${location.origin}${location.pathname}`
+    }
+  });
+
+  if (error) showToast(error.message || "Google sign-in failed");
+}
+
+async function signOut() {
+  state.isLoggedIn = false;
+  state.authMode = "signin";
+  state.view = "dashboard";
+  saveState();
+  render();
+
+  if (supabaseClient) {
+    supabaseClient.auth.signOut().catch((error) => {
+      console.warn("Supabase sign-out failed after local logout:", error);
+    });
+  }
+}
+
+function getMonthKey() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function getCurrentPlanLimits() {
+  return PLAN_LIMITS[state.user.plan || "free"] || PLAN_LIMITS.free;
+}
+
+async function getCurrentUsage() {
+  if (!supabaseClient || !currentSession?.user) {
+    return { review_generations: 0, reply_generations: 0 };
+  }
+
+  const monthKey = getMonthKey();
+  const { data, error } = await supabaseClient
+    .from("usage_limits")
+    .select("review_generations,reply_generations")
+    .eq("user_id", currentSession.user.id)
+    .eq("month_key", monthKey)
+    .maybeSingle();
+
+  if (error) return { review_generations: 0, reply_generations: 0 };
+  return data || { review_generations: 0, reply_generations: 0 };
+}
+
+async function canGenerate(type) {
+  if (!supabaseClient || !currentSession?.user) return true;
+
+  const usage = await getCurrentUsage();
+  const limits = getCurrentPlanLimits();
+  const used = type === "review" ? usage.review_generations : usage.reply_generations;
+  const limit = type === "review" ? limits.reviewGenerations : limits.replyGenerations;
+
+  if (used >= limit) {
+    showToast(`Monthly ${type} generation limit reached`);
+    return false;
+  }
+
+  return true;
+}
+
+async function incrementUsage(type) {
+  if (!supabaseClient || !currentSession?.user) return;
+
+  const monthKey = getMonthKey();
+  const usage = await getCurrentUsage();
+  const payload = {
+    user_id: currentSession.user.id,
+    month_key: monthKey,
+    review_generations: usage.review_generations + (type === "review" ? 1 : 0),
+    reply_generations: usage.reply_generations + (type === "reply" ? 1 : 0),
+    updated_at: new Date().toISOString()
+  };
+
+  await supabaseClient
+    .from("usage_limits")
+    .upsert(payload, { onConflict: "user_id,month_key" });
 }
 
 function escapeHtml(value) {
@@ -107,10 +472,156 @@ function escapeHtml(value) {
 }
 
 function getReviewUrl() {
-  return `${location.origin}${location.pathname}#review`;
+  const suffix = state.business.publicToken ? `/${state.business.publicToken}` : "";
+  return `${location.origin}${location.pathname}#review${suffix}`;
 }
 
-function completeGoogleProfile() {
+function getPublicReviewToken() {
+  const match = location.hash.match(/^#review\/([0-9a-f-]{36})$/i);
+  return match ? match[1] : "";
+}
+
+function isPublicReviewRoute() {
+  return location.hash === "#review" || location.hash.startsWith("#review/");
+}
+
+async function loadPublicReviewBusiness() {
+  const publicToken = getPublicReviewToken();
+  if (!supabaseClient || !publicToken || state.business.publicToken === publicToken) return;
+
+  const { data, error } = await supabaseClient
+    .from("businesses")
+    .select("id,public_token,name,category,city,google_review_url,services,keywords,language,tone,mobile")
+    .eq("public_token", publicToken)
+    .eq("public_reviews_enabled", true)
+    .maybeSingle();
+
+  if (error || !data) {
+    showToast(error?.message || "Business profile not found");
+    return;
+  }
+
+  state.business = {
+    ...state.business,
+    id: data.id,
+    publicToken: data.public_token || publicToken,
+    name: data.name || state.business.name,
+    category: data.category || state.business.category,
+    city: data.city || "",
+    googleUrl: data.google_review_url || "",
+    services: data.services || "",
+    serviceTypes: state.business.serviceTypes || "",
+    keywords: data.keywords || "",
+    language: data.language || "English",
+    tone: data.tone || "Professional",
+    mobile: data.mobile || ""
+  };
+  state.suggestions = [];
+  saveState();
+}
+
+async function saveGeneratedReviewsToSupabase(experience) {
+  if (!supabaseClient || !state.suggestions.length) return;
+
+  if (!state.business.id) {
+    await findSupabaseBusinessForPublicReview();
+  }
+
+  if (!state.business.id) {
+    showToast("Please save your business profile before collecting reviews");
+    return;
+  }
+
+  const { data: request, error: requestError } = await supabaseClient
+    .from("review_requests")
+    .insert({
+      business_id: state.business.id,
+      rating: state.rating,
+      customer_experience: experience || null,
+      customer_language: state.business.language || "English",
+      source: "public_page"
+    })
+    .select("id")
+    .single();
+
+  if (requestError) {
+    showToast(requestError.message || "Could not save review request");
+    return;
+  }
+
+  const rows = state.suggestions.map((suggestion) => ({
+    review_request_id: request.id,
+    business_id: state.business.id,
+    suggestion
+  }));
+
+  const { error: suggestionsError } = await supabaseClient
+    .from("generated_reviews")
+    .insert(rows);
+
+  if (suggestionsError) {
+    showToast(suggestionsError.message || "Could not save suggestions");
+  }
+}
+
+async function callAIGenerator(action, payload) {
+  if (!supabaseClient) return null;
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("generate-ai", {
+      body: { action, ...payload }
+    });
+
+    if (error) {
+      console.warn("AI function unavailable, using local fallback:", error.message || error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.warn("AI function unavailable, using local fallback:", error);
+    return null;
+  }
+}
+
+async function saveSmartRepliesToSupabase({ customerName, rating, reviewText }) {
+  if (!supabaseClient || !state.business.id || !state.smartReplies.length) return;
+
+  const rows = state.smartReplies.map((replyText) => ({
+    business_id: state.business.id,
+    customer_name: customerName || null,
+    rating,
+    review_text: reviewText || null,
+    reply_text: replyText
+  }));
+
+  const { error } = await supabaseClient
+    .from("smart_replies")
+    .insert(rows);
+
+  if (error) {
+    showToast(error.message || "Could not save smart replies");
+  }
+}
+
+async function findSupabaseBusinessForPublicReview() {
+  if (!supabaseClient || !state.business.name.trim()) return;
+
+  const { data } = await supabaseClient
+    .from("businesses")
+    .select("id,public_token")
+    .eq("name", state.business.name.trim())
+    .limit(1)
+    .maybeSingle();
+
+  if (data?.id) {
+    state.business.id = data.id;
+    state.business.publicToken = data.public_token || state.business.publicToken;
+    saveState();
+  }
+}
+
+async function completeGoogleProfile() {
   const name = state.user.name.trim();
   const email = state.user.email.trim();
   const mobile = state.user.mobile.trim();
@@ -141,20 +652,31 @@ function completeGoogleProfile() {
   state.isLoggedIn = true;
   state.authMode = "signin";
   state.view = "dashboard";
+  const profileSaved = await saveSupabaseProfile();
+  if (!profileSaved) return;
+  const businessSaved = await saveSupabaseBusiness();
+  if (!businessSaved) return;
   saveState();
   render();
 }
 
-function createReviewSuggestions() {
+async function createReviewSuggestions() {
   if (!state.rating) {
     showToast("Please select a star rating first");
     return;
   }
 
+  const allowed = await canGenerate("review");
+  if (!allowed) return;
+
   const business = state.business;
-  const experience = document.querySelector("#reviewText")?.value.trim();
+  preserveReviewDraftFromDom();
+  const selectedService = state.reviewDraft.service || business.category;
+  const selectedProduct = state.reviewDraft.product || "";
+  const experience = state.reviewDraft.experience.trim();
+  const proMaxReview = isProMaxPlan() && Boolean(selectedService || selectedProduct);
   const services = business.services.split(",").map((item) => item.trim()).filter(Boolean);
-  const serviceLine = services.length ? services.slice(0, 2).join(" and ") : business.category;
+  const serviceLine = selectedService || (services.length ? services.slice(0, 2).join(" and ") : business.category);
   const base = experience || `I had a genuine experience with ${serviceLine}.`;
   const starText = state.rating >= 5 ? "excellent" : state.rating >= 4 ? "very good" : "helpful";
   const tone = business.tone || "Professional";
@@ -162,8 +684,35 @@ function createReviewSuggestions() {
   const name = business.name;
   const city = business.city;
   const cat = business.category.toLowerCase();
+  const aiResult = await callAIGenerator("review_suggestions", {
+    rating: state.rating,
+    experience,
+    selectedService,
+    selectedProduct,
+    depth: proMaxReview ? "seo_deep" : "standard",
+    business: {
+      name,
+      category: business.category,
+      city,
+      services: business.services,
+      keywords: business.keywords,
+      language: lang,
+      tone
+    }
+  });
 
-  if (lang === "Hindi") {
+  if (Array.isArray(aiResult?.suggestions) && aiResult.suggestions.length) {
+    state.suggestions = aiResult.suggestions.slice(0, 3);
+  } else if (proMaxReview) {
+    const productLine = selectedProduct ? ` for ${selectedProduct}` : "";
+    const locationLine = city ? ` in ${city}` : "";
+    state.suggestions = [
+      `${name} gave me a ${starText} experience with ${selectedService}${productLine}${locationLine}. ${base} The team explained things clearly, handled the work professionally, and made the whole process easy to trust. I would recommend them to anyone looking for reliable ${business.category}.`,
+      `I chose ${name} for ${selectedService}${productLine}, and the experience felt smooth from start to finish. ${base} Their communication, service quality, and attention to detail stood out. It is a dependable option for customers searching for ${business.category}${locationLine}.`,
+      `${name} was helpful and professional for my ${selectedService}${productLine} requirement. ${base} The service felt genuine, the team understood what I needed, and the overall experience was worth recommending. A good choice for ${business.category}${locationLine}.`
+    ];
+  } else if (lang === "Hindi") {
+
     state.suggestions = [
       `${name} ने ${city} में ${starText} सेवा प्रदान की। ${base} टीम पेशेवर और भरोसेमंद थी।`,
       `${name} के साथ अनुभव बहुत अच्छा रहा। ${cat} सेवा समय पर और विश्वसनीय थी।`,
@@ -196,34 +745,81 @@ function createReviewSuggestions() {
   }
 
   state.stats.generated += 1;
+  await saveGeneratedReviewsToSupabase(experience);
+  await incrementUsage("review");
   saveState();
   render();
 }
 
-function createSmartReplies() {
-  const name = document.querySelector("#customerName")?.value.trim() || "there";
-  const text = document.querySelector("#customerReview")?.value.trim() || "Thank you for the positive feedback.";
+async function createSmartReplies() {
+  if (isGeneratingReply) return;
+
+  const customerNameInput = document.querySelector("#customerName");
+  const customerReviewInput = document.querySelector("#customerReview");
+  state.replyDraft.customerName = customerNameInput?.value.trim() || state.replyDraft.customerName.trim();
+  state.replyDraft.reviewText = customerReviewInput?.value.trim() || state.replyDraft.reviewText.trim();
+
+  const allowed = await canGenerate("reply");
+  if (!allowed) return;
+
+  const name = state.replyDraft.customerName || "there";
+  const text = state.replyDraft.reviewText || "Thank you for the positive feedback.";
   const rating = state.replyRating;
   const business = state.business.name;
 
-  if (rating <= 2) {
-    state.smartReplies = [
-      `Hi ${name}, thank you for sharing your feedback. We are sorry your experience did not meet expectations. Please contact us directly so we can understand what happened and make this right.`,
-      `Thank you, ${name}. We take this seriously and appreciate you bringing it to our attention. Our team will review your feedback and work on improving the experience.`
-    ];
-  } else {
-    state.smartReplies = [
-      `Hi ${name}, thank you for your kind words and for choosing ${business}. We are glad you had a positive experience and truly appreciate your support.`,
-      `Thank you, ${name}. We are happy to hear this feedback. It means a lot to our team, and we look forward to serving you again.`
-    ];
-  }
-
-  if (text.length > 80) {
-    state.smartReplies.push(`Hi ${name}, thank you for taking the time to write such detailed feedback. We appreciate your trust in ${business} and are glad we could help.`);
-  }
-
+  isGeneratingReply = true;
+  state.smartReplies = [];
   saveState();
   render();
+
+  try {
+    const aiResult = await callAIGenerator("smart_replies", {
+      customerName: name === "there" ? "" : name,
+      rating,
+      reviewText: text,
+      business: {
+        name: business,
+        category: state.business.category,
+        city: state.business.city,
+        language: state.business.language,
+        tone: state.business.tone
+      }
+    });
+
+    if (Array.isArray(aiResult?.replies) && aiResult.replies.length) {
+      state.smartReplies = aiResult.replies.slice(0, 3);
+    } else if (rating <= 2) {
+      state.smartReplies = [
+        `Hi ${name}, thank you for sharing your feedback. We are sorry your experience did not meet expectations. Please contact us directly so we can understand what happened and make this right.`,
+        `Thank you, ${name}. We take this seriously and appreciate you bringing it to our attention. Our team will review your feedback and work on improving the experience.`
+      ];
+    } else {
+      state.smartReplies = [
+        `Hi ${name}, thank you for your kind words and for choosing ${business}. We are glad you had a positive experience and truly appreciate your support.`,
+        `Thank you, ${name}. We are happy to hear this feedback. It means a lot to our team, and we look forward to serving you again.`
+      ];
+    }
+
+    if (text.length > 80 && state.smartReplies.length < 3) {
+      state.smartReplies.push(`Hi ${name}, thank you for taking the time to write such detailed feedback. We appreciate your trust in ${business} and are glad we could help.`);
+    }
+
+    isGeneratingReply = false;
+    saveState();
+    render();
+
+    await saveSmartRepliesToSupabase({
+      customerName: name === "there" ? "" : name,
+      rating,
+      reviewText: text
+    });
+    await incrementUsage("reply");
+  } catch (error) {
+    isGeneratingReply = false;
+    console.warn("Could not generate smart replies:", error);
+    showToast("Could not generate replies");
+    render();
+  }
 }
 
 async function copyText(text) {
@@ -331,7 +927,7 @@ function dashboardPage() {
     <section class="dash-wrap">
       <div class="dash-welcome">
         <h2 class="dash-title">Dashboard</h2>
-        <p class="dash-sub">Welcome back. Your reputation is growing.</p>
+        <p class="dash-sub">Welcome back. Your reputation is growing. Current plan: ${escapeHtml((state.user.plan || "free").toUpperCase())}</p>
       </div>
 
       <div class="dash-metrics">
@@ -418,6 +1014,8 @@ function reviewCard({ initials, name, time, platform, stars, text }) {
 
 function businessPage() {
   const b = state.business;
+  const proMax = isProMaxPlan();
+  const categoryMeta = getCategoryMeta(b.category);
   return `
     <section class="panel form-panel">
       <h1 class="page-title">Complete Your Profile</h1>
@@ -429,12 +1027,48 @@ function businessPage() {
 
       <h2>Edit Business Profile</h2>
       <div class="required-note">* indicates required field</div>
+      <div class="field">
+        <label for="profile-image">Profile Picture</label>
+        <div class="profile-upload-row">
+          <div class="profile-upload-preview">
+            ${b.logo ? `<img src="${escapeHtml(b.logo)}" alt="Business profile" />` : `<span>${escapeHtml((b.name || state.user.name || "R").charAt(0).toUpperCase())}</span>`}
+          </div>
+          <div>
+            <input id="profile-image" class="file-input" type="file" accept="image/*" data-profile-image />
+            <label class="button secondary file-button" for="profile-image">Upload Picture</label>
+            <p class="hint">Use a square logo or owner photo under 700 KB.</p>
+          </div>
+        </div>
+      </div>
       ${inputField("Business Name *", "name", b.name)}
-      ${inputField("Category *", "category", b.category)}
+      <div class="field">
+        <label for="field-category">Category *</label>
+        <select id="field-category" class="select" data-field="category">
+          ${selectOptions(BUSINESS_CATEGORIES.map((item) => item.value), b.category, "Select category")}
+        </select>
+      </div>
       ${inputField("City", "city", b.city)}
       ${inputField("Google Review URL *", "googleUrl", b.googleUrl)}
-      ${inputField("Services (comma separated)", "services", b.services)}
       ${inputField("Keywords (comma separated)", "keywords", b.keywords)}
+
+      <div class="pro-settings ${proMax ? "" : "locked"}">
+        <div class="pro-settings-head">
+          <div>
+            <strong>Pro Max Review Personalization</strong>
+            <p>These options appear on your customer review page for hyper-personalized review drafts.</p>
+          </div>
+          <span>${proMax ? "Enabled" : "Pro Max"}</span>
+        </div>
+        <div class="field">
+          <label for="field-services">5 Main Services</label>
+          <input id="field-services" class="input" placeholder="Example: buying consultation, selling plots, flats, apartments, commercial property" value="${escapeHtml(b.services)}" data-field="services" ${proMax ? "" : "disabled"} />
+        </div>
+        <div class="field">
+          <label for="field-serviceTypes">${escapeHtml(categoryMeta.typeLabel)}</label>
+          <input id="field-serviceTypes" class="input" placeholder="${escapeHtml(categoryMeta.typePlaceholder)}" value="${escapeHtml(b.serviceTypes || "")}" data-field="serviceTypes" ${proMax ? "" : "disabled"} />
+        </div>
+        <p class="pro-settings-note">${proMax ? "Tip: separate each option with commas. The app will show up to 5 services." : "Upgrade to Pro Max to edit these fields. Other plans can view them but cannot use them."}</p>
+      </div>
 
       <div class="field">
         <label>Choose Language</label>
@@ -442,6 +1076,7 @@ function businessPage() {
           ${chip("language", "English")}
           ${chip("language", "Hindi")}
           ${chip("language", "Hinglish")}
+          ${chip("language", "Marathi")}
         </div>
       </div>
 
@@ -473,20 +1108,33 @@ function chip(field, value) {
   return `<button class="chip ${active}" type="button" data-chip-field="${field}" data-chip-value="${value}">${value}</button>`;
 }
 
+function selectOptions(items, selected, placeholder) {
+  return [
+    `<option value="">${escapeHtml(placeholder)}</option>`,
+    ...items.map((item) => `<option value="${escapeHtml(item)}" ${item === selected ? "selected" : ""}>${escapeHtml(item)}</option>`)
+  ].join("");
+}
+
 function replyPage() {
+  const draft = state.replyDraft || {};
+  const buttonText = isGeneratingReply ? "Generating replies..." : "Generate Smart Replies";
   return `
     <h1 class="page-title">Smart Reply Generator</h1>
     <p class="page-subtitle">Create warm, professional Google Business replies in seconds</p>
     <section class="panel reply-card">
       <div class="field">
-        <input id="customerName" class="input" placeholder="Customer Name" />
+        <input id="customerName" class="input" placeholder="Customer Name" value="${escapeHtml(draft.customerName || "")}" data-reply-draft="customerName" />
       </div>
       <label><strong>Rating</strong></label>
       <div class="stars">${stars("replyRating")}</div>
       <div class="field">
-        <textarea id="customerReview" class="textarea" placeholder="Review Text"></textarea>
+        <textarea id="customerReview" class="textarea" placeholder="Review Text" data-reply-draft="reviewText">${escapeHtml(draft.reviewText || "")}</textarea>
       </div>
-      <button class="button full" type="button" data-generate-reply>Generate Smart Replies</button>
+      <button class="button full ${isGeneratingReply ? "is-loading" : ""}" type="button" data-generate-reply ${isGeneratingReply ? "disabled" : ""}>
+        ${isGeneratingReply ? `<span class="button-spinner"></span>` : ""}
+        <span>${buttonText}</span>
+      </button>
+      ${isGeneratingReply ? `<div class="reply-loading-note">Using AI to write concise replies. This usually takes a few seconds.</div>` : ""}
       ${suggestionList(state.smartReplies)}
     </section>
   `;
@@ -500,7 +1148,7 @@ function stars(field) {
   }).join("");
 }
 
-function pricingPage() {
+function legacyPricingPage() {
   const plans = [
     ["Free", "₹0 / month", "", false],
     ["Pro Monthly", "₹149 / month", "₹449 / month", false],
@@ -510,7 +1158,7 @@ function pricingPage() {
   return `<section class="pricing-grid">${plans.map(planCard).join("")}</section>`;
 }
 
-function planCard([name, price, oldPrice, featured]) {
+function legacyPlanCard([name, price, oldPrice, featured]) {
   const free = name === "Free";
   const features = [
     ["Unlimited QR Scans", true],
@@ -520,7 +1168,6 @@ function planCard([name, price, oldPrice, featured]) {
     ["Smart SEO Friendly Reply", !free],
     ["Multi-language Support", !free],
     ["Tone Customization", !free],
-    ["Free Website", !free],
     ["Included Future Updates", !free]
   ];
 
@@ -533,6 +1180,162 @@ function planCard([name, price, oldPrice, featured]) {
       </div>
       ${features.map(([label, ok]) => `<div class="feature"><span class="${ok ? "yes" : "no"}">${ok ? "✓" : "×"}</span><span class="${ok ? "" : "disabled"}">${label}</span></div>`).join("")}
       ${free ? "" : `<button class="button full" type="button">Upgrade</button>`}
+    </article>
+  `;
+}
+
+function pricingPage() {
+  const plans = [
+    { id: "free", name: "Free", price: "Rs 0 / month", oldPrice: "", featured: false },
+    { id: "pro", name: "Pro Monthly", price: "Rs 149 / month", oldPrice: "Rs 449 / month", featured: false },
+    { id: "pro_max", name: "Pro Max Monthly", price: "Rs 199 / month", oldPrice: "Rs 599 / month", featured: true },
+    { id: "pro_yearly", name: "Pro Yearly", price: "Rs 999 / year", oldPrice: "Rs 2499 / year", featured: false }
+  ];
+
+  return `<section class="pricing-grid">${plans.map(planCard).join("")}</section>`;
+}
+
+function planCard({ id, name, price, oldPrice, featured }) {
+  const free = id === "free";
+  const proMax = id === "pro_max";
+  const proOrAbove = !free;
+  const features = [
+    ["Unlimited QR Scans", true],
+    [`AI Generated ${free ? "2" : "5"} Review Suggestions`, true],
+    ["Editable Services and Keywords", proOrAbove],
+    ["Smart SEO Friendly Reply", proOrAbove],
+    ["Service/Product Review Selection", proMax],
+    ["In-depth SEO Review Generator", proMax],
+    ["Multi-language Support", proOrAbove],
+    ["Tone Customization", proOrAbove],
+    ["Included Future Updates", proOrAbove]
+  ];
+
+  return `
+    <article class="price-card ${featured ? "featured" : ""}">
+      ${proMax ? `<div class="plan-badge">New</div>` : ""}
+      <h3>${name}</h3>
+      <div class="price ${free ? "free" : ""}">
+        ${oldPrice ? `<div class="old">${oldPrice}</div>` : ""}
+        ${price}
+      </div>
+      ${features.map(([label, ok]) => `<div class="feature"><span class="${ok ? "yes" : "no"}">${ok ? "✓" : "×"}</span><span class="${ok ? "" : "disabled"}">${label}</span></div>`).join("")}
+      ${free ? "" : `<button class="button full" type="button" data-plan-select="${id}">Upgrade</button>`}
+    </article>
+  `;
+}
+
+function pricingPageV2() {
+  const plans = [
+    {
+      id: "free",
+      name: "Free",
+      label: "Start",
+      description: "For testing review collection with a small customer flow.",
+      price: "Rs 0",
+      period: "/ month",
+      oldPrice: "",
+      featured: false,
+      cta: "Current Plan"
+    },
+    {
+      id: "pro",
+      name: "Pro Monthly",
+      label: "Popular",
+      description: "For active local businesses that need more AI reviews and replies.",
+      price: "Rs 149",
+      period: "/ month",
+      oldPrice: "Rs 449",
+      featured: false,
+      cta: "Upgrade to Pro"
+    },
+    {
+      id: "pro_max",
+      name: "Pro Max Monthly",
+      label: "Best for SEO",
+      description: "Unlock service selection and deeper, more personalized review drafts.",
+      price: "Rs 199",
+      period: "/ month",
+      oldPrice: "Rs 599",
+      featured: true,
+      cta: "Upgrade to Pro Max"
+    },
+    {
+      id: "pro_yearly",
+      name: "Pro Yearly",
+      label: "Best Value",
+      description: "A lower yearly cost for businesses ready to use RevYne long term.",
+      price: "Rs 999",
+      period: "/ year",
+      oldPrice: "Rs 2499",
+      featured: false,
+      cta: "Upgrade Yearly"
+    }
+  ];
+
+  return `
+    <section class="pricing-intro">
+      <div>
+        <p class="eyebrow">Pricing</p>
+        <h1 class="page-title">Choose the plan that fits your review workflow</h1>
+        <p class="page-subtitle">Every plan keeps review wording honest. Pro Max adds service-level personalization for businesses that want more detailed SEO-friendly drafts.</p>
+      </div>
+      <div class="pricing-note">
+        <strong>Current plan</strong>
+        <span>${formatPlanName(state.user.plan || "free")}</span>
+      </div>
+    </section>
+    <section class="pricing-grid">${plans.map(planCardV2).join("")}</section>
+  `;
+}
+
+function formatPlanName(planId) {
+  const names = {
+    free: "Free",
+    pro: "Pro Monthly",
+    pro_max: "Pro Max Monthly",
+    pro_yearly: "Pro Yearly"
+  };
+  return names[planId] || "Free";
+}
+
+function planCardV2({ id, name, label, description, price, period, oldPrice, featured, cta }) {
+  const free = id === "free";
+  const proMax = id === "pro_max";
+  const proOrAbove = !free;
+  const currentPlan = (state.user.plan || "free") === id;
+  const features = [
+    ["Unlimited QR scans", true],
+    [`${free ? "2" : "5"} AI review suggestions per customer`, true],
+    ["Editable services and keywords", proOrAbove],
+    ["Smart SEO-friendly replies", proOrAbove],
+    ["Service and type selection on public review page", proMax],
+    ["In-depth SEO review generator", proMax],
+    ["Multi-language support including Marathi", proOrAbove],
+    ["Tone customization", proOrAbove],
+    ["Future updates included", proOrAbove]
+  ];
+
+  return `
+    <article class="price-card ${featured ? "featured" : ""}">
+      <div class="price-card-header">
+        <span class="plan-badge">${label}</span>
+        ${currentPlan ? `<span class="current-plan-pill">Active</span>` : ""}
+      </div>
+      <h3>${name}</h3>
+      <p class="plan-description">${description}</p>
+      <div class="price ${free ? "free" : ""}">
+        ${oldPrice ? `<div class="old">${oldPrice}</div>` : ""}
+        <span>${price}</span><small>${period}</small>
+      </div>
+      <div class="feature-list">
+        ${features.map(([featureLabel, ok]) => `<div class="feature"><span class="${ok ? "yes" : "no"}">${ok ? "&#10003;" : "&times;"}</span><span class="${ok ? "" : "disabled"}">${featureLabel}</span></div>`).join("")}
+      </div>
+      ${currentPlan
+        ? `<button class="button ghost full" type="button" disabled>Current Plan</button>`
+        : free
+          ? `<button class="button ghost full" type="button" disabled>Free Included</button>`
+          : `<button class="button full" type="button" data-plan-select="${id}">${cta}</button>`}
     </article>
   `;
 }
@@ -573,21 +1376,46 @@ function aboutPage() {
 
 function publicReviewPage() {
   const b = state.business;
+  const draft = state.reviewDraft || {};
+  const categoryMeta = getCategoryMeta(b.category);
+  const services = splitList(b.services, [b.category || "General Service"]).slice(0, 5);
+  const products = splitList(b.serviceTypes, splitList(b.keywords, ["Standard", "Premium", "Custom Requirement"]));
+  const proMax = isProMaxPlan();
+  const customerSubtitle = proMax
+    ? "Choose details and share your genuine experience"
+    : "Share your genuine experience in your own words";
   return `
     <main class="public-body">
       <section class="panel public-card">
-        <button class="button secondary" type="button" data-back-app style="min-height: 42px; margin-bottom: 12px;">Back to Dashboard</button>
+        ${state.isLoggedIn ? `<button class="button secondary public-back" type="button" data-back-app>Back to Dashboard</button>` : ""}
+        ${b.logo ? `<img class="public-logo" src="${escapeHtml(b.logo)}" alt="${escapeHtml(b.name)}" />` : ""}
         <div class="brand-big">RevYne</div>
         <p class="hint">Turn experiences into clear, honest reviews</p>
         <div class="business-box">
           <h1>${escapeHtml(b.name)}</h1>
-          <p class="hint">Select stars for professional ideas</p>
+          <p class="hint">${customerSubtitle}</p>
         </div>
         <div class="stars">${stars("rating")}</div>
-        <textarea id="reviewText" class="textarea" placeholder="Describe your genuine experience to see suggestions..."></textarea>
-        <button class="button full" type="button" data-generate-review>Ready to Review</button>
+        ${proMax ? `
+          <div class="review-customizer">
+            <div class="field">
+              <label for="reviewService">What service did you use?</label>
+              <select id="reviewService" class="select" data-review-draft="service">
+                ${selectOptions(services, draft.service, "Select service")}
+              </select>
+            </div>
+            <div class="field">
+              <label for="reviewProduct">Which ${escapeHtml(categoryMeta.typeLabel.toLowerCase())}?</label>
+              <select id="reviewProduct" class="select" data-review-draft="product">
+                ${selectOptions(products, draft.product, `Select ${categoryMeta.typeLabel.toLowerCase()}`)}
+              </select>
+            </div>
+          </div>
+        ` : ""}
+        <textarea id="reviewText" class="textarea" placeholder="Tell us what actually happened..." data-review-draft="experience">${escapeHtml(draft.experience || "")}</textarea>
+        <button class="button full" type="button" data-generate-review>Generate My Review</button>
         ${suggestionList(state.suggestions, true)}
-        <p class="hint" style="margin-top: 28px;">Only post reviews based on your genuine experience.</p>
+        <p class="public-footnote">AI helps with wording only. Please edit and post only what matches your real experience.</p>
       </section>
       <div class="copy-toast"></div>
     </main>
@@ -673,7 +1501,7 @@ function googleProfileSetupPage() {
 
       <div class="panel auth-card auth-profile-card">
         <h2>Set Up Your Profile</h2>
-        <p class="auth-sub">This static MVP stores your login profile locally on this device.</p>
+        <p class="auth-sub">${supabaseClient ? "This information will be saved to your RevYne account." : "This static MVP stores your login profile locally on this device."}</p>
 
         <div class="field">
           <label for="google-name">Full Name *</label>
@@ -711,6 +1539,9 @@ function profilePage() {
   const displayEmail = u.email || "demo@revyne.app";
   const displayMobile = u.mobile || b.mobile;
   const initial = displayName ? displayName.charAt(0).toUpperCase() : "U";
+  const avatar = b.logo
+    ? `<div class="profile-avatar has-image"><img src="${escapeHtml(b.logo)}" alt="Profile" /></div>`
+    : `<div class="profile-avatar">${escapeHtml(initial)}</div>`;
   const items = [
     { icon: "i", label: "About RevYne", view: "about", color: "#e5eeff", fg: "var(--blue)" },
     { icon: "↻", label: "Order History", view: "orders", color: "#e5eeff", fg: "var(--blue)" },
@@ -721,7 +1552,7 @@ function profilePage() {
   return `
     <section class="profile-page">
       <div class="profile-hero">
-        <div class="profile-avatar">${escapeHtml(initial)}</div>
+        ${avatar}
         <div class="profile-name">${escapeHtml(displayName)}</div>
         <div class="profile-email">${escapeHtml(displayEmail)}</div>
         ${displayMobile ? `<div class="profile-email">${escapeHtml(displayMobile)}</div>` : ""}
@@ -745,14 +1576,14 @@ function profilePage() {
 }
 
 function currentPage() {
-  if (location.hash === "#review") return publicReviewPage();
+  if (isPublicReviewRoute()) return publicReviewPage();
   if (!state.isLoggedIn) return authPage();
 
   const pages = {
     dashboard: dashboardPage,
     business: businessPage,
     reply: replyPage,
-    pricing: pricingPage,
+    pricing: pricingPageV2,
     orders: ordersPage,
     about: aboutPage,
     profile: profilePage
@@ -777,6 +1608,24 @@ function bindEvents() {
     input.addEventListener("input", () => updateUserField(input.dataset.userField, input.value));
   });
 
+  document.querySelector("[data-profile-image]")?.addEventListener("change", (event) => {
+    handleProfileImageUpload(event.target.files?.[0]);
+  });
+
+  document.querySelectorAll("[data-reply-draft]").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.replyDraft[input.dataset.replyDraft] = input.value;
+      saveState();
+    });
+  });
+
+  document.querySelectorAll("[data-review-draft]").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.reviewDraft[input.dataset.reviewDraft] = input.value;
+      saveState();
+    });
+  });
+
   document.querySelectorAll("[data-chip-field]").forEach((button) => {
     button.addEventListener("click", () => {
       updateBusinessField(button.dataset.chipField, button.dataset.chipValue);
@@ -786,7 +1635,10 @@ function bindEvents() {
 
   document.querySelectorAll("[data-star]").forEach((button) => {
     button.addEventListener("click", () => {
+      if (button.dataset.starField === "replyRating") preserveReplyDraftFromDom();
+      if (button.dataset.starField === "rating") preserveReviewDraftFromDom();
       state[button.dataset.starField] = Number(button.dataset.star);
+      syncBottomNavPosition();
       saveState();
       render();
     });
@@ -795,23 +1647,29 @@ function bindEvents() {
   document.querySelector("[data-generate-review]")?.addEventListener("click", createReviewSuggestions);
   document.querySelector("[data-generate-reply]")?.addEventListener("click", createSmartReplies);
 
-  document.querySelector("[data-save-mobile]")?.addEventListener("click", () => {
+  document.querySelector("[data-save-mobile]")?.addEventListener("click", async () => {
     const mobile = state.business.mobile.trim();
     if (!/^\d{10}$/.test(mobile)) {
       showToast("Please enter a valid 10-digit mobile number");
       return;
     }
     state.user.mobile = mobile;
+    const saved = await saveSupabaseProfile();
+    if (!saved) return;
     saveState();
     showToast("Mobile number saved");
   });
 
-  document.querySelector("[data-save-profile]")?.addEventListener("click", () => {
+  document.querySelector("[data-save-profile]")?.addEventListener("click", async () => {
     const b = state.business;
     if (!b.name.trim() || !b.category.trim() || !b.googleUrl.trim()) {
       showToast("Please fill in all required fields (Name, Category, Google URL)");
       return;
     }
+    const profileSaved = await saveSupabaseProfile();
+    if (!profileSaved) return;
+    const businessSaved = await saveSupabaseBusiness();
+    if (!businessSaved) return;
     showToast("Profile updated");
   });
 
@@ -822,20 +1680,7 @@ function bindEvents() {
     render();
   });
 
-  document.querySelector("[data-auth-google]")?.addEventListener("click", () => {
-    if (state.user.provider === "google" && state.user.email) {
-      state.isLoggedIn = true;
-      state.view = "dashboard";
-      state.user.lastLogin = new Date().toISOString();
-      saveState();
-      render();
-      return;
-    }
-
-    state.authMode = "google-profile";
-    saveState();
-    render();
-  });
+  document.querySelector("[data-auth-google]")?.addEventListener("click", signInWithGoogle);
 
   document.querySelector("[data-auth-save-profile]")?.addEventListener("click", completeGoogleProfile);
 
@@ -853,14 +1698,14 @@ function bindEvents() {
     render();
   });
 
-  document.querySelectorAll(".logout, [data-logout]").forEach((button) => {
+  document.querySelectorAll("[data-plan-select]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.isLoggedIn = false;
-      state.authMode = "signin";
-      state.view = "dashboard";
-      saveState();
-      render();
+      showToast("Payment checkout will be connected next");
     });
+  });
+
+  document.querySelectorAll(".logout, [data-logout]").forEach((button) => {
+    button.addEventListener("click", signOut);
   });
 
   document.querySelectorAll("[data-copy]").forEach((button) => {
@@ -872,7 +1717,11 @@ function bindEvents() {
   });
 }
 
-function render() {
+async function render() {
+  if (isPublicReviewRoute()) {
+    await loadPublicReviewBusiness();
+  }
+
   const dir = slideDirection;
   slideDirection = null;
   document.querySelector("#app").innerHTML = currentPage();
@@ -886,4 +1735,31 @@ function render() {
 }
 
 window.addEventListener("hashchange", render);
-render();
+
+async function initializeApp() {
+  if (!supabaseClient) {
+    render();
+    return;
+  }
+
+  render();
+
+  try {
+    const { data } = await supabaseClient.auth.getSession();
+    await applySupabaseSession(data.session);
+    render();
+  } catch (error) {
+    console.warn("Could not restore Supabase session:", error);
+  }
+
+  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+    try {
+      await applySupabaseSession(session);
+    } catch (error) {
+      console.warn("Could not apply Supabase session:", error);
+    }
+    render();
+  });
+}
+
+initializeApp();
