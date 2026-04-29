@@ -476,6 +476,15 @@ function getReviewUrl() {
   return `${location.origin}${location.pathname}#review${suffix}`;
 }
 
+function getQrFileName() {
+  const base = (state.business.name || "revyne-review")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 42);
+  return `${base || "revyne-review"}-qr.png`;
+}
+
 function getPublicReviewToken() {
   const match = location.hash.match(/^#review\/([0-9a-f-]{36})$/i);
   return match ? match[1] : "";
@@ -850,6 +859,130 @@ function showToast(message) {
   setTimeout(() => toast.classList.remove("show"), 1400);
 }
 
+function renderQrCodes() {
+  document.querySelectorAll("[data-qr-code]").forEach((canvas) => {
+    const text = canvas.dataset.qrCode;
+    if (!text) return;
+
+    if (!window.QRCode?.toCanvas) {
+      const attempts = Number(canvas.dataset.qrAttempts || "0");
+      if (attempts < 8) {
+        canvas.dataset.qrAttempts = String(attempts + 1);
+        setTimeout(renderQrCodes, 300);
+        return;
+      }
+
+      const fallback = document.createElement("img");
+      fallback.className = "qr-canvas";
+      fallback.alt = "Review QR code";
+      fallback.dataset.qrImage = "fallback";
+      fallback.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(text)}`;
+      canvas.replaceWith(fallback);
+      return;
+    }
+
+    window.QRCode.toCanvas(canvas, text, {
+      width: 220,
+      margin: 2,
+      color: {
+        dark: "#111827",
+        light: "#ffffff"
+      }
+    }, (error) => {
+      if (error) {
+        console.warn("Could not render QR code:", error);
+        showToast("Could not create QR code");
+      }
+    });
+  });
+}
+
+function downloadReviewQr() {
+  const canvas = document.querySelector("[data-qr-code]");
+  const fallbackImage = document.querySelector("[data-qr-image='fallback']");
+  if (fallbackImage) {
+    const link = document.createElement("a");
+    link.href = fallbackImage.src;
+    link.download = getQrFileName();
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.click();
+    return;
+  }
+
+  if (!canvas) {
+    showToast("QR code not ready");
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.href = canvas.toDataURL("image/png");
+  link.download = getQrFileName();
+  link.click();
+}
+
+function printReviewQr() {
+  const canvas = document.querySelector("[data-qr-code]");
+  const fallbackImage = document.querySelector("[data-qr-image='fallback']");
+  if (!canvas && !fallbackImage) {
+    showToast("QR code not ready");
+    return;
+  }
+
+  const imageUrl = fallbackImage ? fallbackImage.src : canvas.toDataURL("image/png");
+  const reviewUrl = escapeHtml(getReviewUrl());
+  const businessName = escapeHtml(state.business.name || "RevYne");
+  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=720,height=900");
+  if (!printWindow) {
+    showToast("Allow popups to print QR");
+    return;
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>${businessName} Review QR</title>
+        <style>
+          body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: Arial, sans-serif;
+            color: #111827;
+          }
+          .card {
+            width: min(420px, 90vw);
+            text-align: center;
+            border: 1px solid #d8dde8;
+            border-radius: 18px;
+            padding: 34px 28px;
+          }
+          h1 { margin: 0 0 8px; font-size: 26px; }
+          p { margin: 0 0 22px; color: #4b5563; }
+          img { width: 260px; height: 260px; }
+          .url { margin-top: 20px; font-size: 12px; word-break: break-all; color: #6b7280; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h1>Review ${businessName}</h1>
+          <p>Scan to share your genuine experience.</p>
+          <img src="${imageUrl}" alt="Review QR code" />
+          <div class="url">${reviewUrl}</div>
+        </div>
+        <script>
+          window.onload = () => {
+            window.print();
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
 function navIcon(view) {
   const paths = {
     dashboard: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
@@ -917,6 +1050,8 @@ function navButton(label, view) {
 }
 
 function dashboardPage() {
+  const reviewUrl = getReviewUrl();
+  const hasPublicToken = Boolean(state.business.publicToken);
   const reviews = [
     { initials: "RK", name: "Rahul K.", time: "2 hours ago", platform: "Google", stars: 5, text: "Outstanding driver service! Very professional, punctual and courteous throughout the trip. Will definitely book again." },
     { initials: "PS", name: "Priya S.", time: "5 hours ago", platform: "Google", stars: 4, text: "Good experience overall. The driver was polite and the car was clean. Minor delay at pickup but otherwise smooth." },
@@ -972,13 +1107,22 @@ function dashboardPage() {
         ${reviews.map((review) => reviewCard(review)).join("")}
       </div>
 
-      <div class="panel review-link-panel">
-        <h3>Your Review Link</h3>
-        <p class="hint">Share on WhatsApp, SMS, invoices &amp; QR posters.</p>
-        <input class="input" readonly value="${escapeHtml(getReviewUrl())}" style="margin:12px 0;" />
-        <div class="option-row">
-          <button class="button" type="button" data-copy="${escapeHtml(getReviewUrl())}">Copy Link</button>
-          <button class="button ghost" type="button" data-view="public">Preview Page</button>
+      <div class="panel review-link-panel qr-panel">
+        <div class="qr-panel-copy">
+          <h3>Your Review QR</h3>
+          <p class="hint">Put this on bills, WhatsApp messages, front desk posters, and delivery cards.</p>
+          ${hasPublicToken ? "" : `<p class="qr-warning">Save your business profile once to create a permanent public review link.</p>`}
+          <input class="input" readonly value="${escapeHtml(reviewUrl)}" style="margin:12px 0;" />
+          <div class="option-row qr-actions">
+            <button class="button" type="button" data-copy="${escapeHtml(reviewUrl)}">Copy Link</button>
+            <button class="button secondary" type="button" data-download-qr>Download QR</button>
+            <button class="button ghost" type="button" data-print-qr>Print QR</button>
+            <button class="button ghost" type="button" data-view="public">Preview Page</button>
+          </div>
+        </div>
+        <div class="qr-preview-card">
+          <canvas class="qr-canvas" data-qr-code="${escapeHtml(reviewUrl)}" width="220" height="220"></canvas>
+          <span>Scan to review</span>
         </div>
       </div>
     </section>
@@ -1712,6 +1856,9 @@ function bindEvents() {
     button.addEventListener("click", () => copyText(button.dataset.copy));
   });
 
+  document.querySelector("[data-download-qr]")?.addEventListener("click", downloadReviewQr);
+  document.querySelector("[data-print-qr]")?.addEventListener("click", printReviewQr);
+
   document.querySelectorAll("[data-open-google]").forEach((button) => {
     button.addEventListener("click", () => window.open(state.business.googleUrl, "_blank", "noopener"));
   });
@@ -1732,6 +1879,7 @@ async function render() {
   }
 
   bindEvents();
+  renderQrCodes();
 }
 
 window.addEventListener("hashchange", render);

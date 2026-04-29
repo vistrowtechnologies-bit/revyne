@@ -1386,6 +1386,77 @@ button {
   font-weight: 800;
 }
 
+.qr-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 22px;
+  align-items: center;
+}
+
+.qr-panel-copy {
+  min-width: 0;
+}
+
+.qr-warning {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7e6;
+  color: #8a5a00;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.qr-actions {
+  flex-wrap: wrap;
+}
+
+.qr-actions .button {
+  min-height: 46px;
+  border-radius: 12px;
+  padding: 0 18px;
+  font-size: 13px;
+}
+
+.qr-preview-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #e1e6ef;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff, #f8f6ff);
+}
+
+.qr-canvas {
+  display: block;
+  width: 220px;
+  height: 220px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.qr-preview-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.qr-fallback {
+  width: 220px;
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border-radius: 14px;
+  background: #f4f6fb;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+}
+
 .about {
   background: #f8fafc;
   min-height: 100%;
@@ -1485,6 +1556,15 @@ button {
   .dashboard-grid,
   .pricing-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .qr-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .qr-preview-card {
+    justify-self: center;
+    width: min(100%, 300px);
   }
 
   .main {
