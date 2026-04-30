@@ -26,6 +26,7 @@ body {
   color: var(--ink);
   background: var(--canvas);
   overflow-x: hidden;
+  width: 100%;
 }
 
 button,
@@ -43,6 +44,7 @@ button {
   min-height: 100vh;
   display: grid;
   grid-template-rows: 72px 1fr;
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -885,7 +887,9 @@ button {
 .bottom-nav {
   display: none;
   position: fixed;
-  bottom: 0; left: 0; right: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   height: 72px;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(16px);
@@ -894,6 +898,7 @@ button {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: center;
   padding: 8px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 0));
   z-index: 50;
   box-shadow: 0 -4px 16px rgba(129, 39, 207, 0.06);
   --from-index: 0;
@@ -1549,8 +1554,19 @@ button {
 }
 
 @media (max-width: 900px) {
+  html,
+  body,
+  #app {
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+
   .app-shell {
-    grid-template-rows: auto 1fr;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .pricing-intro {
@@ -1584,7 +1600,8 @@ button {
 
   .layout {
     grid-template-columns: 1fr;
-    min-height: auto;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .side-hero {
@@ -1611,12 +1628,15 @@ button {
 
   .main {
     padding: 28px 22px 96px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    min-height: 0;
   }
 }
 
 @media (max-width: 640px) {
   .app-shell {
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .topbar-main {
@@ -1629,7 +1649,7 @@ button {
   }
 
   .layout {
-    min-height: auto;
+    min-height: 0;
   }
 
   .side-hero {
@@ -1645,7 +1665,7 @@ button {
   }
 
   .main {
-    padding: 20px 14px 96px;
+    padding: 16px 14px 88px;
   }
 
   .page-title {
@@ -1655,6 +1675,74 @@ button {
   .page-subtitle {
     margin-bottom: 24px;
     font-size: 14px;
+  }
+
+  .pricing-intro {
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .pricing-intro .page-title {
+    font-size: 25px;
+    line-height: 1.18;
+  }
+
+  .pricing-intro .page-subtitle {
+    margin-bottom: 0;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .pricing-note {
+    padding: 14px 16px;
+  }
+
+  .pricing-grid {
+    gap: 14px;
+  }
+
+  .price-card {
+    padding: 18px;
+  }
+
+  .plan-description {
+    min-height: auto;
+    margin-bottom: 12px;
+  }
+
+  .price {
+    min-height: auto;
+    margin-bottom: 14px;
+  }
+
+  .feature {
+    margin: 9px 0;
+  }
+
+  .profile-page {
+    max-width: none;
+  }
+
+  .profile-hero {
+    margin: -16px -14px 18px;
+    padding: 28px 20px 26px;
+    border-radius: 0 0 22px 22px;
+  }
+
+  .profile-avatar {
+    width: 72px;
+    height: 72px;
+    margin-bottom: 12px;
+    font-size: 29px;
+  }
+
+  .profile-name {
+    font-size: 19px;
+  }
+
+  .profile-menu-item {
+    padding: 14px 18px;
+    min-height: 66px;
   }
 
   .form-panel,

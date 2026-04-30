@@ -1,9 +1,0 @@
-node_modules/
-.vercel/
-.env
-.env.*
-*.log
-*.tmp
-Thumbs.db
-
-.vercel

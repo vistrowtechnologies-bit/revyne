@@ -1,9 +1,0 @@
-node_modules/
-supabase/
-.claude/
-.git/
-package.json
-package-lock.json
-.env
-.env.*
-*.log
