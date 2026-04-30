@@ -73,22 +73,22 @@ const defaultState = {
   business: {
     id: "",
     publicToken: "",
-    name: "Driver On Hire - Professional Driver Service in Pune",
-    category: "Driver Service",
-    city: "Pune",
-    googleUrl: "https://www.google.com/search?q=google+business+review",
+    name: "",
+    category: "",
+    city: "",
+    googleUrl: "",
     logo: "",
-    services: "airport pickup, hourly driver, outstation trip, professional chauffeur",
+    services: "",
     serviceTypes: "",
-    keywords: "professional driver, driver on hire, Pune driver service",
+    keywords: "",
     language: "English",
     tone: "Professional",
     mobile: ""
   },
   stats: {
-    scans: 184,
-    generated: 91,
-    copied: 63
+    scans: 0,
+    generated: 0,
+    copied: 0
   },
   suggestions: [],
   smartReplies: [],
@@ -109,6 +109,22 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function emptyBusiness(overrides = {}) {
+  return {
+    ...clone(defaultState.business),
+    ...overrides
+  };
+}
+
+function isDemoBusiness(business = state.business, stats = state.stats) {
+  return !business?.id && !business?.publicToken && stats?.scans === 184 && stats?.generated === 91;
+}
+
+function hasBusinessProfile() {
+  const b = state.business || {};
+  return Boolean(b.id && b.publicToken && b.name && b.googleUrl);
+}
+
 function loadState() {
   const freshState = clone(defaultState);
   const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -116,7 +132,7 @@ function loadState() {
 
   try {
     const parsed = JSON.parse(saved);
-    return {
+    const merged = {
       ...freshState,
       ...parsed,
       user: { ...freshState.user, ...(parsed.user || {}) },
@@ -125,6 +141,15 @@ function loadState() {
       reviewDraft: { ...freshState.reviewDraft, ...(parsed.reviewDraft || {}) },
       replyDraft: { ...freshState.replyDraft, ...(parsed.replyDraft || {}) }
     };
+    if (isDemoBusiness(merged.business, merged.stats)) {
+      merged.business = emptyBusiness({
+        mobile: merged.user.mobile || ""
+      });
+      merged.stats = clone(defaultState.stats);
+      merged.suggestions = [];
+      merged.smartReplies = [];
+    }
+    return merged;
   } catch {
     return freshState;
   }
@@ -235,9 +260,9 @@ function trimToFiveList(value) {
 function getSupabaseUserProfile(user) {
   const metadata = user.user_metadata || {};
   return {
-    name: metadata.full_name || metadata.name || state.user.name,
-    email: user.email || state.user.email,
-    mobile: state.user.mobile,
+    name: metadata.full_name || metadata.name || "",
+    email: user.email || "",
+    mobile: "",
     provider: "google",
     lastLogin: new Date().toISOString()
   };
@@ -253,10 +278,19 @@ async function applySupabaseSession(session) {
     return;
   }
 
-  state.user = { ...state.user, ...getSupabaseUserProfile(session.user) };
+  state.user = {
+    ...clone(defaultState.user),
+    ...getSupabaseUserProfile(session.user),
+    plan: state.user.plan || "free"
+  };
+  state.business = emptyBusiness();
+  state.stats = clone(defaultState.stats);
+  state.suggestions = [];
+  state.smartReplies = [];
   state.isLoggedIn = true;
   state.authMode = "signin";
   await loadSupabaseProfile();
+  await saveSupabaseProfile();
   await loadSupabaseBusiness();
   saveState();
 }
@@ -266,15 +300,15 @@ async function loadSupabaseProfile() {
 
   const { data } = await supabaseClient
     .from("profiles")
-    .select("full_name,email,mobile")
+    .select("full_name,email,mobile,plan,plan_status")
     .eq("id", currentSession.user.id)
     .maybeSingle();
 
   if (!data) return;
-    state.user.name = data.full_name || state.user.name;
-    state.user.email = data.email || state.user.email;
-    state.user.mobile = data.mobile || state.user.mobile;
-    state.user.plan = data.plan || state.user.plan || "free";
+  state.user.name = data.full_name || state.user.name;
+  state.user.email = data.email || state.user.email;
+  state.user.mobile = data.mobile || state.user.mobile;
+  state.user.plan = data.plan || state.user.plan || "free";
   if (data.mobile) state.business.mobile = data.mobile;
 }
 
@@ -289,17 +323,22 @@ async function loadSupabaseBusiness() {
     .limit(1)
     .maybeSingle();
 
-  if (!data) return;
+  if (!data) {
+    state.business = emptyBusiness({
+      mobile: state.user.mobile || ""
+    });
+    return;
+  }
   state.business = {
-    ...state.business,
+    ...emptyBusiness(),
     id: data.id,
     publicToken: data.public_token || state.business.publicToken,
-    name: data.name || state.business.name,
-    category: data.category || state.business.category,
+    name: data.name || "",
+    category: data.category || "",
     city: data.city || "",
     googleUrl: data.google_review_url || "",
     services: data.services || "",
-    serviceTypes: state.business.serviceTypes || "",
+    serviceTypes: data.service_types || "",
     keywords: data.keywords || "",
     language: data.language || "English",
     tone: data.tone || "Professional",
@@ -390,9 +429,10 @@ async function signInWithGoogle() {
 }
 
 async function signOut() {
-  state.isLoggedIn = false;
-  state.authMode = "signin";
-  state.view = "dashboard";
+  const nextState = clone(defaultState);
+  nextState.authMode = "signin";
+  state = nextState;
+  currentSession = null;
   saveState();
   render();
 
@@ -663,8 +703,6 @@ async function completeGoogleProfile() {
   state.view = "dashboard";
   const profileSaved = await saveSupabaseProfile();
   if (!profileSaved) return;
-  const businessSaved = await saveSupabaseBusiness();
-  if (!businessSaved) return;
   saveState();
   render();
 }
@@ -848,6 +886,43 @@ async function copyText(text) {
   state.stats.copied += 1;
   saveState();
   showToast("Copied");
+}
+
+async function startPlanCheckout(plan) {
+  if (!supabaseClient || !currentSession?.user) {
+    showToast("Please login before upgrading");
+    state.authMode = "signin";
+    render();
+    return;
+  }
+
+  const button = document.querySelector(`[data-plan-select="${plan}"]`);
+  const originalText = button?.textContent || "Upgrade";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Opening checkout...";
+  }
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("create-razorpay-subscription", {
+      body: {
+        plan,
+        returnUrl: `${location.origin}${location.pathname}`
+      }
+    });
+
+    if (error) throw error;
+    if (!data?.shortUrl) throw new Error("Checkout link was not created");
+
+    window.location.href = data.shortUrl;
+  } catch (error) {
+    console.error("Checkout error:", error);
+    showToast(error.message || "Could not open checkout");
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
 }
 
 function showToast(message) {
@@ -1048,55 +1123,65 @@ function appShell(content) {
 function navButton(label, view) {
   return `<button class="${state.view === view ? "active" : ""}" type="button" data-view="${view}">${label}</button>`;
 }
-
 function dashboardPage() {
+  return dashboardPageClean();
+}
+
+function dashboardPageClean() {
   const reviewUrl = getReviewUrl();
+  const hasBusiness = hasBusinessProfile();
   const hasPublicToken = Boolean(state.business.publicToken);
-  const reviews = [
-    { initials: "RK", name: "Rahul K.", time: "2 hours ago", platform: "Google", stars: 5, text: "Outstanding driver service! Very professional, punctual and courteous throughout the trip. Will definitely book again." },
-    { initials: "PS", name: "Priya S.", time: "5 hours ago", platform: "Google", stars: 4, text: "Good experience overall. The driver was polite and the car was clean. Minor delay at pickup but otherwise smooth." },
-    { initials: "AM", name: "Amit M.", time: "Yesterday", platform: "Google", stars: 5, text: "Excellent chauffeur service for our outstation trip. Driver knew the route well and was very responsible." }
-  ];
 
   return `
     <section class="dash-wrap">
       <div class="dash-welcome">
         <h2 class="dash-title">Dashboard</h2>
-        <p class="dash-sub">Welcome back. Your reputation is growing. Current plan: ${escapeHtml((state.user.plan || "free").toUpperCase())}</p>
+        <p class="dash-sub">${hasBusiness ? "Welcome back. Your reputation workspace is ready." : "Welcome. Add your business profile to start collecting real customer reviews."} Current plan: ${escapeHtml((state.user.plan || "free").toUpperCase())}</p>
       </div>
+
+      ${hasBusiness ? "" : `
+        <div class="panel onboarding-panel">
+          <div>
+            <p class="eyebrow">First step</p>
+            <h3>Add your business details</h3>
+            <p>Once you save your business profile, RevYne will create your public review link and QR code for customers.</p>
+          </div>
+          <button class="button" type="button" data-view="business">Add Business Profile</button>
+        </div>
+      `}
 
       <div class="dash-metrics">
         <div class="panel metric-wide">
           <div>
             <div class="metric-label">Average Rating</div>
             <div class="metric-big-row">
-              <span class="metric-big">4.8</span>
-              <span class="metric-stars">${"★".repeat(5)}</span>
+              <span class="metric-big">${hasBusiness ? "0.0" : "--"}</span>
+              <span class="metric-stars">${hasBusiness ? "No reviews yet" : "Not started"}</span>
             </div>
           </div>
-          <div class="metric-icon-circle">↑</div>
+          <div class="metric-icon-circle">+</div>
         </div>
         <div class="panel metric-half">
           <div class="metric-label">Total Reviews</div>
-          <div class="metric-num">${state.stats.scans + 1064}</div>
-          <div class="metric-trend positive">+12 this week</div>
+          <div class="metric-num">${state.stats.scans}</div>
+          <div class="metric-trend positive">${hasBusiness ? "Ready to collect" : "Create profile first"}</div>
         </div>
         <div class="panel metric-half">
           <div class="metric-label">AI Replies</div>
-          <div class="metric-num">${state.stats.generated + 801}</div>
-          <div class="metric-trend brand">72% Auto-pilot</div>
+          <div class="metric-num">${state.stats.generated}</div>
+          <div class="metric-trend brand">${hasBusiness ? "Available" : "Waiting for reviews"}</div>
         </div>
       </div>
 
       <div class="ai-spotlight">
         <div class="ai-spotlight-inner">
-          <div class="ai-icon-box">✦</div>
+          <div class="ai-icon-box">&#10022;</div>
           <div>
-            <div class="ai-spotlight-title">Smart Reply Ready</div>
-            <p class="ai-spotlight-sub">You have ${reviews.length} pending reviews. Generate professional draft replies instantly.</p>
+            <div class="ai-spotlight-title">${hasBusiness ? "Smart Reply Ready" : "Set Up Before Replies"}</div>
+            <p class="ai-spotlight-sub">${hasBusiness ? "Paste a real customer review and generate professional draft replies instantly." : "Add your business profile first, then use AI replies for real customer reviews."}</p>
           </div>
         </div>
-        <button class="button full" type="button" data-view="reply" style="margin-top:14px;">Generate All Drafts</button>
+        <button class="button full" type="button" data-view="${hasBusiness ? "reply" : "business"}" style="margin-top:14px;">${hasBusiness ? "Generate Reply" : "Add Business Profile"}</button>
       </div>
 
       <div class="recent-reviews">
@@ -1104,27 +1189,32 @@ function dashboardPage() {
           <span class="recent-title">Recent Reviews</span>
           <button class="view-all" type="button">View All</button>
         </div>
-        ${reviews.map((review) => reviewCard(review)).join("")}
+        <div class="panel empty-state">
+          <strong>No reviews yet</strong>
+          <p>Your real customer reviews will appear here after customers start using your review link.</p>
+        </div>
       </div>
 
-      <div class="panel review-link-panel qr-panel">
-        <div class="qr-panel-copy">
-          <h3>Your Review QR</h3>
-          <p class="hint">Put this on bills, WhatsApp messages, front desk posters, and delivery cards.</p>
-          ${hasPublicToken ? "" : `<p class="qr-warning">Save your business profile once to create a permanent public review link.</p>`}
-          <input class="input" readonly value="${escapeHtml(reviewUrl)}" style="margin:12px 0;" />
-          <div class="option-row qr-actions">
-            <button class="button" type="button" data-copy="${escapeHtml(reviewUrl)}">Copy Link</button>
-            <button class="button secondary" type="button" data-download-qr>Download QR</button>
-            <button class="button ghost" type="button" data-print-qr>Print QR</button>
-            <button class="button ghost" type="button" data-view="public">Preview Page</button>
+      ${hasBusiness ? `
+        <div class="panel review-link-panel qr-panel">
+          <div class="qr-panel-copy">
+            <h3>Your Review QR</h3>
+            <p class="hint">Put this on bills, WhatsApp messages, front desk posters, and delivery cards.</p>
+            ${hasPublicToken ? "" : `<p class="qr-warning">Save your business profile once to create a permanent public review link.</p>`}
+            <input class="input" readonly value="${escapeHtml(reviewUrl)}" style="margin:12px 0;" />
+            <div class="option-row qr-actions">
+              <button class="button" type="button" data-copy="${escapeHtml(reviewUrl)}">Copy Link</button>
+              <button class="button secondary" type="button" data-download-qr>Download QR</button>
+              <button class="button ghost" type="button" data-print-qr>Print QR</button>
+              <button class="button ghost" type="button" data-view="public">Preview Page</button>
+            </div>
+          </div>
+          <div class="qr-preview-card">
+            <canvas class="qr-canvas" data-qr-code="${escapeHtml(reviewUrl)}" width="220" height="220"></canvas>
+            <span>Scan to review</span>
           </div>
         </div>
-        <div class="qr-preview-card">
-          <canvas class="qr-canvas" data-qr-code="${escapeHtml(reviewUrl)}" width="220" height="220"></canvas>
-          <span>Scan to review</span>
-        </div>
-      </div>
+      ` : ""}
     </section>
   `;
 }
@@ -1679,8 +1769,8 @@ function googleProfileSetupPage() {
 function profilePage() {
   const b = state.business;
   const u = state.user;
-  const displayName = u.name || b.name || "Your Business";
-  const displayEmail = u.email || "demo@revyne.app";
+  const displayName = u.name || b.name || "Your Profile";
+  const displayEmail = u.email || "Add your email";
   const displayMobile = u.mobile || b.mobile;
   const initial = displayName ? displayName.charAt(0).toUpperCase() : "U";
   const avatar = b.logo
@@ -1724,7 +1814,7 @@ function currentPage() {
   if (!state.isLoggedIn) return authPage();
 
   const pages = {
-    dashboard: dashboardPage,
+    dashboard: dashboardPageClean,
     business: businessPage,
     reply: replyPage,
     pricing: pricingPageV2,
@@ -1733,7 +1823,7 @@ function currentPage() {
     profile: profilePage
   };
 
-  return appShell((pages[state.view] || dashboardPage)());
+  return appShell((pages[state.view] || dashboardPageClean)());
 }
 
 function bindEvents() {
@@ -1835,16 +1925,18 @@ function bindEvents() {
   });
 
   document.querySelector("[data-auth-demo]")?.addEventListener("click", () => {
-    state.isLoggedIn = true;
-    state.view = "dashboard";
-    state.authMode = "signin";
+    const guestState = clone(defaultState);
+    guestState.isLoggedIn = true;
+    guestState.view = "dashboard";
+    guestState.authMode = "signin";
+    state = guestState;
     saveState();
     render();
   });
 
   document.querySelectorAll("[data-plan-select]").forEach((button) => {
     button.addEventListener("click", () => {
-      showToast("Payment checkout will be connected next");
+      startPlanCheckout(button.dataset.planSelect);
     });
   });
 
