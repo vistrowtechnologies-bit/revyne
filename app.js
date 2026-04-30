@@ -68,7 +68,8 @@ const defaultState = {
     mobile: "",
     provider: "",
     lastLogin: "",
-    plan: "free"
+    plan: "free",
+    isAdmin: false
   },
   business: {
     id: "",
@@ -93,6 +94,8 @@ const defaultState = {
   suggestions: [],
   smartReplies: [],
   supportTickets: [],
+  adminTickets: [],
+  adminTicketFilter: "open",
   reviewDraft: {
     service: "",
     product: "",
@@ -140,6 +143,8 @@ function loadState() {
       business: { ...freshState.business, ...(parsed.business || {}) },
       stats: { ...freshState.stats, ...(parsed.stats || {}) },
       supportTickets: Array.isArray(parsed.supportTickets) ? parsed.supportTickets : [],
+      adminTickets: Array.isArray(parsed.adminTickets) ? parsed.adminTickets : [],
+      adminTicketFilter: parsed.adminTicketFilter || freshState.adminTicketFilter,
       reviewDraft: { ...freshState.reviewDraft, ...(parsed.reviewDraft || {}) },
       replyDraft: { ...freshState.replyDraft, ...(parsed.replyDraft || {}) }
     };
@@ -290,12 +295,14 @@ async function applySupabaseSession(session) {
   state.suggestions = [];
   state.smartReplies = [];
   state.supportTickets = [];
+  state.adminTickets = [];
   state.isLoggedIn = true;
   state.authMode = "signin";
   await loadSupabaseProfile();
   await saveSupabaseProfile();
   await loadSupabaseBusiness();
   await loadSupportTickets();
+  if (state.user.isAdmin) await loadAdminTickets();
   saveState();
 }
 
@@ -304,7 +311,7 @@ async function loadSupabaseProfile() {
 
   const { data } = await supabaseClient
     .from("profiles")
-    .select("full_name,email,mobile,plan,plan_status")
+    .select("full_name,email,mobile,plan,plan_status,is_admin")
     .eq("id", currentSession.user.id)
     .maybeSingle();
 
@@ -313,6 +320,7 @@ async function loadSupabaseProfile() {
   state.user.email = data.email || state.user.email;
   state.user.mobile = data.mobile || state.user.mobile;
   state.user.plan = data.plan || state.user.plan || "free";
+  state.user.isAdmin = Boolean(data.is_admin);
   if (data.mobile) state.business.mobile = data.mobile;
 }
 
@@ -366,6 +374,31 @@ async function loadSupportTickets() {
   }
 
   state.supportTickets = data || [];
+  saveState();
+}
+
+async function loadAdminTickets() {
+  if (!supabaseClient || !currentSession?.user || !state.user.isAdmin) return;
+
+  const filter = state.adminTicketFilter || "open";
+  let query = supabaseClient
+    .from("support_tickets")
+    .select("id,user_id,business_id,customer_name,customer_email,subject,category,priority,status,message,admin_response,assigned_to,created_at,updated_at,resolved_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (filter !== "all") {
+    query = query.eq("status", filter);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.warn("Could not load admin tickets:", error);
+    showToast(error.message || "Could not load admin tickets");
+    return;
+  }
+
+  state.adminTickets = data || [];
   saveState();
 }
 
@@ -493,6 +526,53 @@ async function createSupportTicket() {
       button.textContent = "Submit Ticket";
     }
   }
+}
+
+async function updateAdminTicket(ticketId) {
+  if (!supabaseClient || !currentSession?.user || !state.user.isAdmin) {
+    showToast("Admin access required");
+    return;
+  }
+
+  const card = document.querySelector(`[data-admin-ticket-card="${ticketId}"]`);
+  const status = card?.querySelector("[data-admin-ticket-status]")?.value || "open";
+  const priority = card?.querySelector("[data-admin-ticket-priority]")?.value || "normal";
+  const assignedTo = card?.querySelector("[data-admin-ticket-assigned]")?.value.trim() || "";
+  const response = card?.querySelector("[data-admin-ticket-response]")?.value.trim() || "";
+
+  const payload = {
+    status,
+    priority,
+    assigned_to: assignedTo || null,
+    admin_response: response || null,
+    updated_at: new Date().toISOString(),
+    resolved_at: status === "resolved" || status === "closed" ? new Date().toISOString() : null
+  };
+
+  const button = card?.querySelector("[data-admin-save-ticket]");
+  const oldText = button?.textContent || "Save";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Saving...";
+  }
+
+  const { error } = await supabaseClient
+    .from("support_tickets")
+    .update(payload)
+    .eq("id", ticketId);
+
+  if (error) {
+    showToast(error.message || "Could not update ticket");
+    if (button) {
+      button.disabled = false;
+      button.textContent = oldText;
+    }
+    return;
+  }
+
+  showToast("Ticket updated");
+  await loadAdminTickets();
+  render();
 }
 
 async function signInWithGoogle() {
@@ -1947,6 +2027,108 @@ function ticketCard(ticket) {
   `;
 }
 
+function adminSupportPage() {
+  if (!state.user.isAdmin) {
+    return `
+      <section class="panel form-panel">
+        <h1 class="page-title">Admin Support</h1>
+        <p class="page-subtitle">Admin access is required to view this page.</p>
+      </section>
+    `;
+  }
+
+  const tickets = state.adminTickets || [];
+  const counts = {
+    open: tickets.filter((ticket) => ticket.status === "open").length,
+    inReview: tickets.filter((ticket) => ticket.status === "in_review").length,
+    waiting: tickets.filter((ticket) => ticket.status === "waiting_customer").length,
+    resolved: tickets.filter((ticket) => ticket.status === "resolved" || ticket.status === "closed").length
+  };
+
+  return `
+    <section class="admin-support-page">
+      <div class="support-hero panel">
+        <div>
+          <p class="section-kicker">Internal Admin</p>
+          <h1>Support Queue</h1>
+          <p>Review customer issues, reply from one place, assign owners, and move tickets through the resolution flow.</p>
+        </div>
+        <div class="support-sla">
+          <strong>${tickets.length} visible</strong>
+          <span>Filter: ${escapeHtml(state.adminTicketFilter || "open")}</span>
+        </div>
+      </div>
+
+      <div class="admin-ticket-stats">
+        <div class="panel"><strong>${counts.open}</strong><span>Open</span></div>
+        <div class="panel"><strong>${counts.inReview}</strong><span>In review</span></div>
+        <div class="panel"><strong>${counts.waiting}</strong><span>Waiting</span></div>
+        <div class="panel"><strong>${counts.resolved}</strong><span>Done</span></div>
+      </div>
+
+      <section class="panel admin-toolbar">
+        <label for="admin-ticket-filter">Status filter</label>
+        <select id="admin-ticket-filter" class="select" data-admin-filter>
+          ${selectOptions(["open", "in_review", "waiting_customer", "resolved", "closed", "all"], state.adminTicketFilter || "open", "")}
+        </select>
+        <button class="button secondary" type="button" data-admin-refresh-tickets>Refresh Queue</button>
+      </section>
+
+      <section class="admin-ticket-list">
+        ${tickets.length ? tickets.map(adminTicketCard).join("") : `
+          <div class="panel empty-state">
+            <strong>No tickets in this filter</strong>
+            <p>Change the filter or refresh the queue.</p>
+          </div>
+        `}
+      </section>
+    </section>
+  `;
+}
+
+function adminTicketCard(ticket) {
+  const created = ticket.created_at ? new Date(ticket.created_at).toLocaleString("en-IN") : "";
+  return `
+    <article class="panel admin-ticket-card" data-admin-ticket-card="${escapeHtml(ticket.id)}">
+      <div class="ticket-card-head">
+        <div>
+          <h3>${escapeHtml(ticket.subject || "Support ticket")}</h3>
+          <p>${escapeHtml(ticket.customer_name || "Customer")} &middot; ${escapeHtml(ticket.customer_email || "No email")} &middot; ${created}</p>
+        </div>
+        <span class="ticket-status status-${escapeHtml(ticket.status || "open")}">${escapeHtml((ticket.status || "open").replaceAll("_", " "))}</span>
+      </div>
+      <p class="ticket-message">${escapeHtml(ticket.message || "")}</p>
+      <div class="ticket-meta">
+        <span>Category: ${escapeHtml(ticket.category || "general")}</span>
+        <span>Ticket: ${escapeHtml(String(ticket.id || "").slice(0, 8))}</span>
+      </div>
+      <div class="admin-ticket-controls">
+        <div class="field">
+          <label>Status</label>
+          <select class="select" data-admin-ticket-status>
+            ${selectOptions(["open", "in_review", "waiting_customer", "resolved", "closed"], ticket.status || "open", "")}
+          </select>
+        </div>
+        <div class="field">
+          <label>Priority</label>
+          <select class="select" data-admin-ticket-priority>
+            ${selectOptions(["low", "normal", "medium", "high", "urgent"], ticket.priority || "normal", "")}
+          </select>
+        </div>
+        <div class="field">
+          <label>Assigned to</label>
+          <input class="input" value="${escapeHtml(ticket.assigned_to || "")}" placeholder="Team member name" data-admin-ticket-assigned />
+        </div>
+      </div>
+      <div class="field">
+        <label>Reply to customer</label>
+        <textarea class="textarea" data-admin-ticket-response placeholder="Write the support reply...">${escapeHtml(ticket.admin_response || "")}</textarea>
+      </div>
+      <button class="button full" type="button" data-admin-save-ticket="${escapeHtml(ticket.id)}">Save Reply & Status</button>
+    </article>
+  `;
+}
+
 function profilePage() {
   const b = state.business;
   const u = state.user;
@@ -1961,6 +2143,7 @@ function profilePage() {
     { icon: "i", label: "About RevYne", view: "about", color: "#e5eeff", fg: "var(--blue)" },
     { icon: "↻", label: "Order History", view: "orders", color: "#e5eeff", fg: "var(--blue)" },
     { icon: "@", label: "Contact Us", view: "support", color: "#e5eeff", fg: "var(--blue)" },
+    ...(u.isAdmin ? [{ icon: "#", label: "Admin Support", view: "adminSupport", color: "#f0dbff", fg: "var(--blue)" }] : []),
     { icon: "≡", label: "Terms & Privacy", view: null, color: "#e5eeff", fg: "var(--blue)" }
   ];
 
@@ -2002,6 +2185,7 @@ function currentPage() {
     orders: ordersPage,
     about: aboutPage,
     support: supportPage,
+    adminSupport: adminSupportPage,
     profile: profilePage
   };
 
@@ -2095,6 +2279,23 @@ function bindEvents() {
     await loadSupportTickets();
     showToast("Tickets refreshed");
     render();
+  });
+
+  document.querySelector("[data-admin-filter]")?.addEventListener("change", async (event) => {
+    state.adminTicketFilter = event.target.value;
+    saveState();
+    await loadAdminTickets();
+    render();
+  });
+
+  document.querySelector("[data-admin-refresh-tickets]")?.addEventListener("click", async () => {
+    await loadAdminTickets();
+    showToast("Admin queue refreshed");
+    render();
+  });
+
+  document.querySelectorAll("[data-admin-save-ticket]").forEach((button) => {
+    button.addEventListener("click", () => updateAdminTicket(button.dataset.adminSaveTicket));
   });
 
   document.querySelector("[data-back-app]")?.addEventListener("click", () => {

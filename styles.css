@@ -1250,6 +1250,73 @@ button {
 }
 
 /* ── Dashboard ── */
+.admin-support-page {
+  display: grid;
+  gap: 18px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.admin-ticket-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-ticket-stats .panel {
+  padding: 16px;
+}
+
+.admin-ticket-stats strong,
+.admin-ticket-stats span {
+  display: block;
+}
+
+.admin-ticket-stats strong {
+  color: var(--blue);
+  font-size: 28px;
+}
+
+.admin-ticket-stats span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-toolbar {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 260px) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 18px;
+}
+
+.admin-toolbar label {
+  font-weight: 800;
+}
+
+.admin-ticket-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-ticket-card {
+  padding: 18px;
+}
+
+.admin-ticket-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 4px;
+}
+
+.admin-ticket-card .textarea {
+  min-height: 96px;
+}
+
 .dash-wrap {
   display: flex;
   flex-direction: column;
@@ -1921,6 +1988,15 @@ button {
   }
 
   .support-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-ticket-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-toolbar,
+  .admin-ticket-controls {
     grid-template-columns: 1fr;
   }
 
