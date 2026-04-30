@@ -782,6 +782,12 @@ button {
   box-shadow: 0 8px 28px rgba(129, 39, 207, 0.35);
 }
 
+.brand-logo-image {
+  display: block;
+  object-fit: cover;
+  background: transparent;
+}
+
 .auth-brand-name {
   font-size: 26px;
   font-weight: 800;

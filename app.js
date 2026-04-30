@@ -1854,11 +1854,7 @@ function authPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <div class="auth-icon">
-          <svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
-            <path d="M22 4C12.06 4 4 11.16 4 20c0 4.42 2.04 8.42 5.34 11.28L8 40l9.1-3.02A19.7 19.7 0 0 0 22 37.6c9.94 0 18-7.16 18-16S31.94 4 22 4zm0 2c8.84 0 16 6.27 16 14S30.84 35.6 22 35.6c-2.1 0-4.12-.38-5.96-1.06l-.54-.2-6.5 2.16.86-5.58-.38-.42C6.8 28.04 6 24.1 6 20c0-8.73 7.16-14 16-14zm-5 9a1 1 0 0 0 0 2h10a1 1 0 0 0 0-2H17zm0 5a1 1 0 0 0 0 2h7a1 1 0 0 0 0-2h-7z"/>
-          </svg>
-        </div>
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260430-7" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Smart AI Review Assistant for Businesses</div>
       </div>
@@ -1898,11 +1894,7 @@ function googleProfileSetupPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <div class="auth-icon">
-          <svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
-            <path d="M22 4C12.06 4 4 11.16 4 20c0 4.42 2.04 8.42 5.34 11.28L8 40l9.1-3.02A19.7 19.7 0 0 0 22 37.6c9.94 0 18-7.16 18-16S31.94 4 22 4zm0 2c8.84 0 16 6.27 16 14S30.84 35.6 22 35.6c-2.1 0-4.12-.38-5.96-1.06l-.54-.2-6.5 2.16.86-5.58-.38-.42C6.8 28.04 6 24.1 6 20c0-8.73 7.16-14 16-14zm-5 9a1 1 0 0 0 0 2h10a1 1 0 0 0 0-2H17zm0 5a1 1 0 0 0 0 2h7a1 1 0 0 0 0-2h-7z"/>
-          </svg>
-        </div>
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260430-7" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Complete your Google profile</div>
       </div>
