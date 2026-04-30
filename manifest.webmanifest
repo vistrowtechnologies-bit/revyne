@@ -4,7 +4,10 @@
   "description": "AI review assistant for honest customer feedback and business replies.",
   "start_url": "/",
   "scope": "/",
+  "id": "/",
   "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["business", "productivity"],
   "background_color": "#F8F9FF",
   "theme_color": "#8127CF",
   "icons": [
