@@ -92,6 +92,7 @@ const defaultState = {
   },
   suggestions: [],
   smartReplies: [],
+  supportTickets: [],
   reviewDraft: {
     service: "",
     product: "",
@@ -138,6 +139,7 @@ function loadState() {
       user: { ...freshState.user, ...(parsed.user || {}) },
       business: { ...freshState.business, ...(parsed.business || {}) },
       stats: { ...freshState.stats, ...(parsed.stats || {}) },
+      supportTickets: Array.isArray(parsed.supportTickets) ? parsed.supportTickets : [],
       reviewDraft: { ...freshState.reviewDraft, ...(parsed.reviewDraft || {}) },
       replyDraft: { ...freshState.replyDraft, ...(parsed.replyDraft || {}) }
     };
@@ -287,11 +289,13 @@ async function applySupabaseSession(session) {
   state.stats = clone(defaultState.stats);
   state.suggestions = [];
   state.smartReplies = [];
+  state.supportTickets = [];
   state.isLoggedIn = true;
   state.authMode = "signin";
   await loadSupabaseProfile();
   await saveSupabaseProfile();
   await loadSupabaseBusiness();
+  await loadSupportTickets();
   saveState();
 }
 
@@ -344,6 +348,25 @@ async function loadSupabaseBusiness() {
     tone: data.tone || "Professional",
     mobile: data.mobile || state.business.mobile
   };
+}
+
+async function loadSupportTickets() {
+  if (!supabaseClient || !currentSession?.user) return;
+
+  const { data, error } = await supabaseClient
+    .from("support_tickets")
+    .select("id,subject,category,priority,status,message,admin_response,created_at,updated_at")
+    .eq("user_id", currentSession.user.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.warn("Could not load support tickets:", error);
+    return;
+  }
+
+  state.supportTickets = data || [];
+  saveState();
 }
 
 async function saveSupabaseProfile() {
@@ -399,6 +422,77 @@ async function saveSupabaseBusiness() {
   if (data?.public_token) state.business.publicToken = data.public_token;
   saveState();
   return true;
+}
+
+function getTicketPriority(category) {
+  if (category === "payment" || category === "login") return "high";
+  if (category === "ai_generation" || category === "review_page") return "medium";
+  return "normal";
+}
+
+async function createSupportTicket() {
+  const category = document.querySelector("#support-category")?.value || "general";
+  const subject = document.querySelector("#support-subject")?.value.trim() || "";
+  const message = document.querySelector("#support-message")?.value.trim() || "";
+
+  if (!subject || !message) {
+    showToast("Please add a subject and describe the issue");
+    return;
+  }
+
+  const localTicket = {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    subject,
+    category,
+    priority: getTicketPriority(category),
+    status: "open",
+    message,
+    admin_response: "",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  const button = document.querySelector("[data-submit-ticket]");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Creating ticket...";
+  }
+
+  try {
+    if (supabaseClient && currentSession?.user) {
+      const { data, error } = await supabaseClient
+        .from("support_tickets")
+        .insert({
+          user_id: currentSession.user.id,
+          business_id: state.business.id || null,
+          subject,
+          category,
+          priority: localTicket.priority,
+          status: "open",
+          message,
+          customer_name: state.user.name || null,
+          customer_email: state.user.email || currentSession.user.email || null
+        })
+        .select("id,subject,category,priority,status,message,admin_response,created_at,updated_at")
+        .single();
+
+      if (error) throw error;
+      state.supportTickets = [data, ...state.supportTickets.filter((ticket) => ticket.id !== data.id)];
+    } else {
+      state.supportTickets = [localTicket, ...state.supportTickets].slice(0, 20);
+    }
+
+    saveState();
+    showToast("Support ticket created");
+    render();
+  } catch (error) {
+    console.error("Support ticket error:", error);
+    showToast(error.message || "Could not create ticket");
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Submit Ticket";
+    }
+  }
 }
 
 async function signInWithGoogle() {
@@ -1766,6 +1860,93 @@ function googleProfileSetupPage() {
   `;
 }
 
+function supportPage() {
+  const tickets = state.supportTickets || [];
+  return `
+    <section class="support-page">
+      <div class="support-hero panel">
+        <div>
+          <p class="section-kicker">Support Center</p>
+          <h1>Raise a ticket</h1>
+          <p>Tell us what is blocked. We will track it like a proper support desk: open, in review, waiting for you, then resolved.</p>
+        </div>
+        <div class="support-sla">
+          <strong>Priority logic</strong>
+          <span>Login and payment issues are marked high priority automatically.</span>
+        </div>
+      </div>
+
+      <section class="panel support-form">
+        <div class="field">
+          <label for="support-category">Issue type</label>
+          <select id="support-category" class="select">
+            <option value="general">General question</option>
+            <option value="login">Login or account access</option>
+            <option value="payment">Payment or subscription</option>
+            <option value="ai_generation">AI review/reply generation</option>
+            <option value="review_page">Public review page or QR code</option>
+            <option value="business_profile">Business profile setup</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="support-subject">Subject</label>
+          <input id="support-subject" class="input" placeholder="Example: Google login is not opening" />
+        </div>
+        <div class="field">
+          <label for="support-message">Describe the issue</label>
+          <textarea id="support-message" class="textarea" placeholder="What happened, where did it happen, and what were you trying to do?"></textarea>
+        </div>
+        <button class="button full" type="button" data-submit-ticket>Submit Ticket</button>
+      </section>
+
+      <section class="panel support-process">
+        <h2>How we resolve tickets</h2>
+        <div class="support-steps">
+          <div><strong>1. Capture</strong><span>Customer creates a ticket from their account.</span></div>
+          <div><strong>2. Triage</strong><span>We assign category, priority, owner, and status.</span></div>
+          <div><strong>3. Investigate</strong><span>We check account, payment, app logs, and database records.</span></div>
+          <div><strong>4. Resolve</strong><span>We reply with the fix and close only after confirmation.</span></div>
+        </div>
+      </section>
+
+      <section class="support-list">
+        <div class="recent-header">
+          <div class="recent-title">Your Tickets</div>
+          <button class="view-all" type="button" data-refresh-tickets>Refresh</button>
+        </div>
+        ${tickets.length ? tickets.map(ticketCard).join("") : `
+          <div class="panel empty-state">
+            <strong>No tickets yet</strong>
+            <p>When you raise a ticket, it will appear here with status updates.</p>
+          </div>
+        `}
+      </section>
+    </section>
+  `;
+}
+
+function ticketCard(ticket) {
+  const created = ticket.created_at ? new Date(ticket.created_at).toLocaleDateString("en-IN") : "";
+  const status = ticket.status || "open";
+  return `
+    <article class="panel ticket-card">
+      <div class="ticket-card-head">
+        <div>
+          <h3>${escapeHtml(ticket.subject || "Support ticket")}</h3>
+          <p>${escapeHtml(ticket.category || "general")} &middot; ${created}</p>
+        </div>
+        <span class="ticket-status status-${escapeHtml(status)}">${escapeHtml(status.replaceAll("_", " "))}</span>
+      </div>
+      <p class="ticket-message">${escapeHtml(ticket.message || "")}</p>
+      <div class="ticket-meta">
+        <span>Priority: ${escapeHtml(ticket.priority || "normal")}</span>
+        <span>ID: ${escapeHtml(String(ticket.id || "").slice(0, 8))}</span>
+      </div>
+      ${ticket.admin_response ? `<div class="ticket-response"><strong>Support reply</strong><p>${escapeHtml(ticket.admin_response)}</p></div>` : ""}
+    </article>
+  `;
+}
+
 function profilePage() {
   const b = state.business;
   const u = state.user;
@@ -1779,7 +1960,7 @@ function profilePage() {
   const items = [
     { icon: "i", label: "About RevYne", view: "about", color: "#e5eeff", fg: "var(--blue)" },
     { icon: "↻", label: "Order History", view: "orders", color: "#e5eeff", fg: "var(--blue)" },
-    { icon: "✉", label: "Contact Us", view: null, color: "#e5eeff", fg: "var(--blue)" },
+    { icon: "@", label: "Contact Us", view: "support", color: "#e5eeff", fg: "var(--blue)" },
     { icon: "≡", label: "Terms & Privacy", view: null, color: "#e5eeff", fg: "var(--blue)" }
   ];
 
@@ -1820,6 +2001,7 @@ function currentPage() {
     pricing: pricingPageV2,
     orders: ordersPage,
     about: aboutPage,
+    support: supportPage,
     profile: profilePage
   };
 
@@ -1905,6 +2087,14 @@ function bindEvents() {
     const businessSaved = await saveSupabaseBusiness();
     if (!businessSaved) return;
     showToast("Profile updated");
+  });
+
+  document.querySelector("[data-submit-ticket]")?.addEventListener("click", createSupportTicket);
+
+  document.querySelector("[data-refresh-tickets]")?.addEventListener("click", async () => {
+    await loadSupportTickets();
+    showToast("Tickets refreshed");
+    render();
   });
 
   document.querySelector("[data-back-app]")?.addEventListener("click", () => {
