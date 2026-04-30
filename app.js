@@ -2142,7 +2142,7 @@ function profilePage() {
   const items = [
     { icon: "i", label: "About RevYne", view: "about", color: "#e5eeff", fg: "var(--blue)" },
     { icon: "↻", label: "Order History", view: "orders", color: "#e5eeff", fg: "var(--blue)" },
-    { icon: "@", label: "Contact Us", view: "support", color: "#e5eeff", fg: "var(--blue)" },
+    { icon: "@", label: "Help & Support", view: "support", color: "#e5eeff", fg: "var(--blue)" },
     ...(u.isAdmin ? [{ icon: "#", label: "Admin Support", view: "adminSupport", color: "#f0dbff", fg: "var(--blue)" }] : []),
     { icon: "≡", label: "Terms & Privacy", view: null, color: "#e5eeff", fg: "var(--blue)" }
   ];
