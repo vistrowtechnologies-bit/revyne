@@ -53,6 +53,7 @@ const BUSINESS_CATEGORIES = [
   { value: "Restaurant", typeLabel: "Cuisine or order type", typePlaceholder: "dine-in, takeaway, biryani, thali" },
   { value: "Salon & Beauty", typeLabel: "Treatment type", typePlaceholder: "haircut, facial, bridal makeup" },
   { value: "Healthcare Clinic", typeLabel: "Consultation or treatment type", typePlaceholder: "dental, physiotherapy, eye checkup" },
+  { value: "Optician & Optical Store", typeLabel: "Eyewear or lens type", typePlaceholder: "spectacles, contact lenses, sunglasses, progressive lenses" },
   { value: "Education & Coaching", typeLabel: "Course type", typePlaceholder: "NEET, JEE, spoken English, coding" },
   { value: "Car & Bike Service", typeLabel: "Vehicle or repair type", typePlaceholder: "car wash, detailing, battery, tyres" },
   { value: "Electronics & Appliances", typeLabel: "Device or appliance type", typePlaceholder: "AC, refrigerator, mobile, laptop" },
@@ -68,6 +69,28 @@ const BUSINESS_CATEGORIES = [
   { value: "Driver Service", typeLabel: "Trip type", typePlaceholder: "hourly driver, outstation, airport pickup" },
   { value: "Other", typeLabel: "Type or requirement", typePlaceholder: "standard, premium, custom requirement" }
 ];
+
+const CATEGORY_KEYWORDS = {
+  "Real Estate": "real estate, property, plots, flats, villas, commercial spaces, property consultation, site visit, investment guidance",
+  Restaurant: "restaurant, food, dining, takeaway, delivery, taste, service, hygiene, ambience, family restaurant",
+  "Salon & Beauty": "salon, beauty, haircut, facial, makeup, grooming, bridal makeup, skincare, hair treatment",
+  "Healthcare Clinic": "clinic, doctor, healthcare, consultation, treatment, appointment, patient care, diagnosis, hygiene",
+  "Optician & Optical Store": "optician, optical store, eyeglasses, spectacles, sunglasses, contact lenses, eye checkup, lens fitting, frames, eyewear, vision care",
+  "Education & Coaching": "coaching, classes, education, course, training, faculty, learning, exam preparation, student support",
+  "Car & Bike Service": "car service, bike service, vehicle repair, maintenance, washing, detailing, tyres, battery, mechanic",
+  "Electronics & Appliances": "electronics, appliances, mobile, laptop, AC, refrigerator, repair, installation, service, warranty",
+  "Home Services": "home services, plumbing, painting, cleaning, pest control, electrician, repair, maintenance",
+  "Travel & Transport": "travel, transport, cab, driver, airport pickup, outstation, tempo traveller, safe ride",
+  "Hotel & Stay": "hotel, stay, rooms, hospitality, cleanliness, staff, location, family stay, business stay",
+  "Fitness & Gym": "gym, fitness, workout, personal training, weight loss, yoga, trainer, equipment, health",
+  "Retail Store": "retail store, shopping, products, customer service, quality, price, collection, local store",
+  Jewellery: "jewellery, gold, diamond, silver, bridal jewellery, designs, hallmark, repair, trust",
+  "Event & Wedding Services": "event services, wedding, decoration, planning, photography, catering, birthday, corporate event",
+  "Legal & Finance": "legal service, finance, tax filing, insurance, loan, consultation, documentation, compliance",
+  "IT & Digital Services": "IT services, website, app, SEO, digital marketing, software, ads, branding, technical support",
+  "Driver Service": "driver service, hourly driver, outstation driver, airport pickup, safe driving, punctual, professional driver",
+  Other: "customer service, quality, professional, reliable, helpful, value for money, trusted, local business"
+};
 
 let slideDirection = null;
 let bottomNavFromIndex = 0;
@@ -306,8 +329,14 @@ function getBottomNavView(view = state.view) {
 }
 
 function updateBusinessField(field, value) {
-  state.business[field] = field === "services" ? trimToFiveList(value) : value;
-  if (field === "category") state.reviewDraft.product = "";
+  if (field === "category") {
+    const previousKeywords = state.business.keywords || "";
+    state.business[field] = value;
+    state.reviewDraft.product = "";
+    state.business.keywords = getKeywordsForCategory(value, previousKeywords);
+  } else {
+    state.business[field] = field === "services" ? trimToFiveList(value) : value;
+  }
   if (field === "mobile") state.user.mobile = value;
   saveState();
 }
@@ -417,6 +446,14 @@ function isPublicBusinessProMax() {
 
 function getCategoryMeta(category) {
   return BUSINESS_CATEGORIES.find((item) => item.value === category) || BUSINESS_CATEGORIES.at(-1);
+}
+
+function getKeywordsForCategory(category, currentKeywords = "") {
+  const suggested = CATEGORY_KEYWORDS[category] || "";
+  const current = String(currentKeywords || "").trim();
+  const knownSuggestions = Object.values(CATEGORY_KEYWORDS);
+  const isBlankOrAuto = !current || knownSuggestions.includes(current);
+  return suggested && isBlankOrAuto ? suggested : currentKeywords;
 }
 
 function trimToFiveList(value) {
@@ -1690,89 +1727,112 @@ function renderQrCodes() {
 }
 
 function downloadReviewQr() {
-  const canvas = document.querySelector("[data-qr-code]");
-  const fallbackImage = document.querySelector("[data-qr-image='fallback']");
-  if (fallbackImage) {
-    const link = document.createElement("a");
-    link.href = fallbackImage.src;
-    link.download = getQrFileName();
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.click();
-    return;
-  }
-
-  if (!canvas) {
-    showToast("QR code not ready");
-    return;
-  }
-
-  const link = document.createElement("a");
-  link.href = canvas.toDataURL("image/png");
-  link.download = getQrFileName();
-  link.click();
+  getReviewQrDataUrl()
+    .then((imageUrl) => {
+      const link = document.createElement("a");
+      link.href = imageUrl;
+      link.download = getQrFileName();
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    })
+    .catch(() => showToast("QR code not ready"));
 }
 
 function printReviewQr() {
-  const canvas = document.querySelector("[data-qr-code]");
-  const fallbackImage = document.querySelector("[data-qr-image='fallback']");
-  if (!canvas && !fallbackImage) {
-    showToast("QR code not ready");
-    return;
-  }
-
-  const imageUrl = fallbackImage ? fallbackImage.src : canvas.toDataURL("image/png");
-  const reviewUrl = escapeHtml(getReviewUrl());
-  const businessName = escapeHtml(state.business.name || "RevYne");
-  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=720,height=900");
+  const printWindow = window.open("", "_blank", "width=720,height=900");
   if (!printWindow) {
     showToast("Allow popups to print QR");
     return;
   }
 
-  printWindow.document.write(`
-    <!doctype html>
-    <html>
-      <head>
-        <title>${businessName} Review QR</title>
-        <style>
-          body {
-            margin: 0;
-            min-height: 100vh;
-            display: grid;
-            place-items: center;
-            font-family: Arial, sans-serif;
-            color: #111827;
-          }
-          .card {
-            width: min(420px, 90vw);
-            text-align: center;
-            border: 1px solid #d8dde8;
-            border-radius: 18px;
-            padding: 34px 28px;
-          }
-          h1 { margin: 0 0 8px; font-size: 26px; }
-          p { margin: 0 0 22px; color: #4b5563; }
-          img { width: 260px; height: 260px; }
-          .url { margin-top: 20px; font-size: 12px; word-break: break-all; color: #6b7280; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h1>Review ${businessName}</h1>
-          <p>Scan to share your genuine experience.</p>
-          <img src="${imageUrl}" alt="Review QR code" />
-          <div class="url">${reviewUrl}</div>
-        </div>
-        <script>
-          window.onload = () => {
-            window.print();
-          };
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
+  printWindow.document.write("<!doctype html><title>Preparing QR...</title><body>Preparing QR...</body>");
+
+  getReviewQrDataUrl()
+    .then((imageUrl) => {
+      const reviewUrl = escapeHtml(getReviewUrl());
+      const businessName = escapeHtml(state.business.name || "RevYne");
+      printWindow.document.open();
+      printWindow.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <title>${businessName} Review QR</title>
+            <style>
+              body {
+                margin: 0;
+                min-height: 100vh;
+                display: grid;
+                place-items: center;
+                font-family: Arial, sans-serif;
+                color: #111827;
+                background: #ffffff;
+              }
+              .card {
+                width: min(420px, 90vw);
+                text-align: center;
+                border: 1px solid #d8dde8;
+                border-radius: 18px;
+                padding: 34px 28px;
+              }
+              h1 { margin: 0 0 8px; font-size: 26px; }
+              p { margin: 0 0 22px; color: #4b5563; }
+              img { width: 260px; height: 260px; }
+              .url { margin-top: 20px; font-size: 12px; word-break: break-all; color: #6b7280; }
+              @media print {
+                body { min-height: auto; }
+                .card { border-color: #cbd5e1; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h1>Review ${businessName}</h1>
+              <p>Scan to share your genuine experience.</p>
+              <img src="${imageUrl}" alt="Review QR code" />
+              <div class="url">${reviewUrl}</div>
+            </div>
+            <script>
+              window.onload = () => {
+                window.focus();
+                window.print();
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    })
+    .catch(() => {
+      printWindow.close();
+      showToast("QR code not ready");
+    });
+}
+
+function getReviewQrDataUrl() {
+  const text = getReviewUrl();
+  const canvas = document.querySelector("[data-qr-code]");
+
+  if (canvas?.toDataURL) {
+    try {
+      return Promise.resolve(canvas.toDataURL("image/png"));
+    } catch (_) {
+      // Fall through and render a fresh QR below.
+    }
+  }
+
+  if (!window.QRCode?.toDataURL) {
+    return Promise.reject(new Error("QR library not ready"));
+  }
+
+  return window.QRCode.toDataURL(text, {
+    width: 900,
+    margin: 2,
+    color: {
+      dark: "#111827",
+      light: "#ffffff"
+    }
+  });
 }
 
 function navIcon(view) {
@@ -1806,7 +1866,7 @@ function appShell(content) {
       <header class="topbar">
         <div class="topbar-main">
           <div class="brand">
-            <img class="brand-mark" src="./assets/favicon.png?v=20260509-2" alt="" />
+            <img class="brand-mark" src="./assets/favicon.png?v=20260509-3" alt="" />
             <span>RevYne</span>
           </div>
         </div>
@@ -2749,7 +2809,7 @@ function authPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-2" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-3" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Smart AI Review Assistant for Businesses</div>
       </div>
@@ -2794,7 +2854,7 @@ function googleProfileSetupPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-2" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-3" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Complete your Google profile</div>
       </div>
@@ -3222,7 +3282,20 @@ function bindEvents() {
   });
 
   document.querySelectorAll("[data-field]").forEach((input) => {
-    input.addEventListener("input", () => updateBusinessField(input.dataset.field, input.value));
+    const handleFieldUpdate = () => {
+      updateBusinessField(input.dataset.field, input.value);
+      if (input.dataset.field === "category") {
+        const keywordsInput = document.querySelector("[data-field='keywords']");
+        if (keywordsInput) keywordsInput.value = state.business.keywords || "";
+        const serviceTypeInput = document.querySelector("[data-field='serviceTypes']");
+        const serviceTypeLabel = document.querySelector("label[for='field-serviceTypes']");
+        const meta = getCategoryMeta(input.value);
+        if (serviceTypeInput) serviceTypeInput.placeholder = meta.typePlaceholder;
+        if (serviceTypeLabel) serviceTypeLabel.textContent = meta.typeLabel;
+      }
+    };
+    input.addEventListener("input", handleFieldUpdate);
+    input.addEventListener("change", handleFieldUpdate);
   });
 
   document.querySelectorAll("[data-user-field]").forEach((input) => {
