@@ -1,5 +1,21 @@
 const STORAGE_KEY = "revyne:mvp";
 const LEGACY_STORAGE_KEY = "reviewpilot:mvp";
+const ANALYTICS_SESSION_KEY = "revyne:analytics-session";
+
+const INDIAN_LANGUAGES = [
+  "Assamese", "Bengali", "Bodo", "Dogri", "English", "Gujarati",
+  "Hindi", "Hinglish", "Kannada", "Kashmiri", "Konkani", "Maithili",
+  "Malayalam", "Manipuri", "Marathi", "Nepali", "Odia", "Punjabi",
+  "Sanskrit", "Santali", "Sindhi", "Tamil", "Telugu", "Urdu"
+];
+
+const THEMES = [
+  { id: "default", label: "Default", c1: "#8127cf", c2: "#a200ba" },
+  { id: "dark",    label: "Dark",    c1: "#312e81", c2: "#4c1d95" },
+  { id: "blue",    label: "Blue",    c1: "#2563eb", c2: "#0ea5e9" },
+  { id: "red",     label: "Red",     c1: "#dc2626", c2: "#ea580c" },
+  { id: "green",   label: "Green",   c1: "#16a34a", c2: "#0d9488" }
+];
 const supabaseConfig = window.REVYNE_SUPABASE || {};
 const hasSupabaseConfig = Boolean(
   window.supabase &&
@@ -29,6 +45,9 @@ const PLAN_LIMITS = {
   }
 };
 
+const PROFILE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PROFILE_IMAGE_MAX_BYTES = 500 * 1024;
+
 const BUSINESS_CATEGORIES = [
   { value: "Real Estate", typeLabel: "Property type", typePlaceholder: "plots, flats, villas, commercial spaces" },
   { value: "Restaurant", typeLabel: "Cuisine or order type", typePlaceholder: "dine-in, takeaway, biryani, thali" },
@@ -52,9 +71,13 @@ const BUSINESS_CATEGORIES = [
 
 let slideDirection = null;
 let bottomNavFromIndex = 0;
+let bottomNavShouldAnimate = false;
 let currentSession = null;
 let isGeneratingReply = false;
+let analyticsSessionId = getAnalyticsSessionId();
+let lastTrackedPageKey = "";
 const navOrder = ["dashboard", "business", "reply", "pricing", "profile"];
+const profileSubViews = ["about", "orders", "support", "adminSupport", "terms", "privacy"];
 
 const defaultState = {
   view: "dashboard",
@@ -69,6 +92,11 @@ const defaultState = {
     provider: "",
     lastLogin: "",
     plan: "free",
+    planStatus: "free",
+    subscriptionId: "",
+    customerId: "",
+    planCurrentStart: "",
+    planCurrentEnd: "",
     isAdmin: false
   },
   business: {
@@ -84,7 +112,10 @@ const defaultState = {
     keywords: "",
     language: "English",
     tone: "Professional",
-    mobile: ""
+    mobile: "",
+    ownerPlan: "free",
+    ownerPlanStatus: "free",
+    ownerPlanCurrentEnd: ""
   },
   stats: {
     scans: 0,
@@ -93,9 +124,14 @@ const defaultState = {
   },
   suggestions: [],
   smartReplies: [],
+  theme: "default",
+  proLanguages: [],
   supportTickets: [],
   adminTickets: [],
+  paymentEvents: [],
+  adminPaymentEvents: [],
   adminTicketFilter: "open",
+  checkoutNotice: "",
   reviewDraft: {
     service: "",
     product: "",
@@ -144,6 +180,8 @@ function loadState() {
       stats: { ...freshState.stats, ...(parsed.stats || {}) },
       supportTickets: Array.isArray(parsed.supportTickets) ? parsed.supportTickets : [],
       adminTickets: Array.isArray(parsed.adminTickets) ? parsed.adminTickets : [],
+      paymentEvents: Array.isArray(parsed.paymentEvents) ? parsed.paymentEvents : [],
+      adminPaymentEvents: Array.isArray(parsed.adminPaymentEvents) ? parsed.adminPaymentEvents : [],
       adminTicketFilter: parsed.adminTicketFilter || freshState.adminTicketFilter,
       reviewDraft: { ...freshState.reviewDraft, ...(parsed.reviewDraft || {}) },
       replyDraft: { ...freshState.replyDraft, ...(parsed.replyDraft || {}) }
@@ -166,17 +204,91 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function getAnalyticsSessionId() {
+  const existing = localStorage.getItem(ANALYTICS_SESSION_KEY);
+  if (existing) return existing;
+  const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  localStorage.setItem(ANALYTICS_SESSION_KEY, id);
+  return id;
+}
+
+function getAnalyticsViewName() {
+  if (isPublicReviewRoute()) return "public_review";
+  if (!state.isLoggedIn && state.view !== "terms" && state.view !== "privacy") return "auth";
+  return state.view || "dashboard";
+}
+
+function compactMetadata(metadata = {}) {
+  return Object.fromEntries(
+    Object.entries(metadata)
+      .filter(([, value]) => value !== undefined && value !== null && value !== "")
+      .map(([key, value]) => [key, typeof value === "string" ? value.slice(0, 160) : value])
+  );
+}
+
+function trackEvent(eventName, metadata = {}, pageView = false) {
+  if (!supabaseClient) return;
+
+  const event = {
+    user_id: currentSession?.user?.id || null,
+    business_id: state.business?.id || null,
+    session_id: analyticsSessionId,
+    event_name: eventName,
+    page_view: pageView,
+    path: `${location.pathname}${location.hash || ""}`,
+    view_name: getAnalyticsViewName(),
+    referrer: document.referrer || null,
+    metadata: compactMetadata({
+      plan: state.user?.plan || "free",
+      is_logged_in: Boolean(state.isLoggedIn),
+      ...metadata
+    })
+  };
+
+  supabaseClient
+    .from("analytics_events")
+    .insert(event)
+    .then(({ error }) => {
+      if (error) console.warn("Analytics event not saved:", error.message);
+    });
+}
+
+function trackPageView() {
+  const viewName = getAnalyticsViewName();
+  const pageKey = `${viewName}:${location.pathname}${location.hash || ""}`;
+  if (pageKey === lastTrackedPageKey) return;
+  lastTrackedPageKey = pageKey;
+  trackEvent("page_view", { view: viewName }, true);
+}
+
+function trackClientError(type, message, source = "") {
+  trackEvent("client_error", {
+    type,
+    message: String(message || "Unknown error").slice(0, 220),
+    source: String(source || "").slice(0, 160)
+  });
+}
+
+function setCheckoutNotice(message) {
+  state.checkoutNotice = message;
+  saveState();
+  if (state.view === "pricing") render();
+}
+
 function setView(view) {
   if (view === "public") {
     location.hash = "review";
     return;
   }
 
-  const oldIdx = navOrder.indexOf(state.view);
-  const newIdx = navOrder.indexOf(view);
+  if (state.view === view) return;
+
+  const oldIdx = navOrder.indexOf(getBottomNavView(state.view));
+  const newIdx = navOrder.indexOf(getBottomNavView(view));
   if (oldIdx !== -1 && newIdx !== -1 && newIdx !== oldIdx) {
     slideDirection = newIdx > oldIdx ? "right" : "left";
     bottomNavFromIndex = oldIdx;
+    bottomNavShouldAnimate = true;
   }
 
   state.view = view;
@@ -185,8 +297,12 @@ function setView(view) {
 }
 
 function syncBottomNavPosition() {
-  const activeIndex = navOrder.indexOf(state.view);
+  const activeIndex = navOrder.indexOf(getBottomNavView());
   bottomNavFromIndex = activeIndex === -1 ? 0 : activeIndex;
+}
+
+function getBottomNavView(view = state.view) {
+  return profileSubViews.includes(view) ? "profile" : view;
 }
 
 function updateBusinessField(field, value) {
@@ -198,19 +314,25 @@ function updateBusinessField(field, value) {
 
 function handleProfileImageUpload(file) {
   if (!file) return;
-  if (!file.type.startsWith("image/")) {
-    showToast("Please choose an image file");
+  if (!PROFILE_IMAGE_TYPES.includes(file.type)) {
+    showToast("Please choose a JPG, PNG, or WebP image");
     return;
   }
 
-  if (file.size > 700 * 1024) {
-    showToast("Please upload an image under 700 KB");
+  if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+    showToast("Please upload an image under 500 KB");
     return;
   }
 
   const reader = new FileReader();
   reader.onload = () => {
-    state.business.logo = reader.result;
+    const imageData = typeof reader.result === "string" ? reader.result : "";
+    if (!PROFILE_IMAGE_TYPES.some((type) => imageData.startsWith(`data:${type};base64,`))) {
+      showToast("Could not verify this image");
+      return;
+    }
+
+    state.business.logo = imageData;
     saveState();
     showToast("Profile picture updated");
     render();
@@ -253,7 +375,44 @@ function splitList(value, fallback = []) {
 }
 
 function isProMaxPlan() {
-  return state.user.plan === "pro_max" || state.user.plan === "pro_yearly";
+  const plan = getEffectivePlan();
+  return plan === "pro_max" || plan === "pro_yearly";
+}
+
+function isPaidPlanId(plan = state.user.plan) {
+  return ["pro", "pro_max", "pro_yearly"].includes(plan);
+}
+
+function isPlanCurrentlyUsable() {
+  const plan = state.user.plan || "free";
+  if (!isPaidPlanId(plan)) return false;
+
+  const status = state.user.planStatus || "free";
+  if (["active", "authenticated"].includes(status)) return true;
+
+  if (status === "cancel_requested") {
+    const end = state.user.planCurrentEnd ? new Date(state.user.planCurrentEnd).getTime() : 0;
+    return !end || end > Date.now();
+  }
+
+  return false;
+}
+
+function getEffectivePlan() {
+  return isPlanCurrentlyUsable() ? state.user.plan : "free";
+}
+
+function isPublicBusinessProMax() {
+  const b = state.business || {};
+  const plan = b.ownerPlan || getEffectivePlan();
+  const status = b.ownerPlanStatus || state.user.planStatus || "free";
+  if (!(plan === "pro_max" || plan === "pro_yearly")) return false;
+  if (["active", "authenticated"].includes(status)) return true;
+  if (status === "cancel_requested") {
+    const end = b.ownerPlanCurrentEnd ? new Date(b.ownerPlanCurrentEnd).getTime() : 0;
+    return !end || end > Date.now();
+  }
+  return false;
 }
 
 function getCategoryMeta(category) {
@@ -279,6 +438,10 @@ async function applySupabaseSession(session) {
   currentSession = session;
 
   if (!session?.user) {
+    if (state.isLoggedIn && state.user?.provider === "guest") {
+      return;
+    }
+
     state.isLoggedIn = false;
     state.authMode = "signin";
     saveState();
@@ -290,19 +453,24 @@ async function applySupabaseSession(session) {
     ...getSupabaseUserProfile(session.user),
     plan: state.user.plan || "free"
   };
-  state.business = emptyBusiness();
   state.stats = clone(defaultState.stats);
   state.suggestions = [];
   state.smartReplies = [];
   state.supportTickets = [];
   state.adminTickets = [];
+  state.paymentEvents = [];
+  state.adminPaymentEvents = [];
   state.isLoggedIn = true;
   state.authMode = "signin";
   await loadSupabaseProfile();
   await saveSupabaseProfile();
   await loadSupabaseBusiness();
+  await loadPaymentEvents();
   await loadSupportTickets();
-  if (state.user.isAdmin) await loadAdminTickets();
+  if (state.user.isAdmin) {
+    await loadAdminTickets();
+    await loadAdminPaymentEvents();
+  }
   saveState();
 }
 
@@ -311,7 +479,7 @@ async function loadSupabaseProfile() {
 
   const { data } = await supabaseClient
     .from("profiles")
-    .select("full_name,email,mobile,plan,plan_status,is_admin")
+    .select("full_name,email,mobile,plan,plan_status,razorpay_subscription_id,razorpay_customer_id,plan_current_start,plan_current_end,is_admin")
     .eq("id", currentSession.user.id)
     .maybeSingle();
 
@@ -320,14 +488,59 @@ async function loadSupabaseProfile() {
   state.user.email = data.email || state.user.email;
   state.user.mobile = data.mobile || state.user.mobile;
   state.user.plan = data.plan || state.user.plan || "free";
+  state.user.planStatus = data.plan_status || state.user.planStatus || "free";
+  state.user.subscriptionId = data.razorpay_subscription_id || state.user.subscriptionId || "";
+  state.user.customerId = data.razorpay_customer_id || state.user.customerId || "";
+  state.user.planCurrentStart = data.plan_current_start || state.user.planCurrentStart || "";
+  state.user.planCurrentEnd = data.plan_current_end || state.user.planCurrentEnd || "";
   state.user.isAdmin = Boolean(data.is_admin);
+  if (state.checkoutNotice && state.user.plan && state.user.plan !== "free") {
+    state.checkoutNotice = "";
+  }
   if (data.mobile) state.business.mobile = data.mobile;
+}
+
+async function loadPaymentEvents() {
+  if (!supabaseClient || !currentSession?.user) return;
+
+  const { data, error } = await supabaseClient
+    .from("payment_events")
+    .select("id,event_name,provider,plan,razorpay_subscription_id,razorpay_payment_id,status,processing_status,processing_error,profile_updated,payload,created_at")
+    .eq("user_id", currentSession.user.id)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (error) {
+    console.warn("Could not load payment events:", error);
+    return;
+  }
+
+  state.paymentEvents = data || [];
+  saveState();
+}
+
+async function loadAdminPaymentEvents() {
+  if (!supabaseClient || !currentSession?.user || !state.user.isAdmin) return;
+
+  const { data, error } = await supabaseClient
+    .from("payment_events")
+    .select("id,user_id,event_name,provider,plan,razorpay_subscription_id,razorpay_payment_id,status,processing_status,processing_error,profile_updated,payload,created_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.warn("Could not load admin payment events:", error);
+    return;
+  }
+
+  state.adminPaymentEvents = data || [];
+  saveState();
 }
 
 async function loadSupabaseBusiness() {
   if (!supabaseClient || !currentSession?.user) return;
 
-  const { data } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from("businesses")
     .select("*")
     .eq("owner_id", currentSession.user.id)
@@ -335,10 +548,17 @@ async function loadSupabaseBusiness() {
     .limit(1)
     .maybeSingle();
 
+  if (error) {
+    console.warn("Could not load business:", error);
+    showToast(error.message || "Could not load saved business");
+    return;
+  }
+
   if (!data) {
-    state.business = emptyBusiness({
-      mobile: state.user.mobile || ""
-    });
+    state.business = {
+      ...state.business,
+      mobile: state.business.mobile || state.user.mobile || ""
+    };
     return;
   }
   state.business = {
@@ -349,12 +569,16 @@ async function loadSupabaseBusiness() {
     category: data.category || "",
     city: data.city || "",
     googleUrl: data.google_review_url || "",
+    logo: data.business_logo || state.business.logo || "",
     services: data.services || "",
     serviceTypes: data.service_types || "",
     keywords: data.keywords || "",
     language: data.language || "English",
     tone: data.tone || "Professional",
-    mobile: data.mobile || state.business.mobile
+    mobile: data.mobile || state.business.mobile,
+    ownerPlan: data.owner_plan || state.user.plan || "free",
+    ownerPlanStatus: data.owner_plan_status || state.user.planStatus || "free",
+    ownerPlanCurrentEnd: data.owner_plan_current_end || state.user.planCurrentEnd || ""
   };
 }
 
@@ -434,12 +658,37 @@ async function saveSupabaseBusiness() {
     city: state.business.city || null,
     google_review_url: state.business.googleUrl || null,
     services: state.business.services || null,
+    service_types: state.business.serviceTypes || null,
     keywords: state.business.keywords || null,
     language: state.business.language || "English",
     tone: state.business.tone || "Professional",
     mobile: state.business.mobile || state.user.mobile || null,
+    business_logo: state.business.logo || null,
+    owner_plan: state.user.plan || "free",
+    owner_plan_status: state.user.planStatus || "free",
+    owner_plan_current_end: state.user.planCurrentEnd || null,
     updated_at: new Date().toISOString()
   };
+
+  if (!state.business.id) {
+    const { data: existing, error: lookupError } = await supabaseClient
+      .from("businesses")
+      .select("id,public_token")
+      .eq("owner_id", currentSession.user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lookupError) {
+      showToast(lookupError.message || "Could not check saved business");
+      return false;
+    }
+
+    if (existing?.id) {
+      state.business.id = existing.id;
+      state.business.publicToken = existing.public_token || state.business.publicToken;
+    }
+  }
 
   const query = state.business.id
     ? supabaseClient.from("businesses").update(payload).eq("id", state.business.id).select("id,public_token").single()
@@ -454,10 +703,16 @@ async function saveSupabaseBusiness() {
   if (data?.id) state.business.id = data.id;
   if (data?.public_token) state.business.publicToken = data.public_token;
   saveState();
+  trackEvent("business_profile_saved", {
+    category: state.business.category,
+    has_google_url: Boolean(state.business.googleUrl),
+    has_logo: Boolean(state.business.logo)
+  });
   return true;
 }
 
 function getTicketPriority(category) {
+  if (category === "bug_report") return "high";
   if (category === "payment" || category === "login") return "high";
   if (category === "ai_generation" || category === "review_page") return "medium";
   return "normal";
@@ -510,12 +765,23 @@ async function createSupportTicket() {
         .single();
 
       if (error) throw error;
-      state.supportTickets = [data, ...state.supportTickets.filter((ticket) => ticket.id !== data.id)];
+      const savedTicket = {
+        ...data,
+        customer_name: state.user.name || "",
+        customer_email: state.user.email || currentSession.user.email || ""
+      };
+      state.supportTickets = [savedTicket, ...state.supportTickets.filter((ticket) => ticket.id !== data.id)];
+      notifySupportEmail("new_ticket", savedTicket);
     } else {
       state.supportTickets = [localTicket, ...state.supportTickets].slice(0, 20);
     }
 
     saveState();
+    trackEvent("support_ticket_created", {
+      category,
+      priority: localTicket.priority,
+      has_business: Boolean(state.business.id)
+    });
     showToast("Support ticket created");
     render();
   } catch (error) {
@@ -539,6 +805,7 @@ async function updateAdminTicket(ticketId) {
   const priority = card?.querySelector("[data-admin-ticket-priority]")?.value || "normal";
   const assignedTo = card?.querySelector("[data-admin-ticket-assigned]")?.value.trim() || "";
   const response = card?.querySelector("[data-admin-ticket-response]")?.value.trim() || "";
+  const existingTicket = state.adminTickets.find((ticket) => ticket.id === ticketId) || {};
 
   const payload = {
     status,
@@ -570,12 +837,51 @@ async function updateAdminTicket(ticketId) {
     return;
   }
 
+  if (response && response !== (existingTicket.admin_response || "")) {
+    notifySupportEmail("admin_reply", {
+      ...existingTicket,
+      status,
+      priority,
+      assigned_to: assignedTo || null,
+      admin_response: response || null
+    });
+  }
+
   showToast("Ticket updated");
   await loadAdminTickets();
   render();
 }
 
+async function notifySupportEmail(type, ticket) {
+  if (!supabaseClient || !currentSession?.user) return;
+
+  try {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) return;
+
+    const response = await fetch("/api/send-support-email", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ type, ticket })
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (response.ok && result.sent) {
+      trackEvent("support_email_sent", { type });
+    } else if (result.reason || result.error) {
+      console.info("Support email skipped:", result.reason || result.error);
+    }
+  } catch (error) {
+    console.warn("Support email notification skipped:", error);
+  }
+}
+
 async function signInWithGoogle() {
+  trackEvent("google_login_clicked");
   if (!supabaseClient) {
     if (state.user.provider === "google" && state.user.email) {
       state.isLoggedIn = true;
@@ -622,7 +928,7 @@ function getMonthKey() {
 }
 
 function getCurrentPlanLimits() {
-  return PLAN_LIMITS[state.user.plan || "free"] || PLAN_LIMITS.free;
+  return PLAN_LIMITS[getEffectivePlan()] || PLAN_LIMITS.free;
 }
 
 async function getCurrentUsage() {
@@ -714,7 +1020,7 @@ async function loadPublicReviewBusiness() {
 
   const { data, error } = await supabaseClient
     .from("businesses")
-    .select("id,public_token,name,category,city,google_review_url,services,keywords,language,tone,mobile")
+    .select("id,public_token,name,category,city,google_review_url,business_logo,services,service_types,keywords,language,tone,mobile,owner_plan,owner_plan_status,owner_plan_current_end")
     .eq("public_token", publicToken)
     .eq("public_reviews_enabled", true)
     .maybeSingle();
@@ -732,12 +1038,16 @@ async function loadPublicReviewBusiness() {
     category: data.category || state.business.category,
     city: data.city || "",
     googleUrl: data.google_review_url || "",
+    logo: data.business_logo || "",
     services: data.services || "",
-    serviceTypes: state.business.serviceTypes || "",
+    serviceTypes: data.service_types || "",
     keywords: data.keywords || "",
     language: data.language || "English",
     tone: data.tone || "Professional",
-    mobile: data.mobile || ""
+    mobile: data.mobile || "",
+    ownerPlan: data.owner_plan || "free",
+    ownerPlanStatus: data.owner_plan_status || "free",
+    ownerPlanCurrentEnd: data.owner_plan_current_end || ""
   };
   state.suggestions = [];
   saveState();
@@ -881,6 +1191,90 @@ async function completeGoogleProfile() {
   render();
 }
 
+function getLangSuggestions(lang, { name, city, cat, starText, base, tone }) {
+  if (lang === "Hindi") return [
+    `${name} ने ${city} में ${starText} सेवा प्रदान की। ${base} टीम पेशेवर और भरोसेमंद थी।`,
+    `${name} के साथ अनुभव बहुत अच्छा रहा। ${cat} सेवा समय पर और विश्वसनीय थी।`,
+    `मैं ${name} की सेवाओं से संतुष्ट हूं। इन्हें जरूर आजमाएं।`
+  ];
+  if (lang === "Hinglish") return [
+    `${name} ka experience bahut ${starText} tha. ${base} Team professional aur helpful thi.`,
+    `${name} ki service ${city} mein really good hai. ${cat} ke liye yahan zaroor aayein.`,
+    `Overall ${name} ne bahut accha kaam kiya. Main inhe definitely recommend karunga.`
+  ];
+  if (lang === "Marathi") return [
+    `${name} कडून ${starText} सेवा मिळाली. ${base} टीम व्यावसायिक आणि विश्वासार्ह होती.`,
+    `${name} बरोबर अनुभव खूप चांगला होता. ${cat} सेवा वेळेवर होती.`,
+    `${name} च्या सेवेने मी समाधानी आहे. सर्वांना शिफारस करतो.`
+  ];
+  if (lang === "Bengali") return [
+    `${name}-এ ${starText} সেবা পেলাম। ${base} দলটি পেশাদার ও বিশ্বস্ত ছিল।`,
+    `${name}-এর সাথে অভিজ্ঞতা অত্যন্ত ভালো। ${cat} সেবা সময়মতো ছিল।`,
+    `${name}-এর সেবায় আমি সন্তুষ্ট। সবাইকে পরামর্শ দিচ্ছি।`
+  ];
+  if (lang === "Telugu") return [
+    `${name} వద్ద ${starText} సేవ పొందాను. ${base} బృందం నిపుణులుగా ఉంది.`,
+    `${name} తో అనుభవం చాలా బాగుంది. ${cat} సేవ నమ్మదగినది.`,
+    `${name} సేవలతో సంతృప్తిగా ఉన్నాను. అందరికీ సిఫారసు చేస్తున్నాను.`
+  ];
+  if (lang === "Tamil") return [
+    `${name}-இல் ${starText} சேவை கிடைத்தது. ${base} குழு தொழில்முறையாக இருந்தது.`,
+    `${name} உடனான அனுபவம் மிகவும் நல்லது. ${cat} சேவை நேரத்தில் கிடைத்தது.`,
+    `${name} சேவையில் திருப்தியாக இருக்கிறேன். அனைவருக்கும் பரிந்துரைக்கிறேன்.`
+  ];
+  if (lang === "Gujarati") return [
+    `${name} પાસેથી ${starText} સેવા મળી. ${base} ટીમ વ્યાવસાયિક અને વિશ્વસનીય હતી.`,
+    `${name} સાથેનો અનુભવ ખૂબ સારો હતો. ${cat} સેવા સમયસર હતી.`,
+    `${name} ની સેવાથી હું સંતુષ્ટ છું. સૌને ભલામણ કરું છું.`
+  ];
+  if (lang === "Kannada") return [
+    `${name} ನಲ್ಲಿ ${starText} ಸೇವೆ ಪಡೆದೆ. ${base} ತಂಡ ವೃತ್ತಿಪರ ಮತ್ತು ವಿಶ್ವಾಸಾರ್ಹ.`,
+    `${name} ನೊಂದಿಗಿನ ಅನುಭವ ಉತ್ತಮ. ${cat} ಸೇವೆ ಸಮಯಕ್ಕೆ ದೊರೆಯಿತು.`,
+    `${name} ಸೇವೆಯಿಂದ ತೃಪ್ತ. ಎಲ್ಲರಿಗೂ ಶಿಫಾರಸು ಮಾಡುತ್ತೇನೆ.`
+  ];
+  if (lang === "Malayalam") return [
+    `${name}-ൽ ${starText} സേവനം ലഭിച്ചു. ${base} ടീം പ്രൊഫഷണൽ ആയിരുന്നു.`,
+    `${name} ഉടനുള്ള അനുഭവം വളരെ നല്ലത്. ${cat} സേവനം സമയത്ത് കിട്ടി.`,
+    `${name}-ന്റെ സേവനത്തിൽ സംതൃപ്തൻ. എല്ലാവർക്കും ശുപാർശ ചെയ്യുന്നു.`
+  ];
+  if (lang === "Punjabi") return [
+    `${name} ਤੋਂ ${starText} ਸੇਵਾ ਮਿਲੀ. ${base} ਟੀਮ ਪੇਸ਼ੇਵਰ ਅਤੇ ਭਰੋਸੇਯੋਗ ਸੀ.`,
+    `${name} ਦੇ ਨਾਲ ਤਜ਼ਰਬਾ ਬਹੁਤ ਵਧੀਆ ਰਿਹਾ. ${cat} ਸੇਵਾ ਸਮੇਂ ਸਿਰ ਸੀ.`,
+    `${name} ਦੀ ਸੇਵਾ ਤੋਂ ਸੰਤੁਸ਼ਟ ਹਾਂ. ਸਾਰਿਆਂ ਨੂੰ ਸਿਫ਼ਾਰਿਸ਼ ਕਰਦਾਂ.`
+  ];
+  if (lang === "Odia") return [
+    `${name} ଠାରୁ ${starText} ସେବା ପାଇଲି. ${base} ଦଳ ଦକ୍ଷ ଏବଂ ବିଶ୍ୱସ୍ତ.`,
+    `${name} ସହ ଅଭିଜ୍ଞତା ଅତ୍ୟନ୍ତ ଭଲ. ${cat} ସେବା ସମୟ ମତେ ଥିଲା.`,
+    `${name} ର ସେବାରେ ସନ୍ତୁଷ୍ଟ. ସମସ୍ତଙ୍କୁ ସୁପାରିଶ.`
+  ];
+  if (lang === "Urdu") return [
+    `${name} سے ${starText} خدمت ملی۔ ${base} ٹیم پیشہ ور اور قابل اعتماد تھی۔`,
+    `${name} کے ساتھ تجربہ بہت اچھا رہا۔ ${cat} سروس وقت پر تھی۔`,
+    `${name} کی خدمات سے مطمئن ہوں۔ سب کو سفارش کرتا ہوں۔`
+  ];
+  if (lang === "Assamese") return [
+    `${name}ত ${starText} সেৱা পাইছিলোঁ। ${base} দলটো দক্ষ আৰু বিশ্বাসযোগ্য।`,
+    `${name}ৰ সৈতে অভিজ্ঞতা অতি ভাল। ${cat} সেৱা সময়মতে পাইছিলোঁ।`,
+    `${name}ৰ সেৱাত সন্তুষ্ট। সকলোকে পৰামৰ্শ দিছোঁ।`
+  ];
+  // Tone-aware English (default for all other languages)
+  if (tone === "Friendly") return [
+    `Really happy with my experience at ${name}! ${base} Warm, helpful team that made everything easy.`,
+    `${name} was great — friendly staff, reliable ${cat}, and smooth communication throughout.`,
+    `Wonderful experience with ${name} in ${city}. Would definitely recommend to friends!`
+  ];
+  if (tone === "Enthusiastic") return [
+    `Absolutely loved ${name}! ${base} Outstanding ${cat} — 100% recommend!`,
+    `Wow, ${name} really delivered! ${starText.charAt(0).toUpperCase() + starText.slice(1)} service — team went above and beyond!`,
+    `Best ${cat} experience ever! ${name} is top-notch. Don't hesitate — just book them!`
+  ];
+  return [
+    `${name} provided ${starText} service in ${city}. ${base} The team was professional, responsive, and easy to coordinate with.`,
+    `I am satisfied with my experience with ${name}. The ${cat} was reliable, punctual, and handled professionally.`,
+    `Good experience overall. ${name} made the process simple and delivered dependable service. I would recommend them to others.`
+  ];
+}
+
 async function createReviewSuggestions() {
   if (!state.rating) {
     showToast("Please select a star rating first");
@@ -895,7 +1289,9 @@ async function createReviewSuggestions() {
   const selectedService = state.reviewDraft.service || business.category;
   const selectedProduct = state.reviewDraft.product || "";
   const experience = state.reviewDraft.experience.trim();
-  const proMaxReview = isProMaxPlan() && Boolean(selectedService || selectedProduct);
+  const proMaxReview = isPublicReviewRoute()
+    ? isPublicBusinessProMax() && Boolean(selectedService || selectedProduct)
+    : isProMaxPlan() && Boolean(selectedService || selectedProduct);
   const services = business.services.split(",").map((item) => item.trim()).filter(Boolean);
   const serviceLine = selectedService || (services.length ? services.slice(0, 2).join(" and ") : business.category);
   const base = experience || `I had a genuine experience with ${serviceLine}.`;
@@ -932,42 +1328,19 @@ async function createReviewSuggestions() {
       `I chose ${name} for ${selectedService}${productLine}, and the experience felt smooth from start to finish. ${base} Their communication, service quality, and attention to detail stood out. It is a dependable option for customers searching for ${business.category}${locationLine}.`,
       `${name} was helpful and professional for my ${selectedService}${productLine} requirement. ${base} The service felt genuine, the team understood what I needed, and the overall experience was worth recommending. A good choice for ${business.category}${locationLine}.`
     ];
-  } else if (lang === "Hindi") {
-
-    state.suggestions = [
-      `${name} ने ${city} में ${starText} सेवा प्रदान की। ${base} टीम पेशेवर और भरोसेमंद थी।`,
-      `${name} के साथ अनुभव बहुत अच्छा रहा। ${cat} सेवा समय पर और विश्वसनीय थी।`,
-      `मैं ${name} की सेवाओं से संतुष्ट हूं। इन्हें जरूर आजमाएं।`
-    ];
-  } else if (lang === "Hinglish") {
-    state.suggestions = [
-      `${name} ka experience bahut ${starText} tha. ${base} Team professional aur helpful thi.`,
-      `${name} ki service ${city} mein really good hai. ${cat} ke liye yahan zaroor aayein.`,
-      `Overall ${name} ne bahut accha kaam kiya. Main inhe definitely recommend karunga.`
-    ];
-  } else if (tone === "Friendly") {
-    state.suggestions = [
-      `Really happy with my experience at ${name}! ${base} The team was warm, helpful, and made everything easy.`,
-      `${name} was great - friendly staff, reliable ${cat}, and smooth communication throughout.`,
-      `Had a wonderful time dealing with ${name} in ${city}. Would definitely come back and recommend to friends!`
-    ];
-  } else if (tone === "Enthusiastic") {
-    state.suggestions = [
-      `Absolutely loved my experience with ${name}! ${base} Outstanding ${cat} - 100% recommend!`,
-      `Wow, ${name} really delivered! ${starText.charAt(0).toUpperCase() + starText.slice(1)} service in ${city} - the team went above and beyond!`,
-      `Best ${cat} experience I've had! ${name} is top-notch. Don't hesitate - just book them!`
-    ];
   } else {
-    state.suggestions = [
-      `${name} provided ${starText} service in ${city}. ${base} The team was professional, responsive, and easy to coordinate with.`,
-      `I am satisfied with my experience with ${name}. The ${cat} was reliable, punctual, and handled professionally.`,
-      `Good experience overall. ${name} made the process simple, communicated clearly, and delivered dependable service. I would recommend them to others.`
-    ];
+    state.suggestions = getLangSuggestions(lang, { name, city, cat, starText, base, tone });
   }
 
   state.stats.generated += 1;
   await saveGeneratedReviewsToSupabase(experience);
   await incrementUsage("review");
+  trackEvent("review_generated", {
+    rating: state.rating,
+    pro_max_flow: proMaxReview,
+    has_experience: Boolean(experience),
+    suggestion_count: state.suggestions.length
+  });
   saveState();
   render();
 }
@@ -1035,6 +1408,12 @@ async function createSmartReplies() {
       reviewText: text
     });
     await incrementUsage("reply");
+    trackEvent("smart_reply_generated", {
+      rating,
+      has_customer_name: name !== "there",
+      review_length_bucket: text.length > 240 ? "long" : text.length > 80 ? "medium" : "short",
+      reply_count: state.smartReplies.length
+    });
   } catch (error) {
     isGeneratingReply = false;
     console.warn("Could not generate smart replies:", error);
@@ -1078,24 +1457,188 @@ async function startPlanCheckout(plan) {
   }
 
   try {
-    const { data, error } = await supabaseClient.functions.invoke("create-razorpay-subscription", {
-      body: {
+    trackEvent("checkout_started", { plan });
+    setCheckoutNotice("Creating Razorpay checkout...");
+
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) throw new Error("Please login again before upgrading");
+
+    const response = await fetch("/api/create-razorpay-subscription", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
         plan,
         returnUrl: `${location.origin}${location.pathname}`
-      }
+      })
     });
 
-    if (error) throw error;
-    if (!data?.shortUrl) throw new Error("Checkout link was not created");
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = data?.detail?.error?.description
+        || data?.detail?.description
+        || data?.detail?.message
+        || (typeof data?.detail === "string" ? data.detail : "")
+        || data?.message;
+      throw new Error(detail || data?.error || "Could not create checkout");
+    }
 
-    window.location.href = data.shortUrl;
+    if (!data?.subscriptionId && !data?.shortUrl) throw new Error("Checkout was not created");
+
+    console.info("Razorpay checkout created", {
+      hasShortUrl: Boolean(data.shortUrl),
+      hasSubscriptionId: Boolean(data.subscriptionId),
+      plan: data.plan
+    });
+    setCheckoutNotice(data.shortUrl ? "Opening Razorpay payment link..." : "Opening Razorpay checkout...");
+
+    if (data.shortUrl) {
+      window.location.href = data.shortUrl;
+      return;
+    }
+
+    await openRazorpayCheckout(data);
   } catch (error) {
     console.error("Checkout error:", error);
-    showToast(error.message || "Could not open checkout");
+    const message = error.message || "Could not open checkout";
+    setCheckoutNotice(message);
+    showToast(message);
     if (button) {
       button.disabled = false;
       button.textContent = originalText;
     }
+  }
+}
+
+async function cancelCurrentSubscription() {
+  if (!supabaseClient || !currentSession?.user) {
+    showToast("Please login before managing your subscription");
+    return;
+  }
+
+  if (!state.user.subscriptionId) {
+    showToast("No active subscription found");
+    return;
+  }
+
+  const confirmed = window.confirm("Cancel this subscription at the end of the current billing cycle?");
+  if (!confirmed) return;
+
+  const button = document.querySelector("[data-cancel-subscription]");
+  const originalText = button?.textContent || "Cancel subscription";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Cancelling...";
+  }
+
+  try {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) throw new Error("Please login again before managing your subscription");
+
+    const response = await fetch("/api/cancel-razorpay-subscription", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || data.detail || "Could not cancel subscription");
+    }
+
+    state.user.planStatus = "cancel_requested";
+    showToast("Subscription cancellation scheduled");
+    await loadSupabaseProfile();
+    await loadPaymentEvents();
+    saveState();
+    render();
+  } catch (error) {
+    showToast(error.message || "Could not cancel subscription");
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+}
+
+function loadRazorpayScript() {
+  if (window.Razorpay) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
+async function openRazorpayCheckout(checkoutData) {
+  const loaded = await loadRazorpayScript();
+  if (!loaded || !window.Razorpay) {
+    throw new Error("Could not load Razorpay Checkout");
+  }
+
+  const options = {
+    key: checkoutData.keyId,
+    subscription_id: checkoutData.subscriptionId,
+    name: "RevYne",
+    description: checkoutData.label || "RevYne subscription",
+    prefill: {
+      name: state.user.name || "",
+      email: state.user.email || "",
+      contact: state.user.mobile || state.business.mobile || ""
+    },
+    notes: {
+      app: "revyne",
+      plan: checkoutData.plan || ""
+    },
+    theme: {
+      color: "#9b1bd6"
+    },
+    handler: async () => {
+      showToast("Payment received. Updating plan...");
+      setTimeout(async () => {
+        await loadSupabaseProfile();
+        saveState();
+        render();
+      }, 2500);
+    },
+    modal: {
+      ondismiss: () => {
+        showToast("Checkout closed");
+        const button = document.querySelector(`[data-plan-select="${checkoutData.plan}"]`);
+        if (button) {
+          button.disabled = false;
+          button.textContent = checkoutData.plan === "pro_max"
+            ? "Upgrade to Pro Max"
+            : checkoutData.plan === "pro_yearly"
+              ? "Upgrade Yearly"
+              : "Upgrade to Pro";
+        }
+      }
+    }
+  };
+
+  try {
+    const razorpay = new window.Razorpay(options);
+    razorpay.on("payment.failed", (response) => {
+      const description = response?.error?.description || "Payment failed. Please try again.";
+      showToast(description);
+      trackClientError("razorpay_payment_failed", description, "razorpay");
+    });
+    razorpay.open();
+  } catch (error) {
+    trackClientError("razorpay_checkout_error", error.message || error, "razorpay");
+    throw new Error("Razorpay Checkout could not open in this browser. Please try Chrome.");
   }
 }
 
@@ -1245,7 +1788,7 @@ function navIcon(view) {
 }
 
 function bottomNavItem(view, label) {
-  const active = state.view === view;
+  const active = getBottomNavView() === view;
   return `
     <button class="bnav-item ${active ? "active" : ""}" type="button" data-view="${view}">
       ${navIcon(view)}
@@ -1255,34 +1798,31 @@ function bottomNavItem(view, label) {
 }
 
 function appShell(content) {
-  const activeBottomIndex = Math.max(0, navOrder.indexOf(state.view));
+  const activeBottomIndex = Math.max(0, navOrder.indexOf(getBottomNavView()));
+  const navAnimationClass = bottomNavShouldAnimate ? " animate" : "";
 
   return `
     <div class="app-shell">
       <header class="topbar">
         <div class="topbar-main">
-          <div class="brand">RevYne</div>
+          <div class="brand">
+            <img class="brand-mark" src="./assets/favicon.png?v=20260509-1" alt="" />
+            <span>RevYne</span>
+          </div>
         </div>
         <nav class="nav">
           ${navButton("Dashboard", "dashboard")}
           ${navButton("Smart Reply", "reply")}
           ${navButton("Pricing", "pricing")}
-          ${navButton("Order History", "orders")}
-          ${navButton("Edit Business", "business")}
+          ${navButton("My Business", "business")}
           ${navButton("Profile", "profile")}
           <button class="logout" type="button">Logout</button>
         </nav>
       </header>
       <div class="layout">
-        <aside class="side-hero">
-          <div>
-            <h1>Smart Review AI</h1>
-            <p>AI-powered review suggestions for modern businesses.</p>
-          </div>
-        </aside>
         <main class="main">${content}</main>
       </div>
-      <nav class="bottom-nav" style="--from-index:${bottomNavFromIndex}; --active-index:${activeBottomIndex};">
+      <nav class="bottom-nav${navAnimationClass}" style="--from-index:${bottomNavFromIndex}; --active-index:${activeBottomIndex};">
         ${bottomNavItem("dashboard", "Home")}
         ${bottomNavItem("business", "Business")}
         ${bottomNavItem("reply", "AI Reply")}
@@ -1309,8 +1849,7 @@ function dashboardPageClean() {
   return `
     <section class="dash-wrap">
       <div class="dash-welcome">
-        <h2 class="dash-title">Dashboard</h2>
-        <p class="dash-sub">${hasBusiness ? "Welcome back. Your reputation workspace is ready." : "Welcome. Add your business profile to start collecting real customer reviews."} Current plan: ${escapeHtml((state.user.plan || "free").toUpperCase())}</p>
+        <p class="dash-sub">${hasBusiness ? "Welcome back. Your reputation workspace is ready." : "Welcome. Add your business profile to start collecting real customer reviews."} Current plan: ${escapeHtml(getEffectivePlan().toUpperCase())}</p>
       </div>
 
       ${hasBusiness ? "" : `
@@ -1426,14 +1965,12 @@ function businessPage() {
   const categoryMeta = getCategoryMeta(b.category);
   return `
     <section class="panel form-panel">
-      <h1 class="page-title">Complete Your Profile</h1>
       <div class="field">
         <label for="field-mobile">Mobile Number</label>
         <input id="field-mobile" type="tel" class="input" maxlength="10" pattern="[0-9]{10}" placeholder="Enter 10-digit Mobile Number" value="${escapeHtml(b.mobile)}" data-field="mobile" />
       </div>
       <button class="button full" type="button" data-save-mobile>Save Mobile Number</button>
 
-      <h2>Edit Business Profile</h2>
       <div class="required-note">* indicates required field</div>
       <div class="field">
         <label for="profile-image">Profile Picture</label>
@@ -1442,7 +1979,7 @@ function businessPage() {
             ${b.logo ? `<img src="${escapeHtml(b.logo)}" alt="Business profile" />` : `<span>${escapeHtml((b.name || state.user.name || "R").charAt(0).toUpperCase())}</span>`}
           </div>
           <div>
-            <input id="profile-image" class="file-input" type="file" accept="image/*" data-profile-image />
+            <input id="profile-image" class="file-input" type="file" accept="image/png,image/jpeg,image/webp" data-profile-image />
             <label class="button secondary file-button" for="profile-image">Upload Picture</label>
             <p class="hint">Use a square logo or owner photo under 700 KB.</p>
           </div>
@@ -1456,7 +1993,22 @@ function businessPage() {
         </select>
       </div>
       ${inputField("City", "city", b.city)}
-      ${inputField("Google Review URL *", "googleUrl", b.googleUrl)}
+      <div class="field">
+        <div class="label-with-info">
+          <label for="field-googleUrl">Google Review URL *</label>
+          <button class="info-button" type="button" data-toggle-review-url-help aria-label="How to get Google Review URL">i</button>
+        </div>
+        <input id="field-googleUrl" class="input" placeholder="Paste your Google review link" value="${escapeHtml(b.googleUrl)}" data-field="googleUrl" />
+        <div class="review-url-help" data-review-url-help hidden>
+          <strong>How to get this link</strong>
+          <ol>
+            <li>Open Google Maps and search your business name.</li>
+            <li>Open your Business Profile and tap <b>Ask for reviews</b> or <b>Share review form</b>.</li>
+            <li>Copy the review link and paste it here.</li>
+          </ol>
+          <p>If you do not see it, open Google Business Profile Manager, select your business, then choose <b>Ask for reviews</b>.</p>
+        </div>
+      </div>
       ${inputField("Keywords (comma separated)", "keywords", b.keywords)}
 
       <div class="pro-settings ${proMax ? "" : "locked"}">
@@ -1480,12 +2032,10 @@ function businessPage() {
 
       <div class="field">
         <label>Choose Language</label>
-        <div class="option-row">
-          ${chip("language", "English")}
-          ${chip("language", "Hindi")}
-          ${chip("language", "Hinglish")}
-          ${chip("language", "Marathi")}
+        <div class="option-row" style="flex-wrap:wrap; gap:8px;">
+          ${(state.proLanguages?.length > 0 ? state.proLanguages : ["English", "Hindi", "Hinglish", "Marathi"]).map(l => chip("language", l)).join("")}
         </div>
+        ${state.proLanguages?.length > 0 ? `<p class="hint" style="margin-top:6px;">✓ ${state.proLanguages.length} custom languages set (Pro plan)</p>` : ""}
       </div>
 
       <div class="field">
@@ -1527,8 +2077,6 @@ function replyPage() {
   const draft = state.replyDraft || {};
   const buttonText = isGeneratingReply ? "Generating replies..." : "Generate Smart Replies";
   return `
-    <h1 class="page-title">Smart Reply Generator</h1>
-    <p class="page-subtitle">Create warm, professional Google Business replies in seconds</p>
     <section class="panel reply-card">
       <div class="field">
         <input id="customerName" class="input" placeholder="Customer Name" value="${escapeHtml(draft.customerName || "")}" data-reply-draft="customerName" />
@@ -1684,7 +2232,6 @@ function pricingPageV2() {
   return `
     <section class="pricing-intro">
       <div>
-        <p class="eyebrow">Pricing</p>
         <h1 class="page-title">Choose the plan that fits your review workflow</h1>
         <p class="page-subtitle">Every plan keeps review wording honest. Pro Max adds service-level personalization for businesses that want more detailed SEO-friendly drafts.</p>
       </div>
@@ -1693,6 +2240,16 @@ function pricingPageV2() {
         <span>${formatPlanName(state.user.plan || "free")}</span>
       </div>
     </section>
+    <section class="plan-status-grid">
+      ${getPlanStatusDetails().map(([label, value]) => `
+        <div class="plan-status-card">
+          <strong>${escapeHtml(label)}</strong>
+          <span>${escapeHtml(value)}</span>
+        </div>
+      `).join("")}
+    </section>
+    ${subscriptionManagePanel()}
+    ${state.checkoutNotice ? `<div class="checkout-notice panel">${escapeHtml(state.checkoutNotice)}</div>` : ""}
     <section class="pricing-grid">${plans.map(planCardV2).join("")}</section>
   `;
 }
@@ -1707,11 +2264,199 @@ function formatPlanName(planId) {
   return names[planId] || "Free";
 }
 
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatDateOnly(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function formatStatusLabel(value) {
+  return String(value || "unknown").replaceAll("_", " ");
+}
+
+function getPlanStatusDetails() {
+  const plan = getEffectivePlan();
+  const status = state.user.planStatus || (plan === "free" ? "free" : "active");
+  const renewal = state.user.planCurrentEnd;
+
+  return [
+    ["Current plan", formatPlanName(plan)],
+    ["Status", formatStatusLabel(status)],
+    ["Next renewal", renewal ? formatDateOnly(renewal) : plan === "free" ? "No renewal" : "Waiting for Razorpay"],
+    ["Subscription", state.user.subscriptionId ? state.user.subscriptionId : "Not created yet"]
+  ];
+}
+
+function subscriptionManagePanel() {
+  const effectivePlan = getEffectivePlan();
+  if (!isPaidPlanId(state.user.plan) && effectivePlan === "free") return "";
+
+  const status = state.user.planStatus || "unknown";
+  const cancelRequested = status === "cancel_requested";
+  const renewal = state.user.planCurrentEnd ? formatDateOnly(state.user.planCurrentEnd) : "the current billing cycle";
+
+  return `
+    <section class="panel subscription-manage-panel">
+      <div>
+        <strong>${cancelRequested ? "Cancellation scheduled" : "Manage subscription"}</strong>
+        <p>${cancelRequested
+          ? `Your paid access remains available until ${escapeHtml(renewal)}.`
+          : "Cancel at the end of the billing cycle. Your paid features remain active until renewal."}</p>
+      </div>
+      ${cancelRequested
+        ? `<button class="button ghost" type="button" disabled>Cancel Requested</button>`
+        : `<button class="button danger" type="button" data-cancel-subscription>Cancel Subscription</button>`}
+    </section>
+  `;
+}
+
+function extractPaymentAmount(event) {
+  const payment = event?.payload?.payload?.payment?.entity;
+  const amount = payment?.amount;
+  if (typeof amount === "number") return `Rs ${(amount / 100).toFixed(2)}`;
+  if (event?.plan === "pro") return "Rs 149.00";
+  if (event?.plan === "pro_max") return "Rs 199.00";
+  if (event?.plan === "pro_yearly") return "Rs 999.00";
+  return "-";
+}
+
+function getPaymentEventSummary(event) {
+  const eventName = event.event_name || "";
+  const status = event.status || event.payload?.payload?.subscription?.entity?.status || "received";
+
+  if (event.processing_status?.includes("failed") || event.processing_status?.includes("unmatched")) {
+    return {
+      title: "Needs review",
+      subtitle: "Payment was received, but RevYne could not fully update the account automatically.",
+      tone: "warning"
+    };
+  }
+
+  if (eventName === "payment.captured") {
+    return {
+      title: "Payment received",
+      subtitle: "Razorpay confirmed this payment successfully.",
+      tone: "success"
+    };
+  }
+
+  if (eventName === "subscription.activated" || eventName === "subscription.authenticated") {
+    return {
+      title: "Subscription active",
+      subtitle: "Your paid RevYne plan is active.",
+      tone: "success"
+    };
+  }
+
+  if (eventName === "subscription.charged") {
+    return {
+      title: "Subscription renewed",
+      subtitle: "Your recurring plan payment was charged.",
+      tone: "success"
+    };
+  }
+
+  if (eventName === "subscription.cancel_requested") {
+    return {
+      title: "Cancellation scheduled",
+      subtitle: "Your plan remains available until the current billing cycle ends.",
+      tone: "warning"
+    };
+  }
+
+  if (eventName === "subscription.cancelled" || eventName === "subscription.completed" || eventName === "subscription.expired") {
+    return {
+      title: "Subscription ended",
+      subtitle: "Paid access has ended for this subscription.",
+      tone: "neutral"
+    };
+  }
+
+  return {
+    title: formatStatusLabel(eventName || "Payment update"),
+    subtitle: `Status: ${formatStatusLabel(status)}`,
+    tone: "neutral"
+  };
+}
+
+function paymentEventCard(event, adminMode = false) {
+  const summary = getPaymentEventSummary(event);
+  const status = formatStatusLabel(event.status || event.payload?.payload?.subscription?.entity?.status || "received");
+  const amount = extractPaymentAmount(event);
+  const paymentId = event.razorpay_payment_id || event.payload?.payload?.payment?.entity?.id || "";
+  const subscriptionId = event.razorpay_subscription_id || event.payload?.payload?.subscription?.entity?.id || "";
+  const planName = event.plan ? formatPlanName(event.plan) : "RevYne plan";
+  const processingWarning = event.processing_status?.includes("failed") || event.processing_status?.includes("unmatched");
+
+  return `
+    <article class="payment-event-card payment-tone-${escapeHtml(summary.tone)}">
+      <div>
+        <strong>${escapeHtml(summary.title)}</strong>
+        <small>${escapeHtml(planName)} &middot; ${escapeHtml(summary.subtitle)}</small>
+        <span>${escapeHtml(formatDateTime(event.created_at))}</span>
+      </div>
+      <div>
+        <span class="payment-status">${escapeHtml(status)}</span>
+        <span>${escapeHtml(amount)}</span>
+      </div>
+      ${(adminMode || processingWarning) && event.processing_status ? `<p class="payment-processing ${processingWarning ? "has-warning" : ""}">Processing: ${escapeHtml(formatStatusLabel(event.processing_status))}${event.processing_error ? ` - ${escapeHtml(event.processing_error)}` : ""}</p>` : ""}
+      ${(paymentId || subscriptionId) ? `<p class="payment-reference">
+        ${paymentId ? `Payment ID: ${escapeHtml(paymentId)}` : ""}
+        ${paymentId && subscriptionId ? " · " : ""}
+        ${subscriptionId ? `Subscription ID: ${escapeHtml(subscriptionId)}` : ""}
+      </p>` : ""}
+    </article>
+  `;
+}
+
+function adminPaymentReliabilityPanel() {
+  if (!state.user.isAdmin) return "";
+  const events = state.adminPaymentEvents || [];
+  const issues = events.filter((event) => {
+    const status = event.processing_status || "";
+    return status.includes("failed") || status.includes("unmatched") || event.profile_updated === false;
+  }).slice(0, 6);
+
+  return `
+    <section class="panel payment-events-panel">
+      <div class="admin-payment-head">
+        <div>
+          <h2>Admin Payment Watch</h2>
+          <p>Webhook events that may need manual review.</p>
+        </div>
+        <button class="button secondary" type="button" data-refresh-admin-payments>Refresh</button>
+      </div>
+      ${issues.length
+        ? `<div class="payment-event-list">${issues.map((event) => paymentEventCard(event, true)).join("")}</div>`
+        : `<div class="empty-state"><strong>No payment issues detected</strong><p>Recent webhooks are matching profiles and updating plans.</p></div>`}
+    </section>
+  `;
+}
+
 function planCardV2({ id, name, label, description, price, period, oldPrice, featured, cta }) {
   const free = id === "free";
   const proMax = id === "pro_max";
   const proOrAbove = !free;
-  const currentPlan = (state.user.plan || "free") === id;
+  const isProMonthly = id === "pro";
+  const currentPlan = getEffectivePlan() === id;
   const features = [
     ["Unlimited QR scans", true],
     [`${free ? "2" : "5"} AI review suggestions per customer`, true],
@@ -1719,10 +2464,36 @@ function planCardV2({ id, name, label, description, price, period, oldPrice, fea
     ["Smart SEO-friendly replies", proOrAbove],
     ["Service and type selection on public review page", proMax],
     ["In-depth SEO review generator", proMax],
-    ["Multi-language support including Marathi", proOrAbove],
+    ["Multi-language support — choose up to 5 Indian languages", proOrAbove],
     ["Tone customization", proOrAbove],
     ["Future updates included", proOrAbove]
   ];
+
+  const langPicker = isProMonthly ? `
+    <div class="lang-picker-box">
+      <div class="lang-picker-header">
+        <span>Choose up to 5 languages</span>
+        <span class="lang-count-badge" id="lang-count-badge">${state.proLanguages?.length || 0}/5</span>
+      </div>
+      <div class="lang-picker-scroll">
+        ${INDIAN_LANGUAGES.map(lang => {
+          const checked = state.proLanguages?.includes(lang);
+          const disabled = !checked && (state.proLanguages?.length || 0) >= 5;
+          return `
+            <label class="lang-check-item ${checked ? "checked" : ""} ${disabled ? "lang-disabled" : ""}">
+              <input type="checkbox" data-lang-check="${lang}"
+                ${checked ? "checked" : ""}
+                ${disabled ? "disabled" : ""} />
+              <span>${lang}</span>
+            </label>
+          `;
+        }).join("")}
+      </div>
+      <button class="button full" type="button" data-save-langs style="min-height:40px; font-size:13px; border-radius:10px; margin-top:8px;">
+        Save Languages
+      </button>
+    </div>
+  ` : "";
 
   return `
     <article class="price-card ${featured ? "featured" : ""}">
@@ -1739,24 +2510,46 @@ function planCardV2({ id, name, label, description, price, period, oldPrice, fea
       <div class="feature-list">
         ${features.map(([featureLabel, ok]) => `<div class="feature"><span class="${ok ? "yes" : "no"}">${ok ? "&#10003;" : "&times;"}</span><span class="${ok ? "" : "disabled"}">${featureLabel}</span></div>`).join("")}
       </div>
+      ${langPicker}
       ${currentPlan
         ? `<button class="button ghost full" type="button" disabled>Current Plan</button>`
         : free
           ? `<button class="button ghost full" type="button" disabled>Free Included</button>`
-          : `<button class="button full" type="button" data-plan-select="${id}">${cta}</button>`}
+          : `<button class="button full" type="button" data-plan-select="${id}" style="margin-top:${isProMonthly ? "8px" : "0"}">${cta}</button>`}
     </article>
   `;
 }
 
 function ordersPage() {
+  const events = state.paymentEvents || [];
+  const planDetails = getPlanStatusDetails();
+
   return `
-    <section class="panel form-panel">
-      <h1 class="page-title">Order History</h1>
-      <p class="page-subtitle">Payment records will appear here after Razorpay or Stripe is connected.</p>
-      <div class="suggestion">
-        <p><strong>Current plan:</strong> Free</p>
-        <p><strong>Status:</strong> MVP demo mode</p>
+    <section class="orders-page">
+      <div class="orders-hero panel">
+        <div>
+          <p class="eyebrow">Billing</p>
+          <h1 class="page-title">Order History</h1>
+          <p class="page-subtitle">Your Razorpay subscription and payment events appear here after checkout.</p>
+        </div>
+        <button class="button secondary" type="button" data-refresh-payments>Refresh</button>
       </div>
+      <section class="plan-status-grid">
+        ${planDetails.map(([label, value]) => `
+          <div class="plan-status-card">
+            <strong>${escapeHtml(label)}</strong>
+            <span>${escapeHtml(value)}</span>
+          </div>
+        `).join("")}
+      </section>
+      ${subscriptionManagePanel()}
+      <section class="panel payment-events-panel">
+        <h2>Invoices & Payments</h2>
+        ${events.length
+          ? `<div class="payment-event-list">${events.map((event) => paymentEventCard(event)).join("")}</div>`
+          : `<div class="empty-state"><strong>No invoices yet</strong><p>Your subscription payments will appear here after Razorpay confirms them.</p></div>`}
+      </section>
+      ${adminPaymentReliabilityPanel()}
     </section>
   `;
 }
@@ -1782,13 +2575,115 @@ function aboutPage() {
   `;
 }
 
+function legalShell(title, subtitle, body) {
+  const backView = state.isLoggedIn ? "profile" : "dashboard";
+  return `
+    <section class="legal-page">
+      <div class="legal-hero panel">
+        <p class="section-kicker">RevYne Legal</p>
+        <h1>${title}</h1>
+        <p>${subtitle}</p>
+        <div class="legal-switcher">
+          <button class="button ${state.view === "terms" ? "" : "secondary"}" type="button" data-view="terms">Terms</button>
+          <button class="button ${state.view === "privacy" ? "" : "secondary"}" type="button" data-view="privacy">Privacy Policy</button>
+          <button class="button ghost" type="button" data-view="${backView}">${state.isLoggedIn ? "Back to Profile" : "Back to Login"}</button>
+        </div>
+      </div>
+      <article class="panel legal-card">
+        ${body}
+        <div class="legal-note">
+          <strong>Note:</strong> This policy text is a practical starting point for launch. Please review it with a legal professional before using RevYne for public paid customers.
+        </div>
+      </article>
+    </section>
+  `;
+}
+
+function termsPage() {
+  return legalShell(
+    "Terms & Conditions",
+    "The rules for using RevYne to collect honest customer feedback and generate business replies.",
+    `
+      <p class="legal-date">Last updated: 2 May 2026</p>
+      <h2>1. Acceptance of Terms</h2>
+      <p>By creating an account, continuing as a guest, or using RevYne, you agree to these Terms & Conditions. If you do not agree, please do not use the service.</p>
+
+      <h2>2. What RevYne Does</h2>
+      <p>RevYne helps businesses collect genuine customer feedback, create review links and QR codes, generate wording suggestions from a customer's real experience, and draft professional replies to customer reviews.</p>
+
+      <h2>3. Honest Review Use Only</h2>
+      <p>You must not use RevYne to create fake reviews, impersonate customers, hide negative feedback, offer improper incentives for positive reviews, or manipulate public ratings. AI suggestions are only drafts and should be edited so they accurately reflect a real customer's experience.</p>
+
+      <h2>4. Your Account</h2>
+      <p>You are responsible for the information added to your account and business profile. Keep your login access secure and tell us if you believe your account has been used without permission.</p>
+
+      <h2>5. Business and Customer Content</h2>
+      <p>You remain responsible for business details, customer feedback, review text, replies, uploaded images, and any other content submitted through RevYne. Do not submit unlawful, misleading, abusive, or confidential content that you do not have permission to use.</p>
+
+      <h2>6. AI Output</h2>
+      <p>AI-generated review suggestions and replies may be incomplete or inaccurate. You are responsible for reviewing, editing, and approving any output before sharing, copying, or posting it publicly.</p>
+
+      <h2>7. Payments and Plans</h2>
+      <p>Paid plans may be billed through Razorpay or another payment provider. Plan limits, pricing, and features may change over time. Subscription changes, cancellations, and refunds will follow the terms shown at checkout and any policy we publish for paid customers.</p>
+
+      <h2>8. Availability</h2>
+      <p>We aim to keep RevYne reliable, but we do not guarantee uninterrupted service. Features may be updated, paused, or changed as we improve the product.</p>
+
+      <h2>9. Limitation of Liability</h2>
+      <p>RevYne is provided on an "as is" basis. To the maximum extent allowed by law, we are not liable for indirect losses, lost profits, lost data, review platform decisions, or business outcomes resulting from use of the app.</p>
+
+      <h2>10. Contact</h2>
+      <p>For questions about these Terms, contact us at <a href="mailto:revyneai@gmail.com">revyneai@gmail.com</a>.</p>
+    `
+  );
+}
+
+function privacyPage() {
+  return legalShell(
+    "Privacy Policy",
+    "How RevYne collects, uses, stores, and protects information for business users and review flows.",
+    `
+      <p class="legal-date">Last updated: 2 May 2026</p>
+      <h2>1. Information We Collect</h2>
+      <p>We may collect your name, email address, mobile number, Google account profile details, business name, category, city, Google review URL, services, keywords, uploaded profile image, support tickets, plan details, usage activity, and review or reply drafts created in the app.</p>
+
+      <h2>2. Customer Review Information</h2>
+      <p>When customers use a public review page, RevYne may process star ratings, selected services, selected service types, written experiences, generated suggestions, and timestamps so the business can understand and improve its review workflow.</p>
+
+      <h2>3. How We Use Information</h2>
+      <p>We use information to create and manage accounts, save business profiles, generate review suggestions and replies, operate QR/public review links, manage support tickets, process payments, prevent misuse, improve the app, and communicate important service updates.</p>
+
+      <h2>4. AI and Third-Party Services</h2>
+      <p>RevYne may send relevant prompts or review text to AI providers to generate drafts. We also use service providers such as Supabase for authentication/database services, Vercel for hosting, Google for OAuth login, and Razorpay for payments where enabled.</p>
+
+      <h2>5. Payments</h2>
+      <p>Payment details are handled by the payment provider. RevYne stores subscription status, plan, payment event references, and related metadata needed to manage access to paid features.</p>
+
+      <h2>6. Cookies and Local Storage</h2>
+      <p>RevYne uses browser storage and service worker caching to keep the app signed in, remember app state, improve loading, and support PWA behavior. If analytics or marketing cookies are added later, this policy and any consent notice should be updated.</p>
+
+      <h2>7. Data Sharing</h2>
+      <p>We do not sell personal information. We share data only with service providers needed to run RevYne, comply with law, protect the service, process payments, or respond to support and security issues.</p>
+
+      <h2>8. Data Retention</h2>
+      <p>We keep account, business, support, payment, and generated content for as long as needed to provide the service, meet legal or accounting requirements, resolve disputes, and improve reliability.</p>
+
+      <h2>9. Your Choices</h2>
+      <p>You may update business and profile information inside the app. For access, correction, deletion, or account-related privacy requests, contact us using the email below.</p>
+
+      <h2>10. Contact</h2>
+      <p>For privacy questions or data requests, contact us at <a href="mailto:revyneai@gmail.com">revyneai@gmail.com</a>.</p>
+    `
+  );
+}
+
 function publicReviewPage() {
   const b = state.business;
   const draft = state.reviewDraft || {};
   const categoryMeta = getCategoryMeta(b.category);
   const services = splitList(b.services, [b.category || "General Service"]).slice(0, 5);
   const products = splitList(b.serviceTypes, splitList(b.keywords, ["Standard", "Premium", "Custom Requirement"]));
-  const proMax = isProMaxPlan();
+  const proMax = isPublicBusinessProMax();
   const customerSubtitle = proMax
     ? "Choose details and share your genuine experience"
     : "Share your genuine experience in your own words";
@@ -1854,7 +2749,7 @@ function authPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260430-7" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-1" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Smart AI Review Assistant for Businesses</div>
       </div>
@@ -1881,7 +2776,12 @@ function authPage() {
         </button>
       </div>
 
-      <p class="auth-terms">By continuing, you agree to our Terms &amp; Privacy Policy</p>
+      <p class="auth-terms">
+        By continuing, you agree to our
+        <button type="button" data-view="terms">Terms</button>
+        and
+        <button type="button" data-view="privacy">Privacy Policy</button>
+      </p>
     </div>
     <div class="copy-toast"></div>
   `;
@@ -1894,7 +2794,7 @@ function googleProfileSetupPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260430-7" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-1" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Complete your Google profile</div>
       </div>
@@ -1934,53 +2834,159 @@ function googleProfileSetupPage() {
 
 function supportPage() {
   const tickets = state.supportTickets || [];
+
+  const FAQ_SECTIONS = [
+    {
+      cat: "🚀 Getting Started",
+      items: [
+        { q: "How do I set up my business profile?", a: "Go to <strong>My Business</strong> tab. Enter your business name, category, and city. Paste your Google Review link (from Google Business Profile → Get more reviews → Share review form). Hit Save — your QR code and public review link are instantly generated." },
+        { q: "How do I share the review link with customers?", a: "From the <strong>Dashboard</strong>, you can copy your review link, download the QR code as an image, or print it. Place the QR code at your counter, on your invoice, or packaging — customers scan and review in under 60 seconds." },
+        { q: "Do customers need to install an app?", a: "No app needed. Customers scan your QR code or tap the link, fill a short form, receive an AI-drafted review, and copy-paste it onto Google in one tap." },
+        { q: "What is the public review page?", a: "It's a branded page hosted at <strong>revyneai.com/review/your-token</strong>. It shows your business name, category, and a star-rating form. After rating, the customer gets 3 AI-written review options in their preferred language." },
+      ]
+    },
+    {
+      cat: "✍️ Review Generation",
+      items: [
+        { q: "How does the AI review suggestion work?", a: "Your customer gives a star rating and optionally their name and city. RevYne generates 3 natural, unique review drafts in the language and tone you've configured. The customer picks one, copies it, and posts it on Google." },
+        { q: "Can I generate reviews in Indian languages?", a: "Yes! The <strong>Free plan</strong> supports English, Hindi, Hinglish, and Marathi. <strong>Pro plan</strong> lets you choose up to 5 languages from all 24 Indian languages — including Tamil, Telugu, Gujarati, Bengali, Kannada, Malayalam, Punjabi, Odia, and more." },
+        { q: "Can I change the tone of the reviews?", a: "Yes. In <strong>My Business → Default Tone</strong>, choose Professional, Friendly, or Enthusiastic. This tone is applied to all AI-generated review drafts for your business." },
+        { q: "Why doesn't the review post directly to Google?", a: "Google's policies do not allow any third-party app to post reviews on behalf of users — only the customer can publish. RevYne makes it as frictionless as possible by pre-writing the review so the customer just copies and pastes it." },
+        { q: "The AI review doesn't sound natural. What should I do?", a: "Try switching the tone (Professional / Friendly / Enthusiastic) or changing the language. If a specific language output seems off, raise a ticket with an example — we actively improve language templates." },
+      ]
+    },
+    {
+      cat: "💬 Smart Reply",
+      items: [
+        { q: "What is Smart Reply?", a: "Smart Reply helps you write professional, personalised responses to reviews you've already received on Google. Paste the review text, select the star rating, and get a polished AI reply you can post directly on your Google Business Profile." },
+        { q: "How many Smart Replies can I use per month?", a: "<strong>Free</strong>: 10 replies/month. <strong>Pro</strong>: 100 replies/month. <strong>Pro Max</strong>: unlimited replies. Your usage resets on the 1st of every month." },
+        { q: "Can I edit the AI reply before posting?", a: "Yes — copy the reply, then paste and edit it directly in your Google Business Profile before hitting publish." },
+      ]
+    },
+    {
+      cat: "💳 Plans & Billing",
+      items: [
+        { q: "What plans are available?", a: "<strong>Free</strong>: core features, 4 languages, 10 AI generations/month. <strong>Pro (₹149/mo)</strong>: 100 generations, 5 custom languages, 100 smart replies. <strong>Pro Max (₹199/mo)</strong>: unlimited everything. <strong>Yearly (₹999/yr)</strong>: best value, all Pro Max features." },
+        { q: "How do I upgrade my plan?", a: "Go to <strong>Pricing</strong> from the top menu. Choose a plan and tap Upgrade. We use Razorpay — UPI, cards, net banking, and wallets are all accepted." },
+        { q: "Can I cancel my subscription anytime?", a: "Yes. Go to <strong>Pricing → Cancel Subscription</strong>. Your plan stays active until the end of the current billing cycle and won't renew after that." },
+        { q: "I was charged but my plan didn't activate. What should I do?", a: "Wait 2 minutes and refresh the app — payment webhooks occasionally have a short delay. If your plan is still not activated after 5 minutes, raise a ticket below with your <strong>Razorpay Payment ID</strong> — we resolve payment issues within 2 hours." },
+        { q: "Do you offer refunds?", a: "Refunds are available within 24 hours of purchase if you haven't used any AI generations. Raise a ticket with your payment ID and reason. After 24 hours or after usage, refunds are at our discretion." },
+      ]
+    },
+    {
+      cat: "👤 Account & Login",
+      items: [
+        { q: "How do I log in?", a: "RevYne supports <strong>Google login</strong> and <strong>mobile OTP</strong> login. Always use the same method — Google and OTP accounts are treated as separate accounts." },
+        { q: "My business details disappeared after logging in.", a: "This was a known bug that has been fixed. If you still experience this, go to My Business and re-enter your details — they will save permanently. Contact support if it keeps happening." },
+        { q: "Can I change my email or mobile number?", a: "Email is tied to your Google login. Mobile number can be updated in <strong>My Business</strong>. If you need to merge two accounts or change your login email, raise a ticket." },
+        { q: "How do I delete my account?", a: "Raise a support ticket with the subject 'Delete my account'. We'll confirm your identity and permanently delete all your data within 7 days as per our privacy policy." },
+        { q: "Is my data secure?", a: "Yes. RevYne uses Supabase (SOC 2 compliant infrastructure) with row-level security — each user can only access their own data. We never store passwords; only OAuth tokens and OTP-verified sessions are used." },
+      ]
+    },
+  ];
+
+  const faqHTML = FAQ_SECTIONS.map((section, si) => `
+    <div class="faq-section">
+      <div class="faq-cat-title">${section.cat}</div>
+      ${section.items.map((item, ii) => `
+        <div class="faq-item" id="faq-item-${si}-${ii}">
+          <button class="faq-q" type="button" data-faq-toggle="${si}-${ii}">
+            <span>${item.q}</span>
+            <svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a" id="faq-a-${si}-${ii}"><p>${item.a}</p></div>
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+
   return `
     <section class="support-page">
-      <div class="support-hero panel">
-        <div>
-          <p class="section-kicker">Support Center</p>
-          <h1>Raise a ticket</h1>
-          <p>Tell us what is blocked. We will track it like a proper support desk: open, in review, waiting for you, then resolved.</p>
-        </div>
-        <div class="support-sla">
-          <strong>Priority logic</strong>
-          <span>Login and payment issues are marked high priority automatically.</span>
+
+      <!-- Hero -->
+      <div class="help-hero panel">
+        <div class="help-hero-icon">🛟</div>
+        <div class="help-hero-body">
+          <p class="section-kicker">Help &amp; Support</p>
+          <h1 class="help-hero-title">How can we help you?</h1>
+          <p class="help-hero-sub">Browse the guides and FAQs below. If you still can't find your answer, raise a support ticket at the bottom — we respond within 24 hours.</p>
         </div>
       </div>
 
-      <section class="panel support-form">
-        <div class="field">
-          <label for="support-category">Issue type</label>
-          <select id="support-category" class="select">
-            <option value="general">General question</option>
-            <option value="login">Login or account access</option>
-            <option value="payment">Payment or subscription</option>
-            <option value="ai_generation">AI review/reply generation</option>
-            <option value="review_page">Public review page or QR code</option>
-            <option value="business_profile">Business profile setup</option>
-          </select>
+      <!-- Feature quick guide -->
+      <div class="help-features-grid">
+        <div class="help-feat-card">
+          <div class="help-feat-icon">⭐</div>
+          <div class="help-feat-title">Collect Reviews</div>
+          <div class="help-feat-desc">Generate a QR code or shareable link. Customers scan, rate, and get an AI-drafted review to post on Google in seconds.</div>
         </div>
-        <div class="field">
-          <label for="support-subject">Subject</label>
-          <input id="support-subject" class="input" placeholder="Example: Google login is not opening" />
+        <div class="help-feat-card">
+          <div class="help-feat-icon">💬</div>
+          <div class="help-feat-title">Smart Reply</div>
+          <div class="help-feat-desc">Paste any customer review and get a professional AI-written response. Works for 5-star praise and 1-star complaints alike.</div>
         </div>
-        <div class="field">
-          <label for="support-message">Describe the issue</label>
-          <textarea id="support-message" class="textarea" placeholder="What happened, where did it happen, and what were you trying to do?"></textarea>
+        <div class="help-feat-card">
+          <div class="help-feat-icon">🌐</div>
+          <div class="help-feat-title">24 Indian Languages</div>
+          <div class="help-feat-desc">Reviews in Hindi, Tamil, Marathi, Bengali, Telugu, Gujarati, Kannada, Malayalam, Punjabi and 15 more — in natural native script.</div>
         </div>
-        <button class="button full" type="button" data-submit-ticket>Submit Ticket</button>
-      </section>
+        <div class="help-feat-card">
+          <div class="help-feat-icon">📱</div>
+          <div class="help-feat-title">QR Code</div>
+          <div class="help-feat-desc">Download and print your unique QR. Every scan opens your branded review page — no app install needed for your customers.</div>
+        </div>
+      </div>
 
-      <section class="panel support-process">
-        <h2>How we resolve tickets</h2>
-        <div class="support-steps">
-          <div><strong>1. Capture</strong><span>Customer creates a ticket from their account.</span></div>
-          <div><strong>2. Triage</strong><span>We assign category, priority, owner, and status.</span></div>
-          <div><strong>3. Investigate</strong><span>We check account, payment, app logs, and database records.</span></div>
-          <div><strong>4. Resolve</strong><span>We reply with the fix and close only after confirmation.</span></div>
-        </div>
-      </section>
+      <!-- FAQs -->
+      <div class="panel faq-panel">
+        <h2 class="faq-panel-heading">Frequently Asked Questions</h2>
+        <div class="faq-list">${faqHTML}</div>
+      </div>
 
+      <!-- Still need help — raise ticket (collapsed by default) -->
+      <div class="panel help-ticket-panel">
+        <div class="help-ticket-head">
+          <div>
+            <h2 class="help-ticket-heading">Still need help?</h2>
+            <p class="help-ticket-sub">Can't find your answer above? Raise a ticket and we'll get back to you within 24 hours.</p>
+          </div>
+          <button class="button" type="button" data-toggle-ticket>Raise a Ticket ↓</button>
+        </div>
+        <div class="help-ticket-form" id="help-ticket-form">
+          <div class="help-ticket-divider">
+            <p class="support-email">Or email us directly: <a href="mailto:revyneai@gmail.com">revyneai@gmail.com</a></p>
+            <div class="field">
+              <label for="support-category">Issue type</label>
+              <select id="support-category" class="select">
+                <option value="general">General question</option>
+                <option value="bug_report">Bug report</option>
+                <option value="login">Login or account access</option>
+                <option value="payment">Payment or subscription</option>
+                <option value="ai_generation">AI review / reply generation</option>
+                <option value="review_page">Public review page or QR code</option>
+                <option value="business_profile">Business profile setup</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="support-subject">Subject</label>
+              <input id="support-subject" class="input" placeholder="e.g. Google login is not opening" />
+            </div>
+            <div class="field">
+              <label for="support-message">Describe the issue</label>
+              <textarea id="support-message" class="textarea" placeholder="What happened, where did it happen, and what were you trying to do?"></textarea>
+            </div>
+            <div class="help-ticket-footer">
+              <div class="support-sla">
+                <strong>Priority logic</strong>
+                <span>Bug reports, login issues, and payment problems are automatically marked high priority.</span>
+              </div>
+              <button class="button full" type="button" data-submit-ticket>Submit Ticket</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Your tickets -->
       <section class="support-list">
         <div class="recent-header">
           <div class="recent-title">Your Tickets</div>
@@ -1989,10 +2995,11 @@ function supportPage() {
         ${tickets.length ? tickets.map(ticketCard).join("") : `
           <div class="panel empty-state">
             <strong>No tickets yet</strong>
-            <p>When you raise a ticket, it will appear here with status updates.</p>
+            <p>When you raise a ticket, it will appear here with live status updates.</p>
           </div>
         `}
       </section>
+
     </section>
   `;
 }
@@ -2136,8 +3143,10 @@ function profilePage() {
     { icon: "↻", label: "Order History", view: "orders", color: "#e5eeff", fg: "var(--blue)" },
     { icon: "@", label: "Help & Support", view: "support", color: "#e5eeff", fg: "var(--blue)" },
     ...(u.isAdmin ? [{ icon: "#", label: "Admin Support", view: "adminSupport", color: "#f0dbff", fg: "var(--blue)" }] : []),
-    { icon: "≡", label: "Terms & Privacy", view: null, color: "#e5eeff", fg: "var(--blue)" }
+    { icon: "≡", label: "Terms & Privacy", view: "terms", color: "#e5eeff", fg: "var(--blue)" }
   ];
+
+  const currentTheme = state.theme || "default";
 
   return `
     <section class="profile-page">
@@ -2147,6 +3156,22 @@ function profilePage() {
         <div class="profile-email">${escapeHtml(displayEmail)}</div>
         ${displayMobile ? `<div class="profile-email">${escapeHtml(displayMobile)}</div>` : ""}
       </div>
+
+      <div class="profile-theme-card">
+        <div class="profile-theme-title">
+          <span>🎨</span> Change Theme
+        </div>
+        <div class="theme-options">
+          ${THEMES.map(t => `
+            <label class="theme-option ${currentTheme === t.id ? "active" : ""}">
+              <input type="radio" name="theme" value="${t.id}" ${currentTheme === t.id ? "checked" : ""} />
+              <span class="theme-dot" style="background:linear-gradient(135deg,${t.c1},${t.c2})"></span>
+              <span class="theme-option-label">${t.label}</span>
+            </label>
+          `).join("")}
+        </div>
+      </div>
+
       <div class="profile-menu-list">
         ${items.map(({ icon, label, view, color, fg }) => `
           <button class="profile-menu-item" type="button" ${view ? `data-view="${view}"` : ""}>
@@ -2167,6 +3192,8 @@ function profilePage() {
 
 function currentPage() {
   if (isPublicReviewRoute()) return publicReviewPage();
+  if (state.view === "terms") return state.isLoggedIn ? appShell(termsPage()) : termsPage();
+  if (state.view === "privacy") return state.isLoggedIn ? appShell(privacyPage()) : privacyPage();
   if (!state.isLoggedIn) return authPage();
 
   const pages = {
@@ -2178,6 +3205,8 @@ function currentPage() {
     about: aboutPage,
     support: supportPage,
     adminSupport: adminSupportPage,
+    terms: termsPage,
+    privacy: privacyPage,
     profile: profilePage
   };
 
@@ -2202,6 +3231,12 @@ function bindEvents() {
 
   document.querySelector("[data-profile-image]")?.addEventListener("change", (event) => {
     handleProfileImageUpload(event.target.files?.[0]);
+  });
+
+  document.querySelector("[data-toggle-review-url-help]")?.addEventListener("click", () => {
+    const help = document.querySelector("[data-review-url-help]");
+    if (!help) return;
+    help.hidden = !help.hidden;
   });
 
   document.querySelectorAll("[data-reply-draft]").forEach((input) => {
@@ -2267,6 +3302,63 @@ function bindEvents() {
 
   document.querySelector("[data-submit-ticket]")?.addEventListener("click", createSupportTicket);
 
+  // FAQ accordion — JS-driven height for reliable cross-browser animation
+  document.querySelectorAll("[data-faq-toggle]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.faqToggle;
+      const item = document.getElementById(`faq-item-${key}`);
+      const answer = document.getElementById(`faq-a-${key}`);
+      if (!item || !answer) return;
+      const isOpen = item.classList.contains("faq-open");
+
+      // Close all open items first
+      document.querySelectorAll(".faq-item.faq-open").forEach(el => {
+        el.classList.remove("faq-open");
+        const ans = el.querySelector(".faq-a");
+        if (ans) ans.style.height = "0px";
+      });
+
+      // Open clicked item if it was closed
+      if (!isOpen) {
+        item.classList.add("faq-open");
+        answer.style.height = answer.scrollHeight + "px";
+      }
+    });
+  });
+
+  // Toggle ticket form — JS-driven height
+  document.querySelector("[data-toggle-ticket]")?.addEventListener("click", () => {
+    const form = document.getElementById("help-ticket-form");
+    const btn = document.querySelector("[data-toggle-ticket]");
+    if (!form) return;
+    const isOpen = form.classList.contains("ticket-open");
+    if (isOpen) {
+      form.classList.remove("ticket-open");
+      form.style.height = "0px";
+      if (btn) btn.textContent = "Raise a Ticket ↓";
+    } else {
+      form.classList.add("ticket-open");
+      form.style.height = form.scrollHeight + "px";
+      if (btn) btn.textContent = "Never mind ✕";
+      setTimeout(() => form.scrollIntoView({ behavior: "smooth", block: "nearest" }), 60);
+    }
+  });
+
+  document.querySelector("[data-refresh-payments]")?.addEventListener("click", async () => {
+    await loadSupabaseProfile();
+    await loadPaymentEvents();
+    showToast("Billing refreshed");
+    render();
+  });
+
+  document.querySelector("[data-refresh-admin-payments]")?.addEventListener("click", async () => {
+    await loadAdminPaymentEvents();
+    showToast("Payment watch refreshed");
+    render();
+  });
+
+  document.querySelector("[data-cancel-subscription]")?.addEventListener("click", cancelCurrentSubscription);
+
   document.querySelector("[data-refresh-tickets]")?.addEventListener("click", async () => {
     await loadSupportTickets();
     showToast("Tickets refreshed");
@@ -2312,8 +3404,11 @@ function bindEvents() {
     guestState.isLoggedIn = true;
     guestState.view = "dashboard";
     guestState.authMode = "signin";
+    guestState.user.provider = "guest";
+    guestState.user.lastLogin = new Date().toISOString();
     state = guestState;
     saveState();
+    trackEvent("guest_login_clicked");
     render();
   });
 
@@ -2321,6 +3416,60 @@ function bindEvents() {
     button.addEventListener("click", () => {
       startPlanCheckout(button.dataset.planSelect);
     });
+  });
+
+  // Theme switcher
+  document.querySelectorAll('[name="theme"]').forEach(radio => {
+    radio.addEventListener("change", () => {
+      state.theme = radio.value;
+      saveState();
+      document.documentElement.setAttribute("data-theme", state.theme);
+      document.querySelectorAll(".theme-option").forEach(opt => {
+        const optInput = opt.querySelector("input");
+        opt.classList.toggle("active", optInput && optInput.value === state.theme);
+      });
+      trackEvent("theme_changed", { theme: state.theme });
+    });
+  });
+
+  // Language picker checkboxes
+  document.querySelectorAll("[data-lang-check]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const lang = cb.dataset.langCheck;
+      if (cb.checked) {
+        if ((state.proLanguages?.length || 0) >= 5) {
+          cb.checked = false;
+          showToast("You can select up to 5 languages");
+          return;
+        }
+        state.proLanguages = [...(state.proLanguages || []), lang];
+      } else {
+        state.proLanguages = (state.proLanguages || []).filter(l => l !== lang);
+      }
+      saveState();
+      // Update badge and disabled states without full re-render
+      const badge = document.getElementById("lang-count-badge");
+      if (badge) badge.textContent = `${state.proLanguages.length}/5`;
+      document.querySelectorAll("[data-lang-check]").forEach(other => {
+        if (!other.checked) other.disabled = state.proLanguages.length >= 5;
+        const item = other.closest(".lang-check-item");
+        if (item) item.classList.toggle("lang-disabled", !other.checked && state.proLanguages.length >= 5);
+      });
+    });
+  });
+
+  document.querySelector("[data-save-langs]")?.addEventListener("click", () => {
+    if (!state.proLanguages?.length) {
+      showToast("Select at least one language first");
+      return;
+    }
+    // If current language isn't in new list, default to first selected
+    if (!state.proLanguages.includes(state.business.language)) {
+      state.business.language = state.proLanguages[0];
+    }
+    saveState();
+    showToast(`${state.proLanguages.length} language${state.proLanguages.length > 1 ? "s" : ""} saved`);
+    trackEvent("pro_languages_saved", { count: state.proLanguages.length });
   });
 
   document.querySelectorAll(".logout, [data-logout]").forEach((button) => {
@@ -2347,17 +3496,28 @@ async function render() {
   const dir = slideDirection;
   slideDirection = null;
   document.querySelector("#app").innerHTML = currentPage();
+  document.documentElement.setAttribute("data-theme", state.theme || "default");
 
   if (dir) {
     const main = document.querySelector(".main");
     if (main) main.classList.add(`slide-${dir}`);
   }
+  bottomNavShouldAnimate = false;
+  syncBottomNavPosition();
 
   bindEvents();
   renderQrCodes();
+  trackPageView();
 }
 
 window.addEventListener("hashchange", render);
+window.addEventListener("error", (event) => {
+  trackClientError("error", event.message, event.filename);
+});
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason?.message || event.reason || "Unhandled promise rejection";
+  trackClientError("unhandledrejection", reason);
+});
 
 async function initializeApp() {
   if (!supabaseClient) {
@@ -2373,6 +3533,7 @@ async function initializeApp() {
     render();
   } catch (error) {
     console.warn("Could not restore Supabase session:", error);
+    render();
   }
 
   supabaseClient.auth.onAuthStateChange(async (_event, session) => {

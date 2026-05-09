@@ -22,6 +22,47 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   });
 }
 
+async function checkRateLimit(userId: string, bucket: string, limit: number, windowSeconds: number) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return { allowed: true };
+
+  const identifier = `user:${userId}`;
+  const since = new Date(Date.now() - windowSeconds * 1000).toISOString();
+  const query = new URL(`${supabaseUrl}/rest/v1/rate_limit_events`);
+  query.searchParams.set("select", "id");
+  query.searchParams.set("bucket", `eq.${bucket}`);
+  query.searchParams.set("identifier", `eq.${identifier}`);
+  query.searchParams.set("created_at", `gte.${since}`);
+
+  const headers = {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
+    "Content-Type": "application/json"
+  };
+
+  const countResponse = await fetch(query, {
+    headers: {
+      ...headers,
+      Prefer: "count=exact"
+    }
+  });
+
+  const contentRange = countResponse.headers.get("content-range") || "";
+  const count = Number(contentRange.split("/")[1] || "0");
+  if (Number.isFinite(count) && count >= limit) {
+    return { allowed: false, retryAfter: windowSeconds };
+  }
+
+  await fetch(`${supabaseUrl}/rest/v1/rate_limit_events`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ bucket, identifier })
+  });
+
+  return { allowed: true };
+}
+
 async function getCurrentUser(authHeader: string) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -117,6 +158,11 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Login required" }, 401);
   }
 
+  const rate = await checkRateLimit(String(user.id), "payment:subscription_create", 5, 60 * 60);
+  if (!rate.allowed) {
+    return jsonResponse({ error: "Too many checkout attempts. Please try again later." }, 429);
+  }
+
   const config = planConfig[selectedPlan];
   const razorpayPlanId = Deno.env.get(config.env);
   if (!razorpayPlanId) {
@@ -150,9 +196,17 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Could not create Razorpay subscription", detail: subscription }, 502);
   }
 
-  await upsertPendingProfile(user, selectedPlan, subscription);
+  try {
+    await upsertPendingProfile(user, selectedPlan, subscription);
+  } catch (error) {
+    return jsonResponse({
+      error: "Could not save pending subscription",
+      detail: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
 
   return jsonResponse({
+    keyId,
     subscriptionId: subscription.id,
     shortUrl: subscription.short_url,
     plan: selectedPlan,

@@ -70,6 +70,39 @@ async function supabaseRequest(path: string, init: RequestInit) {
   });
 }
 
+async function findProfileBySubscription(subscriptionId: string) {
+  const response = await supabaseRequest(
+    `profiles?select=id,plan,plan_status,plan_current_end&razorpay_subscription_id=eq.${encodeURIComponent(subscriptionId)}&limit=1`,
+    { method: "GET" }
+  );
+
+  if (!response.ok) return null;
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.length > 0 ? rows[0] as Record<string, unknown> : null;
+}
+
+async function syncBusinessPlanSnapshot(userId: string, plan: string, status: string, currentEnd: string | null) {
+  await supabaseRequest(`businesses?owner_id=eq.${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      owner_plan: plan,
+      owner_plan_status: status,
+      owner_plan_current_end: currentEnd,
+      updated_at: new Date().toISOString()
+    })
+  });
+}
+
+async function insertPaymentEvent(eventRow: Record<string, unknown>) {
+  return await supabaseRequest("payment_events", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=ignore-duplicates"
+    },
+    body: JSON.stringify(eventRow)
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
@@ -100,20 +133,38 @@ Deno.serve(async (req) => {
   const notes = typeof subscription.notes === "object" && subscription.notes
     ? subscription.notes as Record<string, unknown>
     : {};
-  const userId = typeof notes.user_id === "string" ? notes.user_id : null;
-  const plan = typeof notes.plan === "string" ? notes.plan : null;
-  const subscriptionId = typeof subscription.id === "string" ? subscription.id : null;
-  const status = subscription.status || null;
+  let userId = typeof notes.user_id === "string" ? notes.user_id : null;
+  let plan = typeof notes.plan === "string" ? notes.plan : null;
+  const subscriptionId = typeof subscription.id === "string"
+    ? subscription.id
+    : typeof payment.subscription_id === "string"
+      ? payment.subscription_id
+      : null;
+  const status = subscription.status || (eventName === "payment.captured" ? "active" : null);
+
+  if ((!userId || !plan) && subscriptionId) {
+    const existingProfile = await findProfileBySubscription(subscriptionId);
+    if (existingProfile) {
+      userId = userId || (typeof existingProfile.id === "string" ? existingProfile.id : null);
+      plan = plan || (typeof existingProfile.plan === "string" ? existingProfile.plan : null);
+    }
+  }
+
   const nextPlan = shouldDowngrade(eventName, status) ? "free" : plan;
+  let processingStatus = "received";
+  let processingError: string | null = null;
+  let profileUpdated = false;
 
   if (userId && nextPlan && subscriptionId) {
+    const nextStatus = mapStatusToPlanStatus(status);
+    const currentEnd = timestampToIso(subscription.current_end);
     const profileUpdate = {
       plan: nextPlan,
-      plan_status: mapStatusToPlanStatus(status),
+      plan_status: nextStatus,
       razorpay_subscription_id: subscriptionId,
       razorpay_customer_id: subscription.customer_id || null,
       plan_current_start: timestampToIso(subscription.current_start),
-      plan_current_end: timestampToIso(subscription.current_end),
+      plan_current_end: currentEnd,
       updated_at: new Date().toISOString()
     };
 
@@ -123,9 +174,16 @@ Deno.serve(async (req) => {
     });
 
     if (!response.ok) {
-      const detail = await response.text();
-      return jsonResponse({ error: "Could not update profile", detail }, 500);
+      processingStatus = "profile_update_failed";
+      processingError = await response.text();
+    } else {
+      profileUpdated = true;
+      processingStatus = "profile_updated";
+      await syncBusinessPlanSnapshot(userId, nextPlan, nextStatus, currentEnd);
     }
+  } else {
+    processingStatus = "unmatched_profile";
+    processingError = "Could not match Razorpay event to a RevYne profile";
   }
 
   const eventRow = {
@@ -136,16 +194,17 @@ Deno.serve(async (req) => {
     razorpay_subscription_id: subscriptionId,
     razorpay_payment_id: typeof payment.id === "string" ? payment.id : null,
     status: typeof status === "string" ? status : null,
+    processing_status: processingStatus,
+    processing_error: processingError,
+    profile_updated: profileUpdated,
     payload
   };
 
-  await supabaseRequest("payment_events", {
-    method: "POST",
-    headers: {
-      Prefer: "resolution=ignore-duplicates"
-    },
-    body: JSON.stringify(eventRow)
-  });
+  await insertPaymentEvent(eventRow);
+
+  if (processingStatus === "profile_update_failed") {
+    return jsonResponse({ error: "Could not update profile", detail: processingError }, 500);
+  }
 
   return jsonResponse({ received: true });
 });

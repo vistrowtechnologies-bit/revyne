@@ -3,26 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RevYne</title>
+    <title>RevYne AI - Smart Review Assistant for Businesses</title>
+    <meta name="description" content="RevYne AI helps businesses collect honest customer feedback, generate review suggestions, create QR review links, and reply professionally to customer reviews." />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://revyneai.com/" />
     <meta name="theme-color" content="#8127CF" />
-    <link rel="icon" type="image/png" href="./assets/favicon.png?v=20260430-9" />
-    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260430-9" />
-    <link rel="manifest" href="./manifest.webmanifest?v=20260430-9" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="RevYne AI" />
+    <meta property="og:title" content="RevYne AI - Smart Review Assistant for Businesses" />
+    <meta property="og:description" content="Collect honest reviews, generate customer-friendly review drafts, create QR review links, and reply professionally with AI." />
+    <meta property="og:url" content="https://revyneai.com/" />
+    <meta property="og:image" content="https://revyneai.com/assets/revyne-icon-512.png" />
+    <meta property="og:image:alt" content="RevYne AI app icon" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="RevYne AI - Smart Review Assistant for Businesses" />
+    <meta name="twitter:description" content="AI-powered review collection, QR review links, and smart customer review replies for businesses." />
+    <meta name="twitter:image" content="https://revyneai.com/assets/revyne-icon-512.png" />
+    <link rel="icon" type="image/png" href="./assets/favicon.png?v=20260509-1" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260509-1" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260509-1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260430-9" />
+    <link rel="stylesheet" href="./styles.css?v=20260509-1" />
   </head>
   <body>
     <div id="app"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <script src="./supabase-config.js?v=20260430-9"></script>
-    <script src="./app.js?v=20260430-9"></script>
+    <script src="./supabase-config.js?v=20260509-1"></script>
+    <script src="./app.js?v=20260509-1"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
-          navigator.serviceWorker.register("./sw.js?v=20260430-9").catch(() => {});
+          navigator.serviceWorker.register("./sw.js?v=20260509-1").catch(() => {});
         });
       }
     </script>

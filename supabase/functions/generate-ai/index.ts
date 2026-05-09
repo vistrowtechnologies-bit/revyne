@@ -26,6 +26,21 @@ type RequestBody = {
   business?: BusinessInput;
 };
 
+const FIELD_LIMITS = {
+  businessName: 120,
+  businessCategory: 80,
+  city: 80,
+  services: 500,
+  keywords: 300,
+  language: 40,
+  tone: 40,
+  customerName: 80,
+  selectedService: 120,
+  selectedProduct: 120,
+  experience: 1200,
+  reviewText: 1200
+};
+
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -34,6 +49,110 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
       "Content-Type": "application/json"
     }
   });
+}
+
+function cleanText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function normalizeRating(value: unknown) {
+  const rating = Number(value);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return null;
+  return rating;
+}
+
+function normalizeBody(body: RequestBody) {
+  const business = body.business || {};
+  const rating = normalizeRating(body.rating);
+
+  return {
+    ...body,
+    rating: rating || undefined,
+    experience: cleanText(body.experience, FIELD_LIMITS.experience),
+    selectedService: cleanText(body.selectedService, FIELD_LIMITS.selectedService),
+    selectedProduct: cleanText(body.selectedProduct, FIELD_LIMITS.selectedProduct),
+    customerName: cleanText(body.customerName, FIELD_LIMITS.customerName),
+    reviewText: cleanText(body.reviewText, FIELD_LIMITS.reviewText),
+    business: {
+      name: cleanText(business.name, FIELD_LIMITS.businessName),
+      category: cleanText(business.category, FIELD_LIMITS.businessCategory),
+      city: cleanText(business.city, FIELD_LIMITS.city),
+      services: cleanText(business.services, FIELD_LIMITS.services),
+      keywords: cleanText(business.keywords, FIELD_LIMITS.keywords),
+      language: cleanText(business.language, FIELD_LIMITS.language) || "English",
+      tone: cleanText(business.tone, FIELD_LIMITS.tone) || "Professional"
+    }
+  };
+}
+
+function validateBody(body: RequestBody) {
+  if (body.action !== "review_suggestions" && body.action !== "smart_replies") {
+    return "Invalid action";
+  }
+
+  if (!normalizeRating(body.rating)) {
+    return "Rating must be a whole number from 1 to 5";
+  }
+
+  if (body.action === "review_suggestions" && cleanText(body.experience, FIELD_LIMITS.experience).length < 3) {
+    return "Customer experience is required";
+  }
+
+  if (body.action === "smart_replies" && cleanText(body.reviewText, FIELD_LIMITS.reviewText).length < 3) {
+    return "Review text is required";
+  }
+
+  return null;
+}
+
+function getClientIdentifier(req: Request) {
+  const authHeader = req.headers.get("authorization") || "";
+  if (authHeader.startsWith("Bearer ")) return `auth:${authHeader.slice(-32)}`;
+  const forwardedFor = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "";
+  const ip = forwardedFor.split(",")[0]?.trim();
+  return `ip:${ip || "unknown"}`;
+}
+
+async function checkRateLimit(req: Request, bucket: string, limit: number, windowSeconds: number) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return { allowed: true };
+
+  const identifier = getClientIdentifier(req);
+  const since = new Date(Date.now() - windowSeconds * 1000).toISOString();
+  const query = new URL(`${supabaseUrl}/rest/v1/rate_limit_events`);
+  query.searchParams.set("select", "id");
+  query.searchParams.set("bucket", `eq.${bucket}`);
+  query.searchParams.set("identifier", `eq.${identifier}`);
+  query.searchParams.set("created_at", `gte.${since}`);
+
+  const headers = {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
+    "Content-Type": "application/json"
+  };
+
+  const countResponse = await fetch(query, {
+    headers: {
+      ...headers,
+      Prefer: "count=exact"
+    }
+  });
+
+  const contentRange = countResponse.headers.get("content-range") || "";
+  const count = Number(contentRange.split("/")[1] || "0");
+  if (Number.isFinite(count) && count >= limit) {
+    return { allowed: false, retryAfter: windowSeconds };
+  }
+
+  await fetch(`${supabaseUrl}/rest/v1/rate_limit_events`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ bucket, identifier })
+  });
+
+  return { allowed: true };
 }
 
 function parseJsonArray(text: string, key: "suggestions" | "replies") {
@@ -126,12 +245,15 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
-  if (body.action !== "review_suggestions" && body.action !== "smart_replies") {
-    return jsonResponse({ error: "Invalid action" }, 400);
+  const validationError = validateBody(body);
+  if (validationError) {
+    return jsonResponse({ error: validationError }, 400);
   }
+  body = normalizeBody(body);
 
-  if (body.action === "review_suggestions" && !body.rating) {
-    return jsonResponse({ error: "Rating is required" }, 400);
+  const rate = await checkRateLimit(req, `generate-ai:${body.action}`, 60, 60 * 60);
+  if (!rate.allowed) {
+    return jsonResponse({ error: "Too many AI requests. Please try again later." }, 429);
   }
 
   const key = body.action === "review_suggestions" ? "suggestions" : "replies";

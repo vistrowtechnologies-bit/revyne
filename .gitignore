@@ -7,3 +7,8 @@ node_modules/
 Thumbs.db
 
 .vercel
+_revyne_push/
+.git_broken_*/
+.codex-git_backup_*/
+.claude/
+supabase/.temp/

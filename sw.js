@@ -1,12 +1,14 @@
-const CACHE_NAME = "revyne-ai-v20260430-9";
+const CACHE_NAME = "revyne-ai-v20260509-1";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/styles.css?v=20260430-9",
-  "/app.js?v=20260430-9",
-  "/supabase-config.js?v=20260430-9",
-  "/manifest.webmanifest?v=20260430-9",
-  "/assets/favicon.png?v=20260430-9",
+  "/styles.css?v=20260509-1",
+  "/app.js?v=20260509-1",
+  "/supabase-config.js?v=20260509-1",
+  "/manifest.webmanifest?v=20260509-1",
+  "/assets/favicon.png?v=20260509-1",
+  "/robots.txt",
+  "/sitemap.xml",
   "/assets/revyne-icon-192.png",
   "/assets/revyne-icon-512.png",
   "/assets/screenshot-mobile.png",
@@ -33,15 +35,22 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
+  const url = new URL(request.url);
+  const sameOrigin = url.origin === self.location.origin;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+        if (sameOrigin && response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+        }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+      .catch(() => {
+        if (!sameOrigin) return Response.error();
+        return caches.match(request).then((cached) => cached || caches.match("/index.html"));
+      })
   );
 });
 
