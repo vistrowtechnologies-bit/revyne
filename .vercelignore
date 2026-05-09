@@ -2,6 +2,11 @@ node_modules/
 supabase/
 .claude/
 .git/
+_git_meta/
+_revyne_push/
+.git_broken_*/
+.git_broken_after_push_*/
+.codex-git_backup_*/
 package.json
 package-lock.json
 .env
