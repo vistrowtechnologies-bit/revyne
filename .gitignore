@@ -12,3 +12,4 @@ _revyne_push/
 .codex-git_backup_*/
 .claude/
 supabase/.temp/
+_git_meta/
