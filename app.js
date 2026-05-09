@@ -1806,7 +1806,7 @@ function appShell(content) {
       <header class="topbar">
         <div class="topbar-main">
           <div class="brand">
-            <img class="brand-mark" src="./assets/favicon.png?v=20260509-1" alt="" />
+            <img class="brand-mark" src="./assets/favicon.png?v=20260509-2" alt="" />
             <span>RevYne</span>
           </div>
         </div>
@@ -2749,7 +2749,7 @@ function authPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-1" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-2" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Smart AI Review Assistant for Businesses</div>
       </div>
@@ -2794,7 +2794,7 @@ function googleProfileSetupPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-1" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-2" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Complete your Google profile</div>
       </div>
