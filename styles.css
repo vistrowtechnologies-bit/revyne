@@ -71,7 +71,7 @@ body {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--ink);
   background: var(--canvas);
-  overflow-x: hidden;
+  overflow-x: clip;
   width: 100%;
 }
 
@@ -90,7 +90,7 @@ button {
   min-height: 100vh;
   display: grid;
   grid-template-rows: 72px 1fr;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .topbar {
@@ -164,7 +164,7 @@ button {
   padding: 28px 36px;
   width: 100%;
   margin: 0;
-  overflow: auto;
+  overflow: visible;
   min-width: 0;
 }
 
@@ -263,9 +263,19 @@ button {
 }
 
 .required-note {
-  color: #ff2c22;
+  display: none;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  color: var(--danger);
   font-size: 14px;
-  margin-bottom: 26px;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.required-note:not([hidden]) {
+  display: block;
 }
 
 .field {
@@ -304,9 +314,9 @@ button {
 .review-url-help {
   margin-top: 10px;
   padding: 14px;
-  border: 1px solid rgba(129, 39, 207, 0.18);
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fbf5ff;
+  background: var(--blue-soft);
   color: var(--ink);
   font-size: 13px;
   line-height: 1.5;
@@ -345,8 +355,8 @@ button {
 .textarea:disabled,
 .select:disabled {
   cursor: not-allowed;
-  color: #8a8f98;
-  background: #f1f3f6;
+  color: var(--muted);
+  background: var(--surface-container);
 }
 
 .textarea {
@@ -407,7 +417,7 @@ button {
 }
 
 .button.secondary {
-  background: #f2f5f9;
+  background: var(--surface-container);
   color: var(--ink);
   box-shadow: none;
 }
@@ -424,10 +434,10 @@ button {
 }
 
 .button.danger {
-  background: #fff1f1;
+  background: rgba(220, 38, 38, 0.08);
   color: var(--danger);
   box-shadow: none;
-  border: 1px solid #ffd1d1;
+  border: 1px solid rgba(220, 38, 38, 0.2);
 }
 
 .full {
@@ -445,8 +455,20 @@ button {
   border: 0;
   padding: 12px 16px;
   border-radius: 12px;
-  background: #f3f5f7;
+  background: var(--surface-container);
   color: var(--ink);
+}
+
+.link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-size: inherit;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .chip.active {
@@ -460,7 +482,8 @@ button {
   padding: 28px;
 }
 
-.reply-loading-note {
+.reply-loading-note,
+.review-loading-note {
   margin-top: 12px;
   color: var(--muted);
   font-size: 13px;
@@ -471,6 +494,18 @@ button {
   display: flex;
   gap: 16px;
   margin: 12px 0 26px;
+}
+
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.stars.shake {
+  animation: shake 0.5s ease;
 }
 
 .star {
@@ -497,7 +532,7 @@ button {
   border-left: 4px solid var(--secondary);
   border-radius: 14px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.65);
+  background: var(--panel);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 2px 8px rgba(129, 39, 207, 0.08);
@@ -743,7 +778,7 @@ button {
   display: grid;
   place-items: center;
   padding: 32px;
-  background: #f6f9fd;
+  background: var(--canvas);
 }
 
 .public-card {
@@ -783,7 +818,7 @@ button {
   padding: 24px 22px;
   border: 1px solid var(--line);
   border-radius: 20px;
-  background: linear-gradient(180deg, #f7e9ff, #f1ddff);
+  background: linear-gradient(180deg, var(--blue-soft), color-mix(in srgb, var(--blue-soft) 80%, var(--canvas)));
 }
 
 .business-box h1 {
@@ -811,12 +846,12 @@ button {
   padding: 18px;
   border: 1px solid rgba(129, 39, 207, 0.16);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--panel);
   text-align: left;
 }
 
 .review-customizer.locked {
-  background: #f7f8fb;
+  background: var(--surface-container);
 }
 
 .review-customizer .field:last-of-type {
@@ -833,13 +868,13 @@ button {
 .pro-settings {
   margin: 18px 0 22px;
   padding: 18px;
-  border: 1px solid rgba(129, 39, 207, 0.16);
+  border: 1px solid var(--line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--panel);
 }
 
 .pro-settings.locked {
-  background: #f7f8fb;
+  background: var(--surface-container);
 }
 
 .pro-settings-head {
@@ -877,21 +912,31 @@ button {
 .copy-toast {
   position: fixed;
   right: 20px;
-  bottom: 20px;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   background: #15233a;
   color: #fff;
-  padding: 14px 18px;
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  padding: 14px 20px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22);
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(10px) scale(0.96);
   pointer-events: none;
-  transition: 180ms ease;
+  transition: 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 200;
+  max-width: calc(100vw - 40px);
 }
 
 .copy-toast.show {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+}
+
+@media (min-width: 901px) {
+  .copy-toast {
+    bottom: 28px;
+  }
 }
 
 .auth-body {
@@ -1053,7 +1098,7 @@ button {
   left: 0;
   right: 0;
   height: 72px;
-  background: rgba(255, 255, 255, 0.96);
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
@@ -1167,7 +1212,7 @@ button {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--panel);
   color: var(--blue);
   font-size: 32px;
   font-weight: 800;
@@ -1511,9 +1556,9 @@ button {
 
 .support-steps div {
   padding: 14px;
-  border: 1px solid #e7ecf2;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fbfcff;
+  background: var(--panel);
 }
 
 .support-steps strong,
@@ -1612,9 +1657,9 @@ button {
   grid-template-columns: minmax(0, 1.4fr) minmax(120px, 0.6fr);
   gap: 8px 16px;
   padding: 16px;
-  border: 1px solid #e7ecf2;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fbfcff;
+  background: var(--panel);
 }
 
 .payment-event-card strong,
@@ -1713,8 +1758,8 @@ button {
   flex: 0 0 auto;
   padding: 6px 10px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: var(--tertiary);
+  background: var(--blue-soft);
+  color: var(--blue);
   font-size: 11px;
   font-weight: 800;
   text-transform: capitalize;
@@ -1722,20 +1767,20 @@ button {
 
 .status-resolved,
 .status-closed {
-  background: #ecfdf3;
-  color: #087443;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
 }
 
 .status-waiting_customer {
-  background: #fff7e6;
-  color: #8a5a00;
+  background: rgba(234, 179, 8, 0.12);
+  color: var(--warning);
 }
 
 .ticket-response {
   margin-top: 14px;
   padding: 14px;
   border-radius: 12px;
-  background: #f8f6ff;
+  background: var(--blue-soft);
 }
 
 .ticket-response p {
@@ -1811,7 +1856,7 @@ button {
   margin-top: 26px;
   padding: 14px;
   border-radius: 12px;
-  background: #f8f6ff;
+  background: var(--blue-soft);
   color: var(--muted);
   line-height: 1.55;
 }
@@ -2028,13 +2073,13 @@ button {
 .metric-trend.brand { color: var(--blue); }
 
 .ai-spotlight {
-  background: rgba(255, 255, 255, 0.65);
+  background: var(--panel);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(129, 39, 207, 0.18);
+  border: 1px solid var(--line);
   border-radius: 18px;
   padding: 18px 20px;
-  box-shadow: 0 4px 18px rgba(129, 39, 207, 0.10);
+  box-shadow: var(--shadow);
 }
 
 .ai-spotlight-inner {
@@ -2246,10 +2291,11 @@ button {
   margin: 12px 0 0;
   padding: 10px 12px;
   border-radius: 12px;
-  background: #fff7e6;
-  color: #8a5a00;
+  background: rgba(234, 179, 8, 0.12);
+  color: var(--ink);
   font-size: 13px;
   line-height: 1.4;
+  border: 1px solid rgba(234, 179, 8, 0.25);
 }
 
 .qr-actions {
@@ -2341,23 +2387,26 @@ button {
 }
 
 @media (max-width: 900px) {
-  html,
-  body,
-  #app {
-    height: auto;
-    min-height: 100%;
-    overflow-x: hidden;
-  }
-
   html {
-    overflow-y: auto;
+    height: 100%;
+    overflow-y: scroll;
     -webkit-overflow-scrolling: touch;
+    overflow-x: clip;
   }
 
   body {
-    overflow-y: auto;
-    overscroll-behavior-y: auto;
-    touch-action: pan-y;
+    height: auto;
+    min-height: 100%;
+    overflow-x: clip;
+    overflow-y: visible;
+    touch-action: pan-y pinch-zoom;
+    overscroll-behavior-y: contain;
+  }
+
+  #app {
+    overflow: visible;
+    height: auto;
+    min-height: 100%;
   }
 
   .app-shell {
@@ -2365,6 +2414,12 @@ button {
     height: auto;
     min-height: 100svh;
     overflow: visible;
+  }
+
+  /* Prevent .main from ever trapping scroll on mobile */
+  .main {
+    overflow: visible !important;
+    height: auto !important;
   }
 
   .pricing-intro {
@@ -2797,12 +2852,13 @@ button {
   height: 42px;
   flex: 0 0 42px;
   aspect-ratio: 1 / 1;
-  border-radius: 999px;
+  border-radius: 50%;
   border: 0;
   overflow: hidden;
   background-clip: padding-box;
   box-shadow: inset 0 0 0 1px rgba(11, 28, 48, 0.10);
   transition: box-shadow 150ms ease, outline-color 150ms ease;
+  -webkit-border-radius: 50%;
 }
 
 .theme-option.active .theme-dot {
@@ -2894,4 +2950,51 @@ button {
 
 .lang-check-item.lang-disabled input {
   cursor: not-allowed;
+}
+
+/* ── Dark theme overrides for hardcoded colors ── */
+[data-theme="dark"] .suggestion {
+  background: var(--panel);
+  border-color: rgba(192, 132, 252, 0.2);
+}
+
+[data-theme="dark"] .review-customizer {
+  background: var(--panel);
+  border-color: rgba(192, 132, 252, 0.18);
+}
+
+[data-theme="dark"] .review-customizer.locked {
+  background: var(--surface-container);
+}
+
+[data-theme="dark"] .profile-avatar {
+  background: var(--surface-container);
+}
+
+[data-theme="dark"] .pmi-logout .pmi-icon {
+  background: rgba(248, 113, 113, 0.15);
+}
+
+[data-theme="dark"] .checkout-notice {
+  background: var(--panel);
+}
+
+[data-theme="dark"] .onboarding-step {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .pro-settings-head {
+  background: var(--surface-container);
+  border-radius: 12px;
+}
+
+[data-theme="dark"] .support-steps div {
+  border-color: var(--line);
+  background: var(--panel);
+}
+
+[data-theme="dark"] .help-feature-card {
+  background: var(--panel);
+  border-color: var(--line);
 }

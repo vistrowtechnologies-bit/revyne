@@ -97,6 +97,7 @@ let bottomNavFromIndex = 0;
 let bottomNavShouldAnimate = false;
 let currentSession = null;
 let isGeneratingReply = false;
+let isGeneratingReview = false;
 let analyticsSessionId = getAnalyticsSessionId();
 let lastTrackedPageKey = "";
 const navOrder = ["dashboard", "business", "reply", "pricing", "profile"];
@@ -348,23 +349,52 @@ function handleProfileImageUpload(file) {
     return;
   }
 
-  if (file.size > PROFILE_IMAGE_MAX_BYTES) {
-    showToast("Please upload an image under 500 KB");
-    return;
-  }
-
   const reader = new FileReader();
   reader.onload = () => {
-    const imageData = typeof reader.result === "string" ? reader.result : "";
-    if (!PROFILE_IMAGE_TYPES.some((type) => imageData.startsWith(`data:${type};base64,`))) {
-      showToast("Could not verify this image");
-      return;
-    }
+    const originalDataUrl = typeof reader.result === "string" ? reader.result : "";
+    if (!originalDataUrl) { showToast("Could not read image"); return; }
 
-    state.business.logo = imageData;
-    saveState();
-    showToast("Profile picture updated");
-    render();
+    // Always compress through canvas to keep logo small
+    const img = new Image();
+    img.onload = () => {
+      const MAX_DIM = 400; // max width/height in px
+      let w = img.naturalWidth || img.width;
+      let h = img.naturalHeight || img.height;
+
+      // Scale down if larger than MAX_DIM
+      if (w > MAX_DIM || h > MAX_DIM) {
+        if (w >= h) { h = Math.round((h / w) * MAX_DIM); w = MAX_DIM; }
+        else { w = Math.round((w / h) * MAX_DIM); h = MAX_DIM; }
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Try quality steps until under 500 KB
+      let quality = 0.85;
+      let dataUrl = canvas.toDataURL("image/jpeg", quality);
+      while (dataUrl.length > PROFILE_IMAGE_MAX_BYTES * 1.37 && quality > 0.3) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL("image/jpeg", quality);
+      }
+
+      // Final size check (base64 is ~1.37× the byte size)
+      const approxBytes = Math.round(dataUrl.length * 0.75);
+      if (approxBytes > PROFILE_IMAGE_MAX_BYTES) {
+        showToast("Image is too large to compress. Please use a smaller photo.");
+        return;
+      }
+
+      state.business.logo = dataUrl;
+      saveState();
+      showToast("✓ Profile picture updated");
+      render();
+    };
+    img.onerror = () => showToast("Could not process this image. Try a different file.");
+    img.src = originalDataUrl;
   };
   reader.onerror = () => showToast("Could not read image");
   reader.readAsDataURL(file);
@@ -373,6 +403,22 @@ function handleProfileImageUpload(file) {
 function updateUserField(field, value) {
   state.user[field] = value;
   if (field === "mobile") state.business.mobile = value;
+  saveState();
+}
+
+function preserveBusinessFromDom() {
+  if (state.view !== "business") return;
+  document.querySelectorAll("[data-field]").forEach(input => {
+    const field = input.dataset.field;
+    if (!field) return;
+    const val = input.value ?? "";
+    if (field === "category" && state.business.category !== val) {
+      updateBusinessField(field, val);
+    } else if (field !== "category") {
+      state.business[field] = field === "services" ? trimToFiveList(val) : val;
+      if (field === "mobile") state.user.mobile = val;
+    }
+  });
   saveState();
 }
 
@@ -988,14 +1034,22 @@ async function getCurrentUsage() {
 async function canGenerate(type) {
   if (!supabaseClient || !currentSession?.user) return true;
 
-  const usage = await getCurrentUsage();
-  const limits = getCurrentPlanLimits();
-  const used = type === "review" ? usage.review_generations : usage.reply_generations;
-  const limit = type === "review" ? limits.reviewGenerations : limits.replyGenerations;
+  try {
+    // Race against 4-second timeout so a slow network never silently blocks
+    const usage = await Promise.race([
+      getCurrentUsage(),
+      new Promise(resolve => setTimeout(() => resolve({ review_generations: 0, reply_generations: 0 }), 4000))
+    ]);
+    const limits = getCurrentPlanLimits();
+    const used = type === "review" ? usage.review_generations : usage.reply_generations;
+    const limit = type === "review" ? limits.reviewGenerations : limits.replyGenerations;
 
-  if (used >= limit) {
-    showToast(`Monthly ${type} generation limit reached`);
-    return false;
+    if (used >= limit) {
+      showToast(`⚠ Monthly ${type} limit reached (${used}/${limit}). Upgrade for more.`, 4000);
+      return false;
+    }
+  } catch {
+    // If limit check fails, allow generation rather than blocking the user
   }
 
   return true;
@@ -1313,73 +1367,97 @@ function getLangSuggestions(lang, { name, city, cat, starText, base, tone }) {
 }
 
 async function createReviewSuggestions() {
+  if (isGeneratingReview) return;
+
   if (!state.rating) {
-    showToast("Please select a star rating first");
+    showToast("⚠ Please select a star rating first");
+    // Briefly shake the stars to draw attention
+    const starsEl = document.querySelector(".stars");
+    if (starsEl) { starsEl.classList.add("shake"); setTimeout(() => starsEl.classList.remove("shake"), 600); }
     return;
   }
 
+  // Check limit BEFORE showing loading state (avoids flicker on limit hit)
   const allowed = await canGenerate("review");
   if (!allowed) return;
 
-  const business = state.business;
+  // Preserve draft text NOW, before render wipes the DOM
   preserveReviewDraftFromDom();
-  const selectedService = state.reviewDraft.service || business.category;
+
+  isGeneratingReview = true;
+  render(); // show loading button immediately
+
+  const business = state.business;
+  const selectedService = state.reviewDraft.service || business.category || "";
   const selectedProduct = state.reviewDraft.product || "";
-  const experience = state.reviewDraft.experience.trim();
+  const experience = (state.reviewDraft.experience || "").trim();
   const proMaxReview = isPublicReviewRoute()
     ? isPublicBusinessProMax() && Boolean(selectedService || selectedProduct)
     : isProMaxPlan() && Boolean(selectedService || selectedProduct);
-  const services = business.services.split(",").map((item) => item.trim()).filter(Boolean);
-  const serviceLine = selectedService || (services.length ? services.slice(0, 2).join(" and ") : business.category);
+  const services = (business.services || "").split(",").map((item) => item.trim()).filter(Boolean);
+  const serviceLine = selectedService || (services.length ? services.slice(0, 2).join(" and ") : (business.category || "service"));
   const base = experience || `I had a genuine experience with ${serviceLine}.`;
   const starText = state.rating >= 5 ? "excellent" : state.rating >= 4 ? "very good" : "helpful";
   const tone = business.tone || "Professional";
   const lang = business.language || "English";
-  const name = business.name;
-  const city = business.city;
-  const cat = business.category.toLowerCase();
-  const aiResult = await callAIGenerator("review_suggestions", {
-    rating: state.rating,
-    experience,
-    selectedService,
-    selectedProduct,
-    depth: proMaxReview ? "seo_deep" : "standard",
-    business: {
-      name,
-      category: business.category,
-      city,
-      services: business.services,
-      keywords: business.keywords,
-      language: lang,
-      tone
+  const name = business.name || "this business";
+  const city = business.city || "";
+  const cat = (business.category || "service").toLowerCase();
+
+  // Call AI with a 10-second timeout — always fall back to local on failure/timeout
+  let aiResult = null;
+  try {
+    aiResult = await Promise.race([
+      callAIGenerator("review_suggestions", {
+        rating: state.rating,
+        experience,
+        selectedService,
+        selectedProduct,
+        depth: proMaxReview ? "seo_deep" : "standard",
+        business: { name, category: business.category, city, services: business.services, keywords: business.keywords, language: lang, tone }
+      }),
+      new Promise(resolve => setTimeout(() => resolve(null), 10000))
+    ]);
+  } catch { aiResult = null; }
+
+  try {
+    if (Array.isArray(aiResult?.suggestions) && aiResult.suggestions.length) {
+      state.suggestions = aiResult.suggestions.slice(0, 3);
+    } else if (proMaxReview) {
+      const productLine = selectedProduct ? ` for ${selectedProduct}` : "";
+      const locationLine = city ? ` in ${city}` : "";
+      state.suggestions = [
+        `${name} gave me a ${starText} experience with ${selectedService}${productLine}${locationLine}. ${base} The team explained things clearly, handled the work professionally, and made the whole process easy to trust. I would recommend them to anyone looking for reliable ${business.category}.`,
+        `I chose ${name} for ${selectedService}${productLine}, and the experience felt smooth from start to finish. ${base} Their communication, service quality, and attention to detail stood out. It is a dependable option for customers searching for ${business.category}${locationLine}.`,
+        `${name} was helpful and professional for my ${selectedService}${productLine} requirement. ${base} The service felt genuine, the team understood what I needed, and the overall experience was worth recommending. A good choice for ${business.category}${locationLine}.`
+      ];
+    } else {
+      // Always guaranteed to return 3 suggestions
+      state.suggestions = getLangSuggestions(lang, { name, city, cat, starText, base, tone });
     }
-  });
 
-  if (Array.isArray(aiResult?.suggestions) && aiResult.suggestions.length) {
-    state.suggestions = aiResult.suggestions.slice(0, 3);
-  } else if (proMaxReview) {
-    const productLine = selectedProduct ? ` for ${selectedProduct}` : "";
-    const locationLine = city ? ` in ${city}` : "";
-    state.suggestions = [
-      `${name} gave me a ${starText} experience with ${selectedService}${productLine}${locationLine}. ${base} The team explained things clearly, handled the work professionally, and made the whole process easy to trust. I would recommend them to anyone looking for reliable ${business.category}.`,
-      `I chose ${name} for ${selectedService}${productLine}, and the experience felt smooth from start to finish. ${base} Their communication, service quality, and attention to detail stood out. It is a dependable option for customers searching for ${business.category}${locationLine}.`,
-      `${name} was helpful and professional for my ${selectedService}${productLine} requirement. ${base} The service felt genuine, the team understood what I needed, and the overall experience was worth recommending. A good choice for ${business.category}${locationLine}.`
-    ];
-  } else {
-    state.suggestions = getLangSuggestions(lang, { name, city, cat, starText, base, tone });
+    state.stats.generated += 1;
+    saveState();
+    // Fire-and-forget background saves — don't let them block or crash the UI
+    saveGeneratedReviewsToSupabase(experience).catch(() => {});
+    incrementUsage("review").catch(() => {});
+    trackEvent("review_generated", {
+      rating: state.rating,
+      pro_max_flow: proMaxReview,
+      has_experience: Boolean(experience),
+      suggestion_count: state.suggestions.length
+    });
+  } catch (err) {
+    console.error("Review generation error:", err);
+    // Even on error, use local fallback so user still gets suggestions
+    if (!state.suggestions.length) {
+      state.suggestions = getLangSuggestions(lang || "English", { name, city, cat, starText, base, tone });
+    }
+    saveState();
+  } finally {
+    isGeneratingReview = false;
+    render();
   }
-
-  state.stats.generated += 1;
-  await saveGeneratedReviewsToSupabase(experience);
-  await incrementUsage("review");
-  trackEvent("review_generated", {
-    rating: state.rating,
-    pro_max_flow: proMaxReview,
-    has_experience: Boolean(experience),
-    suggestion_count: state.suggestions.length
-  });
-  saveState();
-  render();
 }
 
 async function createSmartReplies() {
@@ -1679,13 +1757,17 @@ async function openRazorpayCheckout(checkoutData) {
   }
 }
 
-function showToast(message) {
+function showToast(message, duration = 2800) {
   const toast = document.querySelector(".copy-toast");
   if (!toast) return;
 
   toast.textContent = message;
+  toast.classList.remove("show");
+  // Force reflow so re-triggering same message still animates
+  void toast.offsetWidth;
   toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 1400);
+  clearTimeout(toast._toastTimer);
+  toast._toastTimer = setTimeout(() => toast.classList.remove("show"), duration);
 }
 
 function renderQrCodes() {
@@ -1726,113 +1808,324 @@ function renderQrCodes() {
   });
 }
 
+// Builds the branded Google+RevYne QR template on a canvas and returns a PNG data URL
+function ensureQrLibrary(timeoutMs = 6000) {
+  if (window.QRCode?.toCanvas) return Promise.resolve();
+  if (window.__revyneQrLibraryPromise) return window.__revyneQrLibraryPromise;
+
+  window.__revyneQrLibraryPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector("script[data-revyne-qr-library]");
+    const script = existingScript || document.createElement("script");
+    let settled = false;
+
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (window.QRCode?.toCanvas && !error) resolve();
+      else reject(error || new Error("QR library not ready"));
+    };
+
+    const timer = setTimeout(() => finish(new Error("QR library timed out")), timeoutMs);
+
+    if (existingScript) {
+      script.addEventListener("load", () => finish(), { once: true });
+      script.addEventListener("error", () => finish(new Error("QR library failed to load")), { once: true });
+      return;
+    }
+
+    script.src = "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js";
+    script.async = true;
+    script.dataset.revyneQrLibrary = "true";
+    script.onload = () => finish();
+    script.onerror = () => finish(new Error("QR library failed to load"));
+    document.head.appendChild(script);
+  }).catch((error) => {
+    window.__revyneQrLibraryPromise = null;
+    throw error;
+  });
+
+  return window.__revyneQrLibraryPromise;
+}
+
+async function buildQrCanvas(text, width = 600) {
+  await ensureQrLibrary();
+
+  const qrCanvas = document.createElement("canvas");
+  qrCanvas.width = width;
+  qrCanvas.height = width;
+
+  await new Promise((resolve, reject) => {
+    window.QRCode.toCanvas(qrCanvas, text, {
+      width,
+      margin: 2,
+      color: {
+        dark: "#111827",
+        light: "#ffffff"
+      }
+    }, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+
+  return qrCanvas;
+}
+
+async function getQrTemplateDataUrl() {
+  // Step 1: render QR directly onto an off-screen canvas (canvas→canvas avoids any taint)
+  const qrCanvas = await buildQrCanvas(getReviewUrl(), 600);
+
+  // Step 2: build the branded template
+  {
+    const W = 900, H = 1200;
+    const qrImg = qrCanvas; // use canvas directly — no Image element needed
+        const c = document.createElement("canvas");
+        c.width = W; c.height = H;
+        const ctx = c.getContext("2d");
+
+        // ── helpers ──────────────────────────────────────────────────────
+        function rrPath(x, y, w, h, r) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+          ctx.arc(x + w - r, y + r, r, -Math.PI / 2, 0);
+          ctx.lineTo(x + w, y + h - r);
+          ctx.arc(x + w - r, y + h - r, r, 0, Math.PI / 2);
+          ctx.lineTo(x + r, y + h);
+          ctx.arc(x + r, y + h - r, r, Math.PI / 2, Math.PI);
+          ctx.lineTo(x, y + r);
+          ctx.arc(x + r, y + r, r, Math.PI, Math.PI * 3 / 2);
+          ctx.closePath();
+        }
+        function rrFill(x, y, w, h, r, color) { rrPath(x, y, w, h, r); ctx.fillStyle = color; ctx.fill(); }
+        function hexPath(cx, cy, r) {
+          ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i - Math.PI / 2;
+            i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+                    : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+          }
+          ctx.closePath();
+        }
+        function txt(str, x, y, font, color, align) {
+          ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || "center"; ctx.fillText(str, x, y);
+        }
+
+        // ── white background ─────────────────────────────────────────────
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+        // ── Google + RevYne header ────────────────────────────────────────
+        const G_FONT = "bold 46px Arial";
+        ctx.font = G_FONT;
+        const gls = [["G","#4285F4"],["o","#EA4335"],["o","#FBBC05"],["g","#4285F4"],["l","#34A853"],["e","#EA4335"]];
+        const gw = gls.reduce((s, [ch]) => s + ctx.measureText(ch).width, 0);
+        const SEP = 2, SPAD = 22, IICON = 42, IPAD = 10, RTW = 142;
+        let hx = (W - (gw + SPAD * 2 + SEP + IICON + IPAD + RTW)) / 2;
+        const hy = 74;
+        gls.forEach(([ch, col]) => {
+          txt(ch, hx, hy, G_FONT, col, "left");
+          hx += ctx.measureText(ch).width;
+        });
+        hx += SPAD;
+        ctx.fillStyle = "#d1d5db"; ctx.fillRect(hx, hy - 42, SEP, 52);
+        hx += SEP + SPAD;
+        // RevYne icon (purple rounded rect + dots)
+        rrFill(hx, hy - 40, IICON, IICON, 10, "#7c3aed");
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(hx + IICON / 2, hy - 22, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#7c3aed";
+        [-8, 0, 8].forEach(ox => { ctx.beginPath(); ctx.arc(hx + IICON / 2 + ox, hy - 14, 3, 0, Math.PI * 2); ctx.fill(); });
+        hx += IICON + IPAD;
+        txt("RevYne", hx, hy, "bold 38px Arial", "#111827", "left");
+
+        // ── tagline "— AI Powered Review —" ──────────────────────────────
+        ctx.fillStyle = "#4f46e5"; ctx.font = "500 17px Arial"; ctx.textAlign = "center";
+        const tagW = ctx.measureText("AI Powered Review").width;
+        const tagX = W / 2, tagY = 118;
+        ctx.fillText("AI Powered Review", tagX, tagY);
+        ctx.strokeStyle = "#4f46e5"; ctx.lineWidth = 1.5;
+        [[-tagW / 2 - 30, -tagW / 2 - 8], [tagW / 2 + 8, tagW / 2 + 30]].forEach(([x1, x2]) => {
+          ctx.beginPath(); ctx.moveTo(tagX + x1, tagY - 5); ctx.lineTo(tagX + x2, tagY - 5); ctx.stroke();
+        });
+
+        // ── title ─────────────────────────────────────────────────────────
+        txt("Here's your Google QR!", W / 2, 173, "bold 46px Arial", "#111827");
+
+        // ── subtitle ──────────────────────────────────────────────────────
+        txt("Scan to leave us a review on Google", W / 2, 213, "18px Arial", "#6b7280");
+
+        // ── hexagon outline ───────────────────────────────────────────────
+        hexPath(W / 2, 492, 285);
+        ctx.strokeStyle = "#c7d2fe"; ctx.lineWidth = 3; ctx.stroke();
+
+        // ── "Review us on Google" text inside hex ─────────────────────────
+        txt("Review us on Google", W / 2, 300, "bold 26px Arial", "#111827");
+
+        // ── QR box (white fill + Google 4-color border) ───────────────────
+        const QX = (W - 284) / 2, QY = 328, QW = 284, QH = 284, QR_ = 26;
+        rrFill(QX, QY, QW, QH, QR_, "#ffffff");
+
+        const PI = Math.PI;
+        ctx.lineCap = "butt"; ctx.lineWidth = 9;
+        const bx = QX, by = QY, bw = QW, bh = QH, br = QR_;
+
+        function seg(col, x1, y1, x2, y2) {
+          ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        }
+        function arc(col, cx, cy, r, s, e) {
+          ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(cx, cy, r, s, e); ctx.stroke();
+        }
+        // top: blue
+        seg("#4285F4", bx + br, by, bx + bw - br, by);
+        arc("#4285F4", bx + bw - br, by + br, br, -PI / 2, -PI / 4);
+        arc("#EA4335", bx + bw - br, by + br, br, -PI / 4, 0);
+        // right: red
+        seg("#EA4335", bx + bw, by + br, bx + bw, by + bh - br);
+        arc("#EA4335", bx + bw - br, by + bh - br, br, 0, PI / 4);
+        arc("#FBBC05", bx + bw - br, by + bh - br, br, PI / 4, PI / 2);
+        // bottom: yellow
+        seg("#FBBC05", bx + bw - br, by + bh, bx + br, by + bh);
+        arc("#FBBC05", bx + br, by + bh - br, br, PI / 2, PI * 3 / 4);
+        arc("#34A853", bx + br, by + bh - br, br, PI * 3 / 4, PI);
+        // left: green
+        seg("#34A853", bx, by + bh - br, bx, by + br);
+        arc("#34A853", bx + br, by + br, br, PI, PI * 5 / 4);
+        arc("#4285F4", bx + br, by + br, br, PI * 5 / 4, PI * 3 / 2);
+
+        // ── QR code image inside box ──────────────────────────────────────
+        const pad = 18;
+        ctx.drawImage(qrImg, QX + pad, QY + pad, QW - pad * 2, QH - pad * 2);
+
+        // ── 4 feature icons + text ────────────────────────────────────────
+        const FEATS = [
+          { col: "#4285F4", label: "Easy to Scan",           desc: ["Quick and secure", "review process"],     icon: "scan" },
+          { col: "#EA4335", label: "Trusted by Google",      desc: ["Your feedback", "matters to us"],         icon: "shield" },
+          { col: "#FBBC05", label: "Share Your Experience",  desc: ["Help others make", "better choices"],     icon: "star" },
+          { col: "#34A853", label: "Support Small Business", desc: ["Your review helps", "us grow"],           icon: "people" },
+        ];
+        const FY = 820, FS = W / 4;
+        FEATS.forEach((f, i) => {
+          const fx = FS * i + FS / 2, R = 38;
+          // circle
+          ctx.beginPath(); ctx.arc(fx, FY, R, 0, PI * 2); ctx.fillStyle = f.col; ctx.fill();
+          // icon
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+          if (f.icon === "scan") {
+            const s = 11, d = 9;
+            [[fx - d - s, FY - d, fx - d, FY - d], [fx - d, FY - d, fx - d, FY - d - s],
+             [fx + d + s, FY - d, fx + d, FY - d], [fx + d, FY - d, fx + d, FY - d - s],
+             [fx - d - s, FY + d, fx - d, FY + d], [fx - d, FY + d, fx - d, FY + d + s],
+             [fx + d + s, FY + d, fx + d, FY + d], [fx + d, FY + d, fx + d, FY + d + s]
+            ].forEach(([x1, y1, x2, y2]) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); });
+          } else if (f.icon === "shield") {
+            ctx.beginPath();
+            ctx.moveTo(fx, FY - R * 0.58); ctx.lineTo(fx + R * 0.52, FY - R * 0.28);
+            ctx.lineTo(fx + R * 0.52, FY + R * 0.12);
+            ctx.quadraticCurveTo(fx + R * 0.52, FY + R * 0.6, fx, FY + R * 0.75);
+            ctx.quadraticCurveTo(fx - R * 0.52, FY + R * 0.6, fx - R * 0.52, FY + R * 0.12);
+            ctx.lineTo(fx - R * 0.52, FY - R * 0.28); ctx.closePath(); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(fx - R * 0.22, FY + R * 0.1); ctx.lineTo(fx, FY + R * 0.32); ctx.lineTo(fx + R * 0.28, FY - R * 0.12);
+            ctx.stroke();
+          } else if (f.icon === "star") {
+            ctx.beginPath(); ctx.fillStyle = "#fff";
+            for (let j = 0; j < 5; j++) {
+              const a1 = (PI * 2 / 5) * j - PI / 2, a2 = a1 + PI / 5;
+              j === 0 ? ctx.moveTo(fx + R * 0.55 * Math.cos(a1), FY + R * 0.55 * Math.sin(a1))
+                      : ctx.lineTo(fx + R * 0.55 * Math.cos(a1), FY + R * 0.55 * Math.sin(a1));
+              ctx.lineTo(fx + R * 0.22 * Math.cos(a2), FY + R * 0.22 * Math.sin(a2));
+            }
+            ctx.closePath(); ctx.fill();
+          } else if (f.icon === "people") {
+            ctx.fillStyle = "#fff";
+            [[-R * 0.38, 0], [0, -R * 0.06], [R * 0.38, 0]].forEach(([ox, oy]) => {
+              ctx.beginPath(); ctx.arc(fx + ox, FY - R * 0.22 + oy, R * 0.16, 0, PI * 2); ctx.fill();
+              ctx.beginPath(); ctx.arc(fx + ox, FY + R * 0.26 + oy, R * 0.2, PI, PI * 2); ctx.fill();
+            });
+          }
+          // label (wrap long text)
+          ctx.lineWidth = 1; ctx.lineCap = "butt";
+          const words = f.label.split(" ");
+          const lines = [];
+          let cur = "";
+          ctx.font = "bold 14px Arial";
+          words.forEach(w => {
+            const test = cur ? cur + " " + w : w;
+            if (ctx.measureText(test).width > FS - 16) { if (cur) lines.push(cur); cur = w; }
+            else cur = test;
+          });
+          if (cur) lines.push(cur);
+          lines.forEach((ln, li) => txt(ln, fx, FY + 56 + li * 17, "bold 14px Arial", "#111827"));
+          const descY = FY + 56 + lines.length * 17;
+          f.desc.forEach((ln, li) => txt(ln, fx, descY + li * 16, "12px Arial", "#6b7280"));
+        });
+
+        // ── divider ───────────────────────────────────────────────────────
+        ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(60, 968); ctx.lineTo(W - 60, 968); ctx.stroke();
+
+        // ── footer: Powered by RevYne ─────────────────────────────────────
+        txt("Powered by", W / 2 - 65, 1013, "17px Arial", "#374151");
+        rrFill(W / 2 - 42, 993, 28, 28, 7, "#7c3aed");
+        txt("RevYne", W / 2 - 8, 1013, "bold 20px Arial", "#7c3aed", "left");
+
+        // ── footer: Contact line ──────────────────────────────────────────
+        txt("Contact us for Order QR :", W / 2 - 48, 1066, "15px Arial", "#374151");
+        ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(W / 2 + 68, 1061); ctx.lineTo(W / 2 + 215, 1061); ctx.stroke();
+
+    return c.toDataURL("image/png");
+  }
+}
+
 function downloadReviewQr() {
-  getReviewQrDataUrl()
-    .then((imageUrl) => {
-      const link = document.createElement("a");
-      link.href = imageUrl;
-      link.download = getQrFileName();
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+  const btn = document.querySelector("[data-download-qr]");
+  if (btn) { btn.disabled = true; btn.textContent = "Preparing…"; }
+  getQrTemplateDataUrl()
+    .then((dataUrl) => {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = getQrFileName();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast("✓ QR downloaded");
     })
-    .catch(() => showToast("QR code not ready"));
+    .catch((error) => {
+      console.warn("Could not download QR:", error);
+      showToast("Could not prepare QR. Check your connection and try again.");
+    })
+    .finally(() => { if (btn) { btn.disabled = false; btn.textContent = "Download QR"; } });
 }
 
 function printReviewQr() {
-  const printWindow = window.open("", "_blank", "width=720,height=900");
-  if (!printWindow) {
-    showToast("Allow popups to print QR");
-    return;
+  const btn = document.querySelector("[data-print-qr]");
+  if (btn) { btn.disabled = true; btn.textContent = "Preparing..."; }
+  const pw = window.open("", "_blank", "width=820,height=1060");
+  if (pw) {
+    pw.document.write(`<!doctype html><html><head><title>Preparing RevYne QR</title>
+      <style>body{font-family:Arial,sans-serif;display:grid;min-height:100vh;place-items:center;color:#111827}</style>
+      </head><body><p>Preparing your RevYne QR...</p></body></html>`);
+    pw.document.close();
   }
 
-  printWindow.document.write("<!doctype html><title>Preparing QR...</title><body>Preparing QR...</body>");
-
-  getReviewQrDataUrl()
-    .then((imageUrl) => {
-      const reviewUrl = escapeHtml(getReviewUrl());
-      const businessName = escapeHtml(state.business.name || "RevYne");
-      printWindow.document.open();
-      printWindow.document.write(`
-        <!doctype html>
-        <html>
-          <head>
-            <title>${businessName} Review QR</title>
-            <style>
-              body {
-                margin: 0;
-                min-height: 100vh;
-                display: grid;
-                place-items: center;
-                font-family: Arial, sans-serif;
-                color: #111827;
-                background: #ffffff;
-              }
-              .card {
-                width: min(420px, 90vw);
-                text-align: center;
-                border: 1px solid #d8dde8;
-                border-radius: 18px;
-                padding: 34px 28px;
-              }
-              h1 { margin: 0 0 8px; font-size: 26px; }
-              p { margin: 0 0 22px; color: #4b5563; }
-              img { width: 260px; height: 260px; }
-              .url { margin-top: 20px; font-size: 12px; word-break: break-all; color: #6b7280; }
-              @media print {
-                body { min-height: auto; }
-                .card { border-color: #cbd5e1; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="card">
-              <h1>Review ${businessName}</h1>
-              <p>Scan to share your genuine experience.</p>
-              <img src="${imageUrl}" alt="Review QR code" />
-              <div class="url">${reviewUrl}</div>
-            </div>
-            <script>
-              window.onload = () => {
-                window.focus();
-                window.print();
-              };
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
+  getQrTemplateDataUrl()
+    .then((dataUrl) => {
+      if (!pw) { showToast("Allow popups to print QR"); return; }
+      pw.document.open();
+      pw.document.write(`<!doctype html><html><head><title>RevYne QR</title>
+        <style>*{margin:0;padding:0;box-sizing:border-box}body{background:#fff}
+        img{width:100%;max-width:900px;display:block;margin:0 auto}
+        @media print{@page{margin:0}body{margin:0}}</style></head>
+        <body><img src="${dataUrl}" alt="RevYne QR Template" onload="window.focus();window.print()"></body></html>`);
+      pw.document.close();
     })
-    .catch(() => {
-      printWindow.close();
-      showToast("QR code not ready");
-    });
-}
-
-function getReviewQrDataUrl() {
-  const text = getReviewUrl();
-  const canvas = document.querySelector("[data-qr-code]");
-
-  if (canvas?.toDataURL) {
-    try {
-      return Promise.resolve(canvas.toDataURL("image/png"));
-    } catch (_) {
-      // Fall through and render a fresh QR below.
-    }
-  }
-
-  if (!window.QRCode?.toDataURL) {
-    return Promise.reject(new Error("QR library not ready"));
-  }
-
-  return window.QRCode.toDataURL(text, {
-    width: 900,
-    margin: 2,
-    color: {
-      dark: "#111827",
-      light: "#ffffff"
-    }
-  });
+    .catch((error) => {
+      console.warn("Could not print QR:", error);
+      if (pw && !pw.closed) pw.close();
+      showToast("Could not prepare QR. Check your connection and try again.");
+    })
+    .finally(() => { if (btn) { btn.disabled = false; btn.textContent = "Print QR"; } });
 }
 
 function navIcon(view) {
@@ -1866,7 +2159,7 @@ function appShell(content) {
       <header class="topbar">
         <div class="topbar-main">
           <div class="brand">
-            <img class="brand-mark" src="./assets/favicon.png?v=20260509-3" alt="" />
+            <img class="brand-mark" src="./assets/favicon.png?v=20260512-1" alt="" />
             <span>RevYne</span>
           </div>
         </div>
@@ -2022,16 +2315,50 @@ function reviewCard({ initials, name, time, platform, stars, text }) {
 function businessPage() {
   const b = state.business;
   const proMax = isProMaxPlan();
+  const effectivePlan = getEffectivePlan();
   const categoryMeta = getCategoryMeta(b.category);
+
+  // Language section — rules by plan
+  let langSection;
+  if (effectivePlan === "free") {
+    // Ensure language is one of the 2 free options
+    if (b.language !== "English" && b.language !== "Hindi") {
+      b.language = "English";
+      saveState();
+    }
+    langSection = `
+      <div class="field">
+        <label>Language</label>
+        <div class="option-row" style="flex-wrap:wrap; gap:8px; justify-content:flex-start;">
+          ${chip("language", "English")}
+          ${chip("language", "Hindi")}
+        </div>
+        <p class="hint" style="margin-top:6px;">Free plan: English &amp; Hindi only. <button class="link-btn" type="button" data-view="pricing">Upgrade to unlock more</button></p>
+      </div>`;
+  } else if (effectivePlan === "pro") {
+    const langs = state.proLanguages?.length > 0 ? state.proLanguages : ["English", "Hindi"];
+    langSection = `
+      <div class="field">
+        <label>Choose Language</label>
+        <div class="option-row" style="flex-wrap:wrap; gap:8px; justify-content:flex-start;">
+          ${langs.map(l => chip("language", l)).join("")}
+        </div>
+        <p class="hint" style="margin-top:6px;">${state.proLanguages?.length > 0 ? `✓ ${state.proLanguages.length} languages selected. ` : ""}Configure your 5 languages on the <button class="link-btn" type="button" data-view="pricing">Pricing page</button></p>
+      </div>`;
+  } else {
+    // pro_max or pro_yearly — all 24 languages
+    langSection = `
+      <div class="field">
+        <label>Choose Language</label>
+        <div class="option-row" style="flex-wrap:wrap; gap:8px; justify-content:flex-start;">
+          ${INDIAN_LANGUAGES.map(l => chip("language", l)).join("")}
+        </div>
+        <p class="hint" style="margin-top:6px;">✓ All 24 Indian languages included with your plan</p>
+      </div>`;
+  }
   return `
     <section class="panel form-panel">
-      <div class="field">
-        <label for="field-mobile">Mobile Number</label>
-        <input id="field-mobile" type="tel" class="input" maxlength="10" pattern="[0-9]{10}" placeholder="Enter 10-digit Mobile Number" value="${escapeHtml(b.mobile)}" data-field="mobile" />
-      </div>
-      <button class="button full" type="button" data-save-mobile>Save Mobile Number</button>
-
-      <div class="required-note">* indicates required field</div>
+      <div class="required-note" id="required-note" hidden>⚠ Please fill in all required fields (*) before saving.</div>
       <div class="field">
         <label for="profile-image">Profile Picture</label>
         <div class="profile-upload-row">
@@ -2090,21 +2417,24 @@ function businessPage() {
         <p class="pro-settings-note">${proMax ? "Tip: separate each option with commas. The app will show up to 5 services." : "Upgrade to Pro Max to edit these fields. Other plans can view them but cannot use them."}</p>
       </div>
 
-      <div class="field">
-        <label>Choose Language</label>
-        <div class="option-row" style="flex-wrap:wrap; gap:8px;">
-          ${(state.proLanguages?.length > 0 ? state.proLanguages : ["English", "Hindi", "Hinglish", "Marathi"]).map(l => chip("language", l)).join("")}
-        </div>
-        ${state.proLanguages?.length > 0 ? `<p class="hint" style="margin-top:6px;">✓ ${state.proLanguages.length} custom languages set (Pro plan)</p>` : ""}
-      </div>
+      ${langSection}
 
       <div class="field">
         <label>Default Tone</label>
-        <div class="option-row">
+        <div class="option-row" style="justify-content:flex-start; gap:8px; flex-wrap:wrap;">
           ${chip("tone", "Professional")}
           ${chip("tone", "Friendly")}
           ${chip("tone", "Enthusiastic")}
         </div>
+      </div>
+
+      <div class="field">
+        <label for="field-mobile">Mobile Number</label>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <input id="field-mobile" type="tel" class="input" style="flex:1;" maxlength="10" pattern="[0-9]{10}" placeholder="10-digit mobile number" value="${escapeHtml(b.mobile)}" data-field="mobile" />
+          <button class="button secondary" type="button" data-save-mobile style="white-space:nowrap; min-height:50px; padding:0 18px; flex-shrink:0;">Save</button>
+        </div>
+        <p class="hint" style="margin-top:4px;">Saved separately for quick updates.</p>
       </div>
 
       <button class="button full" type="button" data-save-profile>Update Profile</button>
@@ -2295,10 +2625,6 @@ function pricingPageV2() {
         <h1 class="page-title">Choose the plan that fits your review workflow</h1>
         <p class="page-subtitle">Every plan keeps review wording honest. Pro Max adds service-level personalization for businesses that want more detailed SEO-friendly drafts.</p>
       </div>
-      <div class="pricing-note">
-        <strong>Current plan</strong>
-        <span>${formatPlanName(state.user.plan || "free")}</span>
-      </div>
     </section>
     <section class="plan-status-grid">
       ${getPlanStatusDetails().map(([label, value]) => `
@@ -2356,13 +2682,35 @@ function getPlanStatusDetails() {
   const plan = getEffectivePlan();
   const status = state.user.planStatus || (plan === "free" ? "free" : "active");
   const renewal = state.user.planCurrentEnd;
+  const isPaid = isPaidPlanId(plan);
 
-  return [
+  const details = [
     ["Current plan", formatPlanName(plan)],
-    ["Status", formatStatusLabel(status)],
-    ["Next renewal", renewal ? formatDateOnly(renewal) : plan === "free" ? "No renewal" : "Waiting for Razorpay"],
-    ["Subscription", state.user.subscriptionId ? state.user.subscriptionId : "Not created yet"]
+    ["Status", isPaid ? formatStatusLabel(status) : "Active"]
   ];
+
+  if (isPaid) {
+    // Next renewal: use stored planCurrentEnd, or compute next calendar-month date
+    let renewalLabel;
+    if (renewal) {
+      renewalLabel = formatDateOnly(renewal);
+    } else if (plan === "pro_yearly") {
+      renewalLabel = "Yearly – see Razorpay";
+    } else {
+      // Compute next calendar-month renewal (same day next month)
+      const start = state.user.planStartDate ? new Date(state.user.planStartDate) : new Date();
+      const next = new Date(start);
+      next.setMonth(next.getMonth() + 1);
+      renewalLabel = formatDateOnly(next.toISOString());
+    }
+    details.push(["Next renewal", renewalLabel]);
+
+    if (state.user.subscriptionId) {
+      details.push(["Subscription ID", state.user.subscriptionId]);
+    }
+  }
+
+  return details;
 }
 
 function subscriptionManagePanel() {
@@ -2775,8 +3123,12 @@ function publicReviewPage() {
             </div>
           </div>
         ` : ""}
-        <textarea id="reviewText" class="textarea" placeholder="Tell us what actually happened..." data-review-draft="experience">${escapeHtml(draft.experience || "")}</textarea>
-        <button class="button full" type="button" data-generate-review>Generate My Review</button>
+        <textarea id="reviewText" class="textarea" placeholder="Tell us what actually happened..." data-review-draft="experience" ${isGeneratingReview ? "disabled" : ""}>${escapeHtml(draft.experience || "")}</textarea>
+        <button class="button full ${isGeneratingReview ? "is-loading" : ""}" type="button" data-generate-review ${isGeneratingReview ? "disabled" : ""}>
+          ${isGeneratingReview ? `<span class="button-spinner"></span>` : ""}
+          <span>${isGeneratingReview ? "Generating your review…" : "Generate My Review"}</span>
+        </button>
+        ${isGeneratingReview ? `<p class="review-loading-note">AI is writing your review draft. This usually takes a few seconds.</p>` : ""}
         ${suggestionList(state.suggestions, true)}
         <p class="public-footnote">AI helps with wording only. Please edit and post only what matches your real experience.</p>
       </section>
@@ -2809,7 +3161,7 @@ function authPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-3" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260512-1" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Smart AI Review Assistant for Businesses</div>
       </div>
@@ -2854,7 +3206,7 @@ function googleProfileSetupPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260509-3" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260512-1" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Complete your Google profile</div>
       </div>
@@ -3198,12 +3550,19 @@ function profilePage() {
   const avatar = b.logo
     ? `<div class="profile-avatar has-image"><img src="${escapeHtml(b.logo)}" alt="Profile" /></div>`
     : `<div class="profile-avatar">${escapeHtml(initial)}</div>`;
+  const svgAbout = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>`;
+  const svgOrders = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8z"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="9" x2="8" y2="9"/><line x1="10" y1="17" x2="8" y2="17"/></svg>`;
+  const svgHelp = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>`;
+  const svgAdmin = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>`;
+  const svgTerms = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
+  const svgLogout = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
+
   const items = [
-    { icon: "i", label: "About RevYne", view: "about", color: "#e5eeff", fg: "var(--blue)" },
-    { icon: "↻", label: "Order History", view: "orders", color: "#e5eeff", fg: "var(--blue)" },
-    { icon: "@", label: "Help & Support", view: "support", color: "#e5eeff", fg: "var(--blue)" },
-    ...(u.isAdmin ? [{ icon: "#", label: "Admin Support", view: "adminSupport", color: "#f0dbff", fg: "var(--blue)" }] : []),
-    { icon: "≡", label: "Terms & Privacy", view: "terms", color: "#e5eeff", fg: "var(--blue)" }
+    { icon: svgAbout, label: "About RevYne", view: "about", color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgOrders, label: "Order History", view: "orders", color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgHelp, label: "Help & Support", view: "support", color: "var(--surface-container)", fg: "var(--blue)" },
+    ...(u.isAdmin ? [{ icon: svgAdmin, label: "Admin Support", view: "adminSupport", color: "var(--blue-soft)", fg: "var(--blue)" }] : []),
+    { icon: svgTerms, label: "Terms & Privacy", view: "terms", color: "var(--surface-container)", fg: "var(--blue)" }
   ];
 
   const currentTheme = state.theme || "default";
@@ -3241,7 +3600,7 @@ function profilePage() {
           </button>
         `).join("")}
         <button class="profile-menu-item pmi-logout" type="button" data-logout>
-          <div class="pmi-icon" style="background:#ffe4e4; color:var(--danger)">→</div>
+          <div class="pmi-icon" style="background:#ffe4e4; color:var(--danger)">${svgLogout}</div>
           <span>Logout</span>
           <span class="pmi-arrow">›</span>
         </button>
@@ -3347,30 +3706,62 @@ function bindEvents() {
   document.querySelector("[data-generate-review]")?.addEventListener("click", createReviewSuggestions);
   document.querySelector("[data-generate-reply]")?.addEventListener("click", createSmartReplies);
 
-  document.querySelector("[data-save-mobile]")?.addEventListener("click", async () => {
-    const mobile = state.business.mobile.trim();
+  document.querySelector("[data-save-mobile]")?.addEventListener("click", async (e) => {
+    // Read directly from DOM input to avoid stale state
+    const mobileInput = document.querySelector("[data-field='mobile']");
+    const mobile = (mobileInput?.value || state.business.mobile || "").trim();
     if (!/^\d{10}$/.test(mobile)) {
       showToast("Please enter a valid 10-digit mobile number");
       return;
     }
+    state.business.mobile = mobile;
     state.user.mobile = mobile;
-    const saved = await saveSupabaseProfile();
-    if (!saved) return;
-    saveState();
-    showToast("Mobile number saved");
+    const btn = e.currentTarget;
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      const saved = await saveSupabaseProfile();
+      if (!saved) return;
+      saveState();
+      showToast("✓ Mobile number saved");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
   });
 
-  document.querySelector("[data-save-profile]")?.addEventListener("click", async () => {
+  document.querySelector("[data-save-profile]")?.addEventListener("click", async (e) => {
+    preserveBusinessFromDom();
     const b = state.business;
-    if (!b.name.trim() || !b.category.trim() || !b.googleUrl.trim()) {
-      showToast("Please fill in all required fields (Name, Category, Google URL)");
+    const requiredNote = document.getElementById("required-note");
+    const showRequired = (msg) => {
+      if (requiredNote) { requiredNote.textContent = "⚠ " + msg; requiredNote.hidden = false; requiredNote.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+      showToast("⚠ " + msg);
+    };
+    if (!b.name?.trim() || !b.category?.trim()) {
+      showRequired("Business Name and Category are required.");
       return;
     }
-    const profileSaved = await saveSupabaseProfile();
-    if (!profileSaved) return;
-    const businessSaved = await saveSupabaseBusiness();
-    if (!businessSaved) return;
-    showToast("Profile updated");
+    if (!b.googleUrl?.trim()) {
+      showRequired("Google Review URL is required.");
+      return;
+    }
+    if (requiredNote) requiredNote.hidden = true;
+    const btn = e.currentTarget;
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      const profileSaved = await saveSupabaseProfile();
+      if (!profileSaved) return;
+      const businessSaved = await saveSupabaseBusiness();
+      if (!businessSaved) return;
+      showToast("✓ Profile saved successfully");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
   });
 
   document.querySelector("[data-submit-ticket]")?.addEventListener("click", createSupportTicket);
