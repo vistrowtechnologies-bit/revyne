@@ -1,0 +1,987 @@
+REVYNE AI - CUSTOM GPT CONTEXT FILE
+Last updated: 9 May 2026
+
+============================================================
+1. PRODUCT IDENTITY
+============================================================
+
+App name:
+RevYne AI
+
+Short brand name used in UI:
+RevYne
+
+Planned domain:
+revyneai.com
+
+Current deployment:
+Production is deployed on Vercel.
+Primary intended public domain: https://revyneai.com/
+Earlier Vercel preview/production URL used during testing: https://revyne-pied.vercel.app/
+
+Product type:
+AI-powered review assistant for businesses.
+
+One-line positioning:
+RevYne AI helps businesses collect honest customer feedback, generate customer-friendly review drafts, create QR review links, and reply professionally to customer reviews.
+
+Important positioning rule:
+Never position RevYne as a fake review generator.
+The product must always support real customer experiences, honest reviews, customer choice, and review-policy-safe wording.
+
+Target customers:
+- Indian local businesses
+- Doctors
+- Clinics
+- Hotels
+- Restaurants
+- Real estate businesses
+- Salons and beauty businesses
+- Opticians and optical stores
+- Coaching classes
+- Car and bike service businesses
+- Retail stores
+- Home service providers
+- Travel/transport businesses
+- Event/wedding service businesses
+- IT and digital service providers
+
+Customer promise:
+Turn genuine customer experiences into clear, useful, natural review wording and help businesses respond professionally.
+
+Tone of brand:
+Helpful, trustworthy, simple, modern, professional, friendly, local-business-friendly.
+
+Avoid these claims:
+- Do not claim reviews are posted automatically to Google.
+- Do not claim RevYne manipulates ratings.
+- Do not claim RevYne creates fake reviews.
+- Do not promise guaranteed 5-star ratings.
+- Do not promise direct Google review posting.
+
+Correct Google review wording:
+RevYne helps customers write and copy review drafts based on their genuine experience. Customers choose, edit, and post their review themselves.
+
+
+============================================================
+2. CURRENT APPLICATION TYPE AND FILE STRUCTURE
+============================================================
+
+Current frontend:
+Static HTML/CSS/JavaScript single page app.
+
+Main files:
+- index.html
+- styles.css
+- app.js
+- sw.js
+- manifest.webmanifest
+- supabase-config.js
+- robots.txt
+- sitemap.xml
+- vercel.json
+
+Assets:
+- assets/favicon.png
+- assets/apple-touch-icon.png
+- assets/revyne-icon-192.png
+- assets/revyne-icon-512.png
+- assets/screenshot-mobile.png
+- assets/screenshot-wide.png
+
+Backend and server-side functions:
+Supabase Edge Functions:
+- supabase/functions/generate-ai/index.ts
+- supabase/functions/create-razorpay-subscription/index.ts
+- supabase/functions/cancel-razorpay-subscription/index.ts
+- supabase/functions/razorpay-webhook/index.ts
+- supabase/functions/send-support-email/index.ts
+
+Vercel API mirror/wrappers also exist:
+- api/create-razorpay-subscription.js
+- api/cancel-razorpay-subscription.js
+- api/send-support-email.js
+
+Database/migration files:
+- supabase/migrations/*
+- supabase/sql/*
+
+Package setup:
+Minimal Node package. Main dev dependency is Supabase CLI.
+
+
+============================================================
+3. BRAND VISUAL SYSTEM
+============================================================
+
+Primary brand color:
+#8127CF
+
+Primary dark purple:
+#6900B3
+
+Secondary magenta/purple:
+#A200BA
+
+Tertiary blue-purple:
+#4648D4
+
+Primary soft purple:
+#F0DBFF
+
+Background/canvas:
+#F8F9FF
+
+Panel/card background:
+#FFFFFF
+
+Main text/ink:
+#0B1C30
+
+Muted text:
+#7E7385
+
+Border/line:
+#CFC2D6
+
+Surface container:
+#E5EEFF
+
+Success:
+#34A853
+
+Danger:
+#BA1A1A
+
+Warning/accent:
+#EA57FF
+
+Default shadow:
+0 4px 16px rgba(129, 39, 207, 0.10)
+
+Default theme gradient:
+linear-gradient using #8127CF and #A200BA
+
+Common button gradient:
+Purple to magenta, usually from var(--blue) to var(--secondary).
+
+Logo:
+Purple/blue rounded square app icon with a white chat/review bubble and sparkle symbol.
+Icon files are stored in /assets/.
+
+Favicon:
+assets/favicon.png
+
+Apple touch icon:
+assets/apple-touch-icon.png
+
+PWA icons:
+assets/revyne-icon-192.png
+assets/revyne-icon-512.png
+
+
+============================================================
+4. TYPOGRAPHY
+============================================================
+
+Primary font:
+Inter
+
+Font import:
+Google Fonts Inter with weights 400, 500, 600, 700, 800.
+
+Fallback font stack:
+Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif
+
+Typography feel:
+Clean SaaS/product UI.
+Use strong headings, compact labels, and readable card content.
+
+Avoid:
+- Overly decorative fonts
+- Heavy serif fonts
+- Large landing-page style hero typography inside dashboard cards
+- Negative letter spacing
+
+
+============================================================
+5. THEMES
+============================================================
+
+The app has selectable themes:
+
+Default:
+- c1: #8127CF
+- c2: #A200BA
+
+Dark:
+- c1: #312E81
+- c2: #4C1D95
+- canvas: #0F172A
+- panel: #1E293B
+- ink: #E2E8F0
+- muted: #94A3B8
+- line: #334155
+- blue/primary: #C084FC
+
+Blue:
+- c1: #2563EB
+- c2: #0EA5E9
+- soft: #DBEAFE
+
+Red:
+- c1: #DC2626
+- c2: #EA580C
+- soft: #FEE2E2
+
+Green:
+- c1: #16A34A
+- c2: #0D9488
+- soft: #DCFCE7
+
+Theme UI rule:
+Theme color previews should render as clean circular gradient dots, not square blocks inside circles.
+
+
+============================================================
+6. RESPONSIVE DESIGN AND NAVIGATION
+============================================================
+
+Desktop:
+- Sticky topbar.
+- Brand logo and name on the left.
+- Header navigation on the right.
+- Header nav currently includes:
+  - Dashboard
+  - Smart Reply
+  - Pricing
+  - My Business
+  - Profile
+  - Logout
+- Order History was removed from the desktop header and lives inside Profile.
+
+Mobile:
+- Sticky header.
+- Bottom navigation with icons.
+- Mobile bottom nav includes:
+  - Home
+  - Business
+  - AI Reply
+  - Pricing
+  - Profile
+- Bottom nav has a moving purple gradient active indicator/pill.
+- Page scrolling must remain enabled on mobile.
+- Avoid scroll trapping.
+
+Layout guidance:
+- Keep dashboards clean and app-like.
+- Do not add a large left sidebar hero panel on desktop.
+- Do not create marketing landing sections inside the logged-in app.
+- Use cards for repeated items and tool panels.
+- Avoid nested cards where possible.
+- Keep desktop pages centered but not overly padded.
+- Header should stay sticky without blocking scroll.
+
+
+============================================================
+7. CURRENT APP PAGES / VIEWS
+============================================================
+
+Authentication:
+- Welcome/login screen.
+- Continue with Google via Supabase Auth.
+- Continue as Guest Demo.
+- Google profile completion flow.
+
+Dashboard:
+- Shows current plan.
+- Average rating.
+- Total reviews.
+- AI replies count.
+- Smart Reply Ready CTA.
+- Recent reviews.
+- Review QR section after business profile is saved.
+- Copy link, Download QR, Print QR, Preview Page.
+
+My Business:
+- Mobile number.
+- Profile picture upload.
+- Business name.
+- Category dropdown.
+- City.
+- Google Review URL with info button explaining how to get the review link.
+- Keywords.
+- Pro Max review personalization:
+  - 5 Main Services
+  - Service/product/type field label changes by category.
+- Language selection.
+- Default tone.
+- Save/update profile.
+
+Public review page:
+- Opens with #review or #review/{publicToken}.
+- Shows RevYne branding and business info.
+- Customer selects star rating.
+- Customer enters genuine experience.
+- For Pro Max businesses only, customer can select service and service/product/type.
+- Generates review suggestions.
+- Customer can copy review and open Google review link.
+
+Smart Reply:
+- Business user pastes a real customer review.
+- Selects rating.
+- Optional customer name.
+- AI generates professional reply drafts.
+- Replies are saved to Supabase.
+
+Pricing:
+- Shows current plan/status/renewal/subscription status.
+- Shows plan cards:
+  - Free
+  - Pro Monthly
+  - Pro Max Monthly
+  - Pro Yearly
+- Supports Razorpay checkout.
+- Supports cancel subscription flow.
+
+Profile:
+- Profile card with user/business name, email, mobile, logo/initial.
+- About RevYne.
+- Order History.
+- Help & Support.
+- Terms & Privacy.
+- Logout.
+- Theme selector.
+
+Order History:
+- Shows user-friendly Razorpay payment/subscription events.
+
+Help & Support:
+- FAQ.
+- Ticket creation for normal users.
+- Admin support queue for admin users.
+- Support email function exists.
+
+Admin Support:
+- Admin-only queue.
+- Admin can view tickets, update status/priority/assignment/admin response.
+
+Legal:
+- Terms & Conditions page.
+- Privacy Policy page.
+
+
+============================================================
+8. BUSINESS PROFILE FIELDS
+============================================================
+
+Business profile fields currently supported:
+- Business name
+- Category
+- City
+- Google Review URL
+- Services
+- Service/Product/Type options
+- Keywords
+- Language
+- Tone
+- Mobile number
+- Profile picture/business logo
+- Public review token
+- Public reviews enabled flag
+
+Important behavior:
+- A new user should not see prefilled demo business data.
+- First-time Google login should create/fetch user profile from Supabase.
+- User should then add their own business info.
+- Business profile must persist for the same Gmail/Supabase user.
+
+Google Review URL helper text:
+Tell users:
+1. Open Google Maps and search your business name.
+2. Open your Business Profile and tap "Ask for reviews" or "Share review form".
+3. Copy the review link and paste it in RevYne.
+If they do not see it, open Google Business Profile Manager, select the business, then choose "Ask for reviews".
+
+
+============================================================
+9. BUSINESS CATEGORIES
+============================================================
+
+Current category dropdown:
+- Real Estate
+- Restaurant
+- Salon & Beauty
+- Healthcare Clinic
+- Optician & Optical Store
+- Education & Coaching
+- Car & Bike Service
+- Electronics & Appliances
+- Home Services
+- Travel & Transport
+- Hotel & Stay
+- Fitness & Gym
+- Retail Store
+- Jewellery
+- Event & Wedding Services
+- Legal & Finance
+- IT & Digital Services
+- Driver Service
+- Other
+
+Category-specific Pro Max type labels:
+- Real Estate: Property type
+- Restaurant: Cuisine or order type
+- Salon & Beauty: Treatment type
+- Healthcare Clinic: Consultation or treatment type
+- Optician & Optical Store: Eyewear or lens type
+- Education & Coaching: Course type
+- Car & Bike Service: Vehicle or repair type
+- Electronics & Appliances: Device or appliance type
+- Home Services: Work type
+- Travel & Transport: Trip or vehicle type
+- Hotel & Stay: Room or stay type
+- Fitness & Gym: Program type
+- Retail Store: Shopping category
+- Jewellery: Jewellery type
+- Event & Wedding Services: Event type
+- Legal & Finance: Service type
+- IT & Digital Services: Project type
+- Driver Service: Trip type
+- Other: Type or requirement
+
+Category keyword auto-fill behavior:
+When a category is selected, RevYne auto-fills suggested keywords if the keywords field is empty or still contains an old auto-suggestion. Users can edit keywords manually afterward.
+
+Example Optician keywords:
+optician, optical store, eyeglasses, spectacles, sunglasses, contact lenses, eye checkup, lens fitting, frames, eyewear, vision care
+
+
+============================================================
+10. AI REVIEW AND REPLY LOGIC
+============================================================
+
+AI provider:
+OpenAI API through Supabase Edge Function.
+
+Current model setting:
+OPENAI_MODEL defaults to gpt-5-nano if not set.
+
+AI endpoint:
+supabase/functions/generate-ai/index.ts
+
+Supported actions:
+- review_suggestions
+- smart_replies
+
+Review suggestion inputs:
+- rating
+- customer experience
+- selected service
+- selected product/type
+- depth: standard or seo_deep
+- business name
+- category
+- city
+- services
+- keywords
+- language
+- tone
+
+Smart reply inputs:
+- customer name
+- rating
+- review text
+- business context
+- language
+- tone
+
+AI safety rules:
+- Never fabricate visits, purchases, outcomes, names, dates, discounts, or service details.
+- Use only provided customer experience and business context.
+- Do not pressure users to post positive reviews.
+- If rating/experience is negative, preserve the concern constructively.
+- Return compact JSON only.
+
+Review suggestions:
+- Return exactly 3 suggestions.
+- Standard suggestions under 45 words.
+- SEO deep suggestions under 90 words.
+- Must sound like a real customer, not an advertisement.
+- Avoid keyword stuffing.
+
+Smart replies:
+- Return exactly 2 replies.
+- Warm, concise, professional.
+- Suitable for Google Business Profile.
+- Under 45 words each.
+- Do not offer compensation or operational promises unless already stated.
+
+Rate limit:
+AI function currently rate limits roughly 60 requests/hour per auth/IP bucket.
+
+
+============================================================
+11. PRICING AND PLAN LOGIC
+============================================================
+
+Plan IDs:
+- free
+- pro
+- pro_max
+- pro_yearly
+
+Pricing shown in app:
+
+Free:
+- Rs 0 / month
+- For testing review collection with a small customer flow.
+- 2 AI review suggestions per customer.
+- Basic QR scans/review link.
+
+Pro Monthly:
+- Rs 149 / month
+- Old price shown: Rs 449
+- For active local businesses that need more AI reviews and replies.
+
+Pro Max Monthly:
+- Rs 199 / month
+- Old price shown: Rs 599
+- Best for SEO.
+- Unlocks service selection and deeper personalized review drafts.
+
+Pro Yearly:
+- Rs 999 / year
+- Old price shown: Rs 2499
+- Best value.
+- Long-term lower yearly cost.
+
+Plan generation limits in app constants:
+Free:
+- reviewGenerations: 20
+- replyGenerations: 20
+
+Pro:
+- reviewGenerations: 1000
+- replyGenerations: 1000
+
+Pro Max:
+- reviewGenerations: 2500
+- replyGenerations: 2500
+
+Pro Yearly:
+- reviewGenerations: 2500
+- replyGenerations: 2500
+
+Important Pro Max behavior:
+Service/product/type selection on the public customer review page must only appear if the business owner has an active Pro Max or Pro Yearly plan.
+Free and Pro users should not show locked Pro Max fields to their end customers.
+
+Paid feature enforcement:
+Free, Pro, Pro Max, and Pro Yearly features should be locked/unlocked based on effective active plan from Supabase profile/payment status.
+
+
+============================================================
+12. PAYMENTS
+============================================================
+
+Payment provider:
+Razorpay
+
+Current payment flow:
+1. User clicks plan upgrade.
+2. App calls create-razorpay-subscription function.
+3. Function creates Razorpay subscription.
+4. User is sent to Razorpay checkout/subscription page.
+5. Razorpay webhook confirms subscription/payment.
+6. Webhook updates Supabase profile plan and business owner plan.
+7. App refreshes profile and unlocks plan.
+
+Razorpay functions:
+- create-razorpay-subscription
+- cancel-razorpay-subscription
+- razorpay-webhook
+
+Razorpay plan env vars expected:
+- RAZORPAY_PLAN_PRO_MONTHLY
+- RAZORPAY_PLAN_PRO_MAX_MONTHLY
+- RAZORPAY_PLAN_PRO_YEARLY
+
+Other required secrets:
+- RAZORPAY_KEY_ID
+- RAZORPAY_KEY_SECRET
+- RAZORPAY_WEBHOOK_SECRET
+
+Important:
+Do not store Razorpay secrets in frontend or in custom GPT files.
+
+
+============================================================
+13. AUTHENTICATION AND USER PROFILE
+============================================================
+
+Auth provider:
+Supabase Auth
+
+Current login methods:
+- Google OAuth
+- Guest demo mode
+
+Expected Google login behavior:
+- Fetch user name/email from Google/Supabase metadata.
+- Store user profile in Supabase profiles table.
+- If user logs out and logs back in with same Google account, previous profile/business data should load.
+
+Known important requirement:
+Business details must not vanish for the same Gmail account. The app should load the latest business where owner_id equals current auth user ID.
+
+Guest mode:
+Used only for demo/testing.
+Guest data is local and should not be treated as a real account.
+
+Admin:
+Admin flag is stored on profile.
+revyneai@gmail.com was intended as admin for support tickets.
+
+
+============================================================
+14. DATABASE / SUPABASE DATA MODEL
+============================================================
+
+Supabase project:
+Project name: revyne-prod
+Project reference: dbqizpephewiefvghenr
+Supabase URL: https://dbqizpephewiefvghenr.supabase.co
+
+Do not place service role keys or private secrets in GPT context.
+
+Main tables used:
+- profiles
+- businesses
+- review_requests
+- generated_reviews
+- smart_replies
+- usage_limits
+- support_tickets
+- payment_events
+- analytics_events
+- rate_limit_events
+
+profiles:
+Stores user account details, plan, subscription details, admin flag, email, name, mobile, Razorpay customer/subscription IDs, plan status/current period.
+
+businesses:
+Stores business profile for each user:
+owner_id, name, category, city, google_review_url, logo, services, service_types, keywords, language, tone, mobile, public_token, public_reviews_enabled, owner_plan, owner_plan_status, owner_plan_current_end.
+
+review_requests:
+Stores customer public review interactions:
+business_id, rating, customer_experience, customer_language, source, created_at.
+
+generated_reviews:
+Stores generated review suggestions linked to business/review request.
+
+smart_replies:
+Stores generated smart reply outputs linked to business/user.
+
+usage_limits:
+Tracks monthly usage of review/reply generations.
+
+support_tickets:
+Stores user support tickets with subject, category, priority, status, message, admin_response, assigned_to, timestamps.
+
+payment_events:
+Stores Razorpay webhook/payment/subscription events and processing status.
+
+analytics_events:
+Stores client-side page/event tracking.
+
+rate_limit_events:
+Stores rate limit buckets/identifiers for AI, payment, and support protection.
+
+Security:
+Supabase Row Level Security is used.
+Users should only access their own data.
+Public review pages can read public-enabled business profiles and insert public review activity.
+Admins can view support/payment/analytics queues where policies allow.
+
+
+============================================================
+15. SUPPORT SYSTEM
+============================================================
+
+Normal user support:
+Accessible from Profile -> Help & Support.
+
+Support categories:
+- General
+- Payment
+- Login
+- AI generation
+- Review page
+- Bug report
+
+Priority logic:
+- bug_report = high
+- payment/login = high
+- ai_generation/review_page = medium
+- general = normal/default
+
+Admin support:
+Admin can view and update all tickets.
+Admin can reply, assign, change priority/status, and close tickets.
+
+Email support:
+send-support-email function exists to notify admins/users.
+
+Support best practice:
+When a user reports an issue, ask for:
+- account email
+- business name
+- screenshot
+- payment ID/subscription ID if billing issue
+- exact steps to reproduce
+- device/browser/app version
+
+
+============================================================
+16. PWA / MOBILE APP PACKAGING
+============================================================
+
+PWA manifest:
+manifest.webmanifest
+
+PWA display mode:
+standalone
+
+Display override:
+standalone, minimal-ui, browser
+
+Orientation:
+portrait
+
+Categories:
+business, productivity
+
+PWA app ID:
+/
+
+Related Android package ID:
+com.revyneai.app
+
+Shortcuts:
+- Create Review Link -> /#business
+- Smart Reply -> /#reply
+- Help & Support -> /#support
+
+Share target:
+Configured with GET params title, text, url.
+
+Protocol handler:
+web+revyne
+
+Service worker:
+sw.js
+
+Current cache version:
+revyne-ai-v20260509-3
+
+Important cache behavior:
+index.html contains logic to unregister old service workers and clear old RevYne caches when swVersion changes. This is because mobile/PWA clients were showing stale CSS/JS earlier.
+
+APK packaging:
+PWABuilder was used to package the PWA for Android testing.
+
+
+============================================================
+17. SEO AND LEGAL
+============================================================
+
+SEO meta title:
+RevYne AI - Smart Review Assistant for Businesses
+
+Meta description:
+RevYne AI helps businesses collect honest customer feedback, generate review suggestions, create QR review links, and reply professionally to customer reviews.
+
+Canonical:
+https://revyneai.com/
+
+Open Graph:
+site_name: RevYne AI
+image: https://revyneai.com/assets/revyne-icon-512.png
+
+Twitter card:
+summary_large_image
+
+robots.txt:
+Present.
+
+sitemap.xml:
+Present.
+
+Legal pages:
+- Terms & Conditions
+- Privacy Policy
+
+Legal message:
+Current policy text is a practical starting point and should be reviewed by a legal professional before using RevYne for public paid customers.
+
+
+============================================================
+18. SECURITY AND COMPLIANCE NOTES
+============================================================
+
+Hosting security headers in vercel.json:
+- X-Content-Type-Options: nosniff
+- Referrer-Policy: strict-origin-when-cross-origin
+- Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+Security principles:
+- Never expose service role key in frontend.
+- Never expose OpenAI API key in frontend.
+- Never expose Razorpay key secret in frontend.
+- Use Supabase RLS.
+- Rate-limit AI, payment, and support endpoints.
+- Keep public review page limited to public business data only.
+- Public review wording must comply with review platform policies.
+
+Supabase security advisor:
+Warnings have appeared during development and should be reviewed before launch.
+
+Before production launch:
+- Review RLS policies.
+- Verify webhook signature validation.
+- Verify OAuth redirect URLs after final domain DNS is set.
+- Turn on leaked password protection if using password auth.
+- Confirm Google OAuth production redirect is configured for final domain.
+- Verify Razorpay live mode and webhook live secret.
+
+
+============================================================
+19. IMPORTANT USER FLOWS
+============================================================
+
+New business user flow:
+1. User opens RevYne.
+2. User signs in with Google.
+3. RevYne creates/fetches profile.
+4. Dashboard is empty for new user.
+5. User goes to My Business.
+6. User enters business profile and Google Review URL.
+7. RevYne creates a public review link and QR.
+8. Business prints/shares QR.
+9. Customer scans QR and writes genuine experience.
+10. RevYne generates review suggestions.
+11. Customer copies chosen review and posts on Google manually.
+
+Smart reply flow:
+1. Business receives a real customer review.
+2. Business opens AI Reply.
+3. Business enters rating, customer name, and review text.
+4. RevYne generates professional reply drafts.
+5. Business copies and posts reply manually.
+
+Upgrade flow:
+1. Business opens Pricing.
+2. Selects Pro, Pro Max, or Yearly.
+3. Razorpay checkout opens.
+4. Payment/subscription completes.
+5. Webhook updates Supabase profile.
+6. App refreshes current plan and unlocks features.
+
+Support flow:
+1. User opens Profile -> Help & Support.
+2. User raises ticket.
+3. Admin sees ticket in admin support dashboard.
+4. Admin updates status/response.
+5. User sees response.
+
+
+============================================================
+20. CURRENT KNOWN ISSUES / WATCH ITEMS
+============================================================
+
+GitHub push/auth:
+GitHub push was blocked on the local machine due broken credential helper/auth. Local commits and Vercel deploys can still happen, but GitHub sync needs auth repair.
+
+Domain:
+Final domain/DNS and Google OAuth production redirects were pending until domain purchase/setup.
+
+Payments:
+Razorpay integration works in test mode. Live mode requires proper Razorpay account activation, live keys, live webhook secret, and compliance approval.
+
+Mobile/PWA cache:
+If deployed changes do not appear, bump cache version in index.html, app.js asset links, and sw.js.
+
+Business persistence:
+Important to keep testing that business data loads for the same Google user after refresh/logout/login.
+
+Dark mode:
+Dark mode contrast was previously adjusted, but continue checking cards, buttons, text, QR panels, and pricing pages.
+
+QR actions:
+Download QR should directly download PNG from local data URL.
+Print QR should open a printable QR page and trigger print.
+
+
+============================================================
+21. STYLE GUIDANCE FOR FUTURE UI CHANGES
+============================================================
+
+Do:
+- Keep UI clean and practical.
+- Use cards with 16-22px radius where current system already does.
+- Use Inter font.
+- Use purple/magenta brand gradient for primary actions.
+- Keep text readable in dark mode.
+- Make mobile app feel native with bottom nav.
+- Keep header sticky.
+- Ensure every page scrolls on mobile.
+- Add concise helper text where needed.
+- Use honest-review language.
+
+Do not:
+- Add a large left hero sidebar in the logged-in app.
+- Add fake review language.
+- Show Pro Max customer service/type selectors to end customers unless business owner has active Pro Max/Yearly.
+- Use excessive padding on desktop.
+- Let bottom nav hide content.
+- Break mobile scrolling.
+- Expose API secrets in frontend.
+- Use external QR redirect for downloads.
+
+
+============================================================
+22. CUSTOM GPT BEHAVIOR INSTRUCTIONS
+============================================================
+
+When helping with RevYne:
+- Treat RevYne as an honest review assistance product.
+- Keep Google review policy in mind.
+- Suggest implementation that stores user-specific data in Supabase.
+- Keep first-time user dashboards clean and empty.
+- Avoid demo/default business data for real users.
+- Use brand colors and Inter font.
+- Prioritize mobile PWA experience.
+- Consider Indian SMB context and pricing sensitivity.
+- For payment features, assume Razorpay.
+- For auth/database, assume Supabase.
+- For hosting, assume Vercel.
+- For AI generation, assume OpenAI via Supabase Edge Function.
+- For UI, assume static HTML/CSS/JS unless the project is migrated later.
+
+When generating content:
+- Use "RevYne" or "RevYne AI" consistently.
+- Use simple, trustworthy language.
+- Do not overpromise.
+- Do not say RevYne posts reviews automatically.
+- Say customers copy/edit/post themselves.
+- Keep review drafts grounded in customer input.
+
+When generating code:
+- Main files are index.html, styles.css, app.js.
+- Respect existing local patterns.
+- Use cache version bumps after frontend deploys.
+- Keep mobile responsive behavior intact.
+- Test syntax before deploy.
+
