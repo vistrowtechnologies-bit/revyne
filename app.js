@@ -1903,210 +1903,295 @@ async function buildQrCanvas(text, width = 600) {
   return qrCanvas;
 }
 
+function loadCanvasImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Could not load image: ${src}`));
+    img.src = src;
+  });
+}
+
 async function getQrTemplateDataUrl() {
-  // Step 1: render QR directly onto an off-screen canvas (canvas→canvas avoids any taint)
   const qrCanvas = await buildQrCanvas(getReviewUrl(), 600);
+  const brandIcon = await loadCanvasImage("./assets/favicon.png?v=20260512-2");
 
-  // Step 2: build the branded template
-  {
-    const W = 900, H = 1200;
-    const qrImg = qrCanvas; // use canvas directly — no Image element needed
-        const c = document.createElement("canvas");
-        c.width = W; c.height = H;
-        const ctx = c.getContext("2d");
+  const W = 900;
+  const H = 1260;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
 
-        // ── helpers ──────────────────────────────────────────────────────
-        function rrPath(x, y, w, h, r) {
-          ctx.beginPath();
-          ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
-          ctx.arc(x + w - r, y + r, r, -Math.PI / 2, 0);
-          ctx.lineTo(x + w, y + h - r);
-          ctx.arc(x + w - r, y + h - r, r, 0, Math.PI / 2);
-          ctx.lineTo(x + r, y + h);
-          ctx.arc(x + r, y + h - r, r, Math.PI / 2, Math.PI);
-          ctx.lineTo(x, y + r);
-          ctx.arc(x + r, y + r, r, Math.PI, Math.PI * 3 / 2);
-          ctx.closePath();
-        }
-        function rrFill(x, y, w, h, r, color) { rrPath(x, y, w, h, r); ctx.fillStyle = color; ctx.fill(); }
-        function hexPath(cx, cy, r) {
-          ctx.beginPath();
-          for (let i = 0; i < 6; i++) {
-            const a = (Math.PI / 3) * i - Math.PI / 2;
-            i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
-                    : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
-          }
-          ctx.closePath();
-        }
-        function txt(str, x, y, font, color, align) {
-          ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || "center"; ctx.fillText(str, x, y);
-        }
+  const ctx = c.getContext("2d");
+  const PI = Math.PI;
+  const qrImg = qrCanvas;
 
-        // ── white background ─────────────────────────────────────────────
-        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
-
-        // ── Google + RevYne header ────────────────────────────────────────
-        const G_FONT = "bold 46px Arial";
-        ctx.font = G_FONT;
-        const gls = [["G","#4285F4"],["o","#EA4335"],["o","#FBBC05"],["g","#4285F4"],["l","#34A853"],["e","#EA4335"]];
-        const gw = gls.reduce((s, [ch]) => s + ctx.measureText(ch).width, 0);
-        const SEP = 2, SPAD = 22, IICON = 42, IPAD = 10, RTW = 142;
-        let hx = (W - (gw + SPAD * 2 + SEP + IICON + IPAD + RTW)) / 2;
-        const hy = 74;
-        gls.forEach(([ch, col]) => {
-          txt(ch, hx, hy, G_FONT, col, "left");
-          hx += ctx.measureText(ch).width;
-        });
-        hx += SPAD;
-        ctx.fillStyle = "#d1d5db"; ctx.fillRect(hx, hy - 42, SEP, 52);
-        hx += SEP + SPAD;
-        // RevYne icon (purple rounded rect + dots)
-        rrFill(hx, hy - 40, IICON, IICON, 10, "#7c3aed");
-        ctx.fillStyle = "#fff";
-        ctx.beginPath(); ctx.arc(hx + IICON / 2, hy - 22, 9, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#7c3aed";
-        [-8, 0, 8].forEach(ox => { ctx.beginPath(); ctx.arc(hx + IICON / 2 + ox, hy - 14, 3, 0, Math.PI * 2); ctx.fill(); });
-        hx += IICON + IPAD;
-        txt("RevYne", hx, hy, "bold 38px Arial", "#111827", "left");
-
-        // ── tagline "— AI Powered Review —" ──────────────────────────────
-        ctx.fillStyle = "#4f46e5"; ctx.font = "500 17px Arial"; ctx.textAlign = "center";
-        const tagW = ctx.measureText("AI Powered Review").width;
-        const tagX = W / 2, tagY = 118;
-        ctx.fillText("AI Powered Review", tagX, tagY);
-        ctx.strokeStyle = "#4f46e5"; ctx.lineWidth = 1.5;
-        [[-tagW / 2 - 30, -tagW / 2 - 8], [tagW / 2 + 8, tagW / 2 + 30]].forEach(([x1, x2]) => {
-          ctx.beginPath(); ctx.moveTo(tagX + x1, tagY - 5); ctx.lineTo(tagX + x2, tagY - 5); ctx.stroke();
-        });
-
-        // ── title ─────────────────────────────────────────────────────────
-        txt("Here's your Google QR!", W / 2, 173, "bold 46px Arial", "#111827");
-
-        // ── subtitle ──────────────────────────────────────────────────────
-        txt("Scan to leave us a review on Google", W / 2, 213, "18px Arial", "#6b7280");
-
-        // ── hexagon outline ───────────────────────────────────────────────
-        hexPath(W / 2, 492, 285);
-        ctx.strokeStyle = "#c7d2fe"; ctx.lineWidth = 3; ctx.stroke();
-
-        // ── "Review us on Google" text inside hex ─────────────────────────
-        txt("Review us on Google", W / 2, 300, "bold 26px Arial", "#111827");
-
-        // ── QR box (white fill + Google 4-color border) ───────────────────
-        const QX = (W - 284) / 2, QY = 328, QW = 284, QH = 284, QR_ = 26;
-        rrFill(QX, QY, QW, QH, QR_, "#ffffff");
-
-        const PI = Math.PI;
-        ctx.lineCap = "butt"; ctx.lineWidth = 9;
-        const bx = QX, by = QY, bw = QW, bh = QH, br = QR_;
-
-        function seg(col, x1, y1, x2, y2) {
-          ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-        }
-        function arc(col, cx, cy, r, s, e) {
-          ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(cx, cy, r, s, e); ctx.stroke();
-        }
-        // top: blue
-        seg("#4285F4", bx + br, by, bx + bw - br, by);
-        arc("#4285F4", bx + bw - br, by + br, br, -PI / 2, -PI / 4);
-        arc("#EA4335", bx + bw - br, by + br, br, -PI / 4, 0);
-        // right: red
-        seg("#EA4335", bx + bw, by + br, bx + bw, by + bh - br);
-        arc("#EA4335", bx + bw - br, by + bh - br, br, 0, PI / 4);
-        arc("#FBBC05", bx + bw - br, by + bh - br, br, PI / 4, PI / 2);
-        // bottom: yellow
-        seg("#FBBC05", bx + bw - br, by + bh, bx + br, by + bh);
-        arc("#FBBC05", bx + br, by + bh - br, br, PI / 2, PI * 3 / 4);
-        arc("#34A853", bx + br, by + bh - br, br, PI * 3 / 4, PI);
-        // left: green
-        seg("#34A853", bx, by + bh - br, bx, by + br);
-        arc("#34A853", bx + br, by + br, br, PI, PI * 5 / 4);
-        arc("#4285F4", bx + br, by + br, br, PI * 5 / 4, PI * 3 / 2);
-
-        // ── QR code image inside box ──────────────────────────────────────
-        const pad = 18;
-        ctx.drawImage(qrImg, QX + pad, QY + pad, QW - pad * 2, QH - pad * 2);
-
-        // ── 4 feature icons + text ────────────────────────────────────────
-        const FEATS = [
-          { col: "#4285F4", label: "Easy to Scan",           desc: ["Quick and secure", "review process"],     icon: "scan" },
-          { col: "#EA4335", label: "Trusted by Google",      desc: ["Your feedback", "matters to us"],         icon: "shield" },
-          { col: "#FBBC05", label: "Share Your Experience",  desc: ["Help others make", "better choices"],     icon: "star" },
-          { col: "#34A853", label: "Support Small Business", desc: ["Your review helps", "us grow"],           icon: "people" },
-        ];
-        const FY = 820, FS = W / 4;
-        FEATS.forEach((f, i) => {
-          const fx = FS * i + FS / 2, R = 38;
-          // circle
-          ctx.beginPath(); ctx.arc(fx, FY, R, 0, PI * 2); ctx.fillStyle = f.col; ctx.fill();
-          // icon
-          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
-          if (f.icon === "scan") {
-            const s = 11, d = 9;
-            [[fx - d - s, FY - d, fx - d, FY - d], [fx - d, FY - d, fx - d, FY - d - s],
-             [fx + d + s, FY - d, fx + d, FY - d], [fx + d, FY - d, fx + d, FY - d - s],
-             [fx - d - s, FY + d, fx - d, FY + d], [fx - d, FY + d, fx - d, FY + d + s],
-             [fx + d + s, FY + d, fx + d, FY + d], [fx + d, FY + d, fx + d, FY + d + s]
-            ].forEach(([x1, y1, x2, y2]) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); });
-          } else if (f.icon === "shield") {
-            ctx.beginPath();
-            ctx.moveTo(fx, FY - R * 0.58); ctx.lineTo(fx + R * 0.52, FY - R * 0.28);
-            ctx.lineTo(fx + R * 0.52, FY + R * 0.12);
-            ctx.quadraticCurveTo(fx + R * 0.52, FY + R * 0.6, fx, FY + R * 0.75);
-            ctx.quadraticCurveTo(fx - R * 0.52, FY + R * 0.6, fx - R * 0.52, FY + R * 0.12);
-            ctx.lineTo(fx - R * 0.52, FY - R * 0.28); ctx.closePath(); ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(fx - R * 0.22, FY + R * 0.1); ctx.lineTo(fx, FY + R * 0.32); ctx.lineTo(fx + R * 0.28, FY - R * 0.12);
-            ctx.stroke();
-          } else if (f.icon === "star") {
-            ctx.beginPath(); ctx.fillStyle = "#fff";
-            for (let j = 0; j < 5; j++) {
-              const a1 = (PI * 2 / 5) * j - PI / 2, a2 = a1 + PI / 5;
-              j === 0 ? ctx.moveTo(fx + R * 0.55 * Math.cos(a1), FY + R * 0.55 * Math.sin(a1))
-                      : ctx.lineTo(fx + R * 0.55 * Math.cos(a1), FY + R * 0.55 * Math.sin(a1));
-              ctx.lineTo(fx + R * 0.22 * Math.cos(a2), FY + R * 0.22 * Math.sin(a2));
-            }
-            ctx.closePath(); ctx.fill();
-          } else if (f.icon === "people") {
-            ctx.fillStyle = "#fff";
-            [[-R * 0.38, 0], [0, -R * 0.06], [R * 0.38, 0]].forEach(([ox, oy]) => {
-              ctx.beginPath(); ctx.arc(fx + ox, FY - R * 0.22 + oy, R * 0.16, 0, PI * 2); ctx.fill();
-              ctx.beginPath(); ctx.arc(fx + ox, FY + R * 0.26 + oy, R * 0.2, PI, PI * 2); ctx.fill();
-            });
-          }
-          // label (wrap long text)
-          ctx.lineWidth = 1; ctx.lineCap = "butt";
-          const words = f.label.split(" ");
-          const lines = [];
-          let cur = "";
-          ctx.font = "bold 14px Arial";
-          words.forEach(w => {
-            const test = cur ? cur + " " + w : w;
-            if (ctx.measureText(test).width > FS - 16) { if (cur) lines.push(cur); cur = w; }
-            else cur = test;
-          });
-          if (cur) lines.push(cur);
-          lines.forEach((ln, li) => txt(ln, fx, FY + 56 + li * 17, "bold 14px Arial", "#111827"));
-          const descY = FY + 56 + lines.length * 17;
-          f.desc.forEach((ln, li) => txt(ln, fx, descY + li * 16, "12px Arial", "#6b7280"));
-        });
-
-        // ── divider ───────────────────────────────────────────────────────
-        ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(60, 968); ctx.lineTo(W - 60, 968); ctx.stroke();
-
-        // ── footer: Powered by RevYne ─────────────────────────────────────
-        txt("Powered by", W / 2 - 65, 1013, "17px Arial", "#374151");
-        rrFill(W / 2 - 42, 993, 28, 28, 7, "#7c3aed");
-        txt("RevYne", W / 2 - 8, 1013, "bold 20px Arial", "#7c3aed", "left");
-
-        // ── footer: Contact line ──────────────────────────────────────────
-        txt("Contact us for Order QR :", W / 2 - 48, 1066, "15px Arial", "#374151");
-        ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(W / 2 + 68, 1061); ctx.lineTo(W / 2 + 215, 1061); ctx.stroke();
-
-    return c.toDataURL("image/png");
+  function rrPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arc(x + w - r, y + r, r, -PI / 2, 0);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arc(x + w - r, y + h - r, r, 0, PI / 2);
+    ctx.lineTo(x + r, y + h);
+    ctx.arc(x + r, y + h - r, r, PI / 2, PI);
+    ctx.lineTo(x, y + r);
+    ctx.arc(x + r, y + r, r, PI, PI * 1.5);
+    ctx.closePath();
   }
+
+  function rrFill(x, y, w, h, r, color) {
+    rrPath(x, y, w, h, r);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function txt(str, x, y, font, color, align = "center") {
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.fillText(str, x, y);
+  }
+
+  function drawHeaderDivider(x, y) {
+    ctx.fillStyle = "#d7dce5";
+    ctx.fillRect(x, y - 37, 2, 56);
+  }
+
+  function drawTaglineLine(x1, x2, y) {
+    ctx.strokeStyle = "#7c3aed";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x1, y);
+    ctx.lineTo(x2, y);
+    ctx.stroke();
+  }
+
+  function tallHexPath() {
+    ctx.beginPath();
+    ctx.moveTo(450, 322);
+    ctx.lineTo(772, 514);
+    ctx.lineTo(772, 806);
+    ctx.lineTo(450, 1002);
+    ctx.lineTo(168, 806);
+    ctx.lineTo(168, 514);
+    ctx.closePath();
+  }
+
+  function drawColoredQrBorder(x, y, w, h, r) {
+    ctx.lineCap = "butt";
+    ctx.lineWidth = 12;
+
+    function seg(col, x1, y1, x2, y2) {
+      ctx.strokeStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    function arc(col, cx, cy, radius, start, end) {
+      ctx.strokeStyle = col;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, start, end);
+      ctx.stroke();
+    }
+
+    seg("#34A853", x + r, y, x + w - r, y);
+    arc("#34A853", x + w - r, y + r, r, -PI / 2, -PI / 4);
+    arc("#4285F4", x + w - r, y + r, r, -PI / 4, 0);
+    seg("#4285F4", x + w, y + r, x + w, y + h - r);
+    arc("#4285F4", x + w - r, y + h - r, r, 0, PI / 4);
+    arc("#EA4335", x + w - r, y + h - r, r, PI / 4, PI / 2);
+    seg("#EA4335", x + w - r, y + h, x + r, y + h);
+    arc("#EA4335", x + r, y + h - r, r, PI / 2, PI * 0.75);
+    arc("#FBBC05", x + r, y + h - r, r, PI * 0.75, PI);
+    seg("#FBBC05", x, y + h - r, x, y + r);
+    arc("#FBBC05", x + r, y + r, r, PI, PI * 1.25);
+    arc("#34A853", x + r, y + r, r, PI * 1.25, PI * 1.5);
+  }
+
+  function drawFeatureIcon(cx, cy, color, type) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, 31, 0, PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    ctx.strokeStyle = "#ffffff";
+    ctx.fillStyle = "#ffffff";
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+
+    if (type === "scan") {
+      const s = 9;
+      const d = 8;
+      [
+        [cx - d - s, cy - d, cx - d, cy - d],
+        [cx - d, cy - d, cx - d, cy - d - s],
+        [cx + d + s, cy - d, cx + d, cy - d],
+        [cx + d, cy - d, cx + d, cy - d - s],
+        [cx - d - s, cy + d, cx - d, cy + d],
+        [cx - d, cy + d, cx - d, cy + d + s],
+        [cx + d + s, cy + d, cx + d, cy + d],
+        [cx + d, cy + d, cx + d, cy + d + s]
+      ].forEach(([x1, y1, x2, y2]) => {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      });
+      return;
+    }
+
+    if (type === "shield") {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 17);
+      ctx.lineTo(cx + 15, cy - 8);
+      ctx.lineTo(cx + 15, cy + 4);
+      ctx.quadraticCurveTo(cx + 15, cy + 18, cx, cy + 24);
+      ctx.quadraticCurveTo(cx - 15, cy + 18, cx - 15, cy + 4);
+      ctx.lineTo(cx - 15, cy - 8);
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, cy + 4);
+      ctx.lineTo(cx - 1, cy + 10);
+      ctx.lineTo(cx + 9, cy - 2);
+      ctx.stroke();
+      return;
+    }
+
+    if (type === "star") {
+      ctx.beginPath();
+      for (let i = 0; i < 5; i += 1) {
+        const a1 = (PI * 2 * i) / 5 - PI / 2;
+        const a2 = a1 + PI / 5;
+        if (i === 0) {
+          ctx.moveTo(cx + 16 * Math.cos(a1), cy + 16 * Math.sin(a1));
+        } else {
+          ctx.lineTo(cx + 16 * Math.cos(a1), cy + 16 * Math.sin(a1));
+        }
+        ctx.lineTo(cx + 7 * Math.cos(a2), cy + 7 * Math.sin(a2));
+      }
+      ctx.closePath();
+      ctx.fill();
+      return;
+    }
+
+    if (type === "people") {
+      [[-10, -2], [0, -5], [10, -2]].forEach(([ox, oy]) => {
+        ctx.beginPath();
+        ctx.arc(cx + ox, cy - 7 + oy, 5, 0, PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx + ox, cy + 10 + oy, 8, PI, PI * 2);
+        ctx.fill();
+      });
+    }
+  }
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.font = "bold 54px Arial";
+  const googleParts = [
+    ["G", "#4285F4"],
+    ["o", "#EA4335"],
+    ["o", "#FBBC05"],
+    ["g", "#4285F4"],
+    ["l", "#34A853"],
+    ["e", "#EA4335"]
+  ];
+  const googleWidth = googleParts.reduce((sum, [ch]) => sum + ctx.measureText(ch).width, 0);
+  const revTextWidth = 168;
+  const iconSize = 64;
+  const separatorGap = 26;
+  const iconGap = 14;
+  const totalHeaderWidth = googleWidth + separatorGap * 2 + 2 + iconSize + iconGap + revTextWidth;
+  let headerX = (W - totalHeaderWidth) / 2;
+  const headerY = 96;
+
+  googleParts.forEach(([ch, color]) => {
+    txt(ch, headerX, headerY, "bold 54px Arial", color, "left");
+    headerX += ctx.measureText(ch).width;
+  });
+
+  headerX += separatorGap;
+  drawHeaderDivider(headerX, headerY);
+  headerX += separatorGap + 2;
+  ctx.drawImage(brandIcon, headerX, headerY - 50, iconSize, iconSize);
+  headerX += iconSize + iconGap;
+  txt("RevYne", headerX, headerY + 1, "bold 58px Arial", "#1f2937", "left");
+
+  txt("AI Powered Review", 450, 168, "700 30px Arial", "#7c3aed");
+  drawTaglineLine(246, 356, 160);
+  drawTaglineLine(544, 654, 160);
+
+  txt("Here's your Google QR!", 450, 248, "bold 58px Arial", "#111827");
+  txt("Scan to leave us a review on Google", 450, 300, "28px Arial", "#9ca3af");
+
+  tallHexPath();
+  ctx.strokeStyle = "#c7d2fe";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  txt("Review us on Google", 450, 500, "bold 46px Arial", "#1f2937");
+
+  const QX = 302;
+  const QY = 539;
+  const QW = 338;
+  const QH = 340;
+  const QR_ = 34;
+  rrFill(QX, QY, QW, QH, QR_, "#ffffff");
+  drawColoredQrBorder(QX, QY, QW, QH, QR_);
+  const qrPad = 36;
+  ctx.drawImage(qrImg, QX + qrPad, QY + qrPad, QW - qrPad * 2, QH - qrPad * 2);
+
+  const features = [
+    { color: "#4285F4", label: "Easy to Scan", desc: ["Quick and secure", "review process"], icon: "scan" },
+    { color: "#EA4335", label: "Trusted by Google", desc: ["Your feedback", "matters to us"], icon: "shield" },
+    { color: "#FBBC05", label: "Share Your Experience", desc: ["Help others make", "better choices"], icon: "star" },
+    { color: "#34A853", label: "Support Small Business", desc: ["Your review helps", "us grow"], icon: "people" }
+  ];
+  const featureX = [150, 350, 570, 780];
+  const featureY = 1010;
+
+  features.forEach((feature, index) => {
+    const cx = featureX[index];
+    drawFeatureIcon(cx, featureY, feature.color, feature.icon);
+    txt(feature.label, cx, 1073, "bold 16px Arial", "#1f2937");
+    txt(feature.desc[0], cx, 1098, "16px Arial", "#6b7280");
+    txt(feature.desc[1], cx, 1119, "16px Arial", "#6b7280");
+  });
+
+  ctx.strokeStyle = "#e5e7eb";
+  ctx.lineWidth = 1;
+  [260, 455, 682].forEach((x) => {
+    ctx.beginPath();
+    ctx.moveTo(x, 1018);
+    ctx.lineTo(x, 1130);
+    ctx.stroke();
+  });
+
+  ctx.beginPath();
+  ctx.moveTo(60, 1150);
+  ctx.lineTo(840, 1150);
+  ctx.stroke();
+
+  txt("Powered by", 370, 1190, "22px Arial", "#4b5563");
+  ctx.drawImage(brandIcon, 440, 1162, 42, 42);
+  txt("RevYne", 498, 1193, "bold 32px Arial", "#7c3aed", "left");
+
+  txt("Contact us for Order QR :", 355, 1240, "22px Arial", "#4b5563");
+  ctx.beginPath();
+  ctx.moveTo(535, 1234);
+  ctx.lineTo(765, 1234);
+  ctx.strokeStyle = "#9ca3af";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  return c.toDataURL("image/png");
 }
 
 function downloadReviewQr() {
