@@ -1776,19 +1776,12 @@ function renderQrCodes() {
     if (!text) return;
 
     if (!window.QRCode?.toCanvas) {
-      const attempts = Number(canvas.dataset.qrAttempts || "0");
-      if (attempts < 8) {
-        canvas.dataset.qrAttempts = String(attempts + 1);
-        setTimeout(renderQrCodes, 300);
-        return;
-      }
-
-      const fallback = document.createElement("img");
-      fallback.className = "qr-canvas";
-      fallback.alt = "Review QR code";
-      fallback.dataset.qrImage = "fallback";
-      fallback.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(text)}`;
-      canvas.replaceWith(fallback);
+      ensureQrLibrary()
+        .then(() => drawQrWithLocalGenerator(canvas, text, 220, 2))
+        .catch((error) => {
+          console.warn("Could not render local QR code:", error);
+          showToast("Could not create QR code");
+        });
       return;
     }
 
@@ -1810,7 +1803,7 @@ function renderQrCodes() {
 
 // Builds the branded Google+RevYne QR template on a canvas and returns a PNG data URL
 function ensureQrLibrary(timeoutMs = 6000) {
-  if (window.QRCode?.toCanvas) return Promise.resolve();
+  if (window.QRCode?.toCanvas || window.qrcode) return Promise.resolve();
   if (window.__revyneQrLibraryPromise) return window.__revyneQrLibraryPromise;
 
   window.__revyneQrLibraryPromise = new Promise((resolve, reject) => {
@@ -1822,7 +1815,7 @@ function ensureQrLibrary(timeoutMs = 6000) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (window.QRCode?.toCanvas && !error) resolve();
+      if ((window.QRCode?.toCanvas || window.qrcode) && !error) resolve();
       else reject(error || new Error("QR library not ready"));
     };
 
@@ -1834,7 +1827,7 @@ function ensureQrLibrary(timeoutMs = 6000) {
       return;
     }
 
-    script.src = "https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js";
+    script.src = "./assets/vendor/qrcode-generator.js?v=20260512-2";
     script.async = true;
     script.dataset.revyneQrLibrary = "true";
     script.onload = () => finish();
@@ -1848,6 +1841,40 @@ function ensureQrLibrary(timeoutMs = 6000) {
   return window.__revyneQrLibraryPromise;
 }
 
+function drawQrWithLocalGenerator(canvas, text, width = 600, marginModules = 2) {
+  if (!window.qrcode) throw new Error("Local QR generator not ready");
+
+  const qr = window.qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+
+  const moduleCount = qr.getModuleCount();
+  const quietModules = marginModules;
+  const cellSize = width / (moduleCount + quietModules * 2);
+  const qrSize = cellSize * moduleCount;
+  const offset = (width - qrSize) / 2;
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = width;
+  canvas.height = width;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, width);
+  ctx.fillStyle = "#111827";
+
+  for (let row = 0; row < moduleCount; row += 1) {
+    for (let col = 0; col < moduleCount; col += 1) {
+      if (qr.isDark(row, col)) {
+        ctx.fillRect(
+          Math.round(offset + col * cellSize),
+          Math.round(offset + row * cellSize),
+          Math.ceil(cellSize),
+          Math.ceil(cellSize)
+        );
+      }
+    }
+  }
+}
+
 async function buildQrCanvas(text, width = 600) {
   await ensureQrLibrary();
 
@@ -1855,19 +1882,23 @@ async function buildQrCanvas(text, width = 600) {
   qrCanvas.width = width;
   qrCanvas.height = width;
 
-  await new Promise((resolve, reject) => {
-    window.QRCode.toCanvas(qrCanvas, text, {
-      width,
-      margin: 2,
-      color: {
-        dark: "#111827",
-        light: "#ffffff"
-      }
-    }, (error) => {
-      if (error) reject(error);
-      else resolve();
+  if (window.QRCode?.toCanvas) {
+    await new Promise((resolve, reject) => {
+      window.QRCode.toCanvas(qrCanvas, text, {
+        width,
+        margin: 2,
+        color: {
+          dark: "#111827",
+          light: "#ffffff"
+        }
+      }, (error) => {
+        if (error) reject(error);
+        else resolve();
+      });
     });
-  });
+  } else {
+    drawQrWithLocalGenerator(qrCanvas, text, width, 2);
+  }
 
   return qrCanvas;
 }
@@ -2159,7 +2190,7 @@ function appShell(content) {
       <header class="topbar">
         <div class="topbar-main">
           <div class="brand">
-            <img class="brand-mark" src="./assets/favicon.png?v=20260512-1" alt="" />
+            <img class="brand-mark" src="./assets/favicon.png?v=20260512-2" alt="" />
             <span>RevYne</span>
           </div>
         </div>
@@ -3161,7 +3192,7 @@ function authPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260512-1" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260512-2" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Smart AI Review Assistant for Businesses</div>
       </div>
@@ -3206,7 +3237,7 @@ function googleProfileSetupPage() {
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260512-1" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260512-2" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
         <div class="auth-tagline">Complete your Google profile</div>
       </div>
