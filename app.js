@@ -2548,8 +2548,6 @@ function appShell(content) {
           ${navButton("Dashboard", "dashboard")}
           ${navButton("Smart Reply", "reply")}
           ${navButton("Google Business", "gmb")}
-          ${navButton("Pricing", "pricing")}
-          ${navButton("My Business", "business")}
           ${navButton("Profile", "profile")}
           <button class="logout" type="button">Logout</button>
         </nav>
@@ -4709,6 +4707,7 @@ function profilePage() {
   const avatar = b.logo
     ? `<div class="profile-avatar has-image"><img src="${escapeHtml(b.logo)}" alt="Profile" /></div>`
     : `<div class="profile-avatar">${escapeHtml(initial)}</div>`;
+  const svgBusiness = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
   const svgAbout = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>`;
   const svgOrders = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8z"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="9" x2="8" y2="9"/><line x1="10" y1="17" x2="8" y2="17"/></svg>`;
   const svgHelp = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>`;
@@ -4718,12 +4717,13 @@ function profilePage() {
   const svgLogout = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
 
   const items = [
-    { icon: svgAbout,   label: "About RevYne",   view: "about",   color: "var(--surface-container)", fg: "var(--blue)" },
-    { icon: svgOrders,  label: "Order History",  view: "orders",  color: "var(--surface-container)", fg: "var(--blue)" },
-    { icon: svgPricing, label: "Plans & Pricing", view: "pricing", color: "var(--surface-container)", fg: "var(--blue)" },
-    { icon: svgHelp,    label: "Help & Support",  view: "support", color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgBusiness, label: "My Business",     view: "business", color: "var(--blue-soft)", fg: "var(--blue)" },
+    { icon: svgAbout,    label: "About RevYne",    view: "about",    color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgOrders,   label: "Order History",   view: "orders",   color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgPricing,  label: "Plans & Pricing", view: "pricing",  color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgHelp,     label: "Help & Support",  view: "support",  color: "var(--surface-container)", fg: "var(--blue)" },
     ...(u.isAdmin ? [{ icon: svgAdmin, label: "Admin Support", view: "adminSupport", color: "var(--blue-soft)", fg: "var(--blue)" }] : []),
-    { icon: svgTerms,   label: "Terms & Privacy", view: "terms",   color: "var(--surface-container)", fg: "var(--blue)" }
+    { icon: svgTerms,    label: "Terms & Privacy", view: "terms",    color: "var(--surface-container)", fg: "var(--blue)" }
   ];
 
   const currentTheme = state.theme || "default";

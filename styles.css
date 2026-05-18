@@ -119,7 +119,7 @@ button {
   align-items: center;
   gap: 10px;
   font-size: 25px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -148,7 +148,7 @@ button {
 
 .nav button.active {
   color: var(--blue);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .logout {
@@ -244,7 +244,7 @@ button {
   color: #fff;
   border-radius: 10px;
   padding: 16px 24px;
-  font-weight: 800;
+  font-weight: 700;
   min-width: 240px;
   text-align: center;
   border: 1px solid rgba(255, 255, 255, 0.4);
@@ -285,7 +285,7 @@ button {
 }
 
 .field label {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .label-with-info {
@@ -378,7 +378,7 @@ button {
   padding: 0 24px;
   background: linear-gradient(135deg, var(--blue), var(--secondary));
   color: #fff;
-  font-weight: 800;
+  font-weight: 700;
   box-shadow: 0 4px 14px rgba(129, 39, 207, 0.35);
   transition: opacity 150ms ease, transform 150ms ease;
 }
@@ -586,7 +586,7 @@ button {
 .pricing-note span {
   color: var(--ink);
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .checkout-notice {
@@ -594,7 +594,7 @@ button {
   padding: 12px 14px;
   color: var(--blue-dark);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   border-color: rgba(129, 39, 207, 0.22);
   background: var(--blue-soft);
 }
@@ -624,7 +624,7 @@ button {
   margin-bottom: 6px;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -632,7 +632,7 @@ button {
 .plan-status-card span {
   color: var(--ink);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -677,7 +677,7 @@ button {
   padding: 5px 10px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -718,7 +718,7 @@ button {
 
 .price span {
   font-size: 28px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .price small {
@@ -759,12 +759,12 @@ button {
 
 .yes {
   color: var(--success);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .no {
   color: var(--danger);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .disabled {
@@ -898,7 +898,7 @@ button {
   background: var(--blue-soft);
   color: var(--blue);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -977,7 +977,7 @@ button {
 
 .auth-brand-name {
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 700;
   background: linear-gradient(135deg, var(--blue), var(--secondary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -1005,8 +1005,8 @@ button {
 
 .auth-card h2 {
   margin: 0 0 4px;
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 600;
   color: var(--ink);
   text-align: center;
 }
@@ -1029,7 +1029,7 @@ button {
   padding: 0 20px;
   background: var(--panel);
   color: var(--ink);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 15px;
   cursor: pointer;
   transition: box-shadow 150ms ease, background 150ms ease;
@@ -1069,7 +1069,7 @@ button {
   background: transparent;
   color: var(--blue);
   font: inherit;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   padding: 0 2px;
 }
@@ -1181,7 +1181,7 @@ button {
 
 .bnav-label {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
   display: block;
   max-width: 100%;
@@ -1215,7 +1215,7 @@ button {
   background: var(--panel);
   color: var(--blue);
   font-size: 32px;
-  font-weight: 800;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1237,7 +1237,7 @@ button {
 
 .profile-name {
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 600;
   margin-bottom: 4px;
 }
 
@@ -1318,7 +1318,7 @@ button {
 .help-hero-title {
   margin: 4px 0 8px;
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 600;
 }
 .help-hero-sub {
   margin: 0;
@@ -1347,7 +1347,7 @@ button {
 }
 .help-feat-title {
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
   margin-bottom: 6px;
   color: var(--ink);
 }
@@ -1364,7 +1364,7 @@ button {
 .faq-panel-heading {
   margin: 0 0 20px;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 600;
 }
 .faq-list {
   display: grid;
@@ -1372,7 +1372,7 @@ button {
 }
 .faq-cat-title {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted);
@@ -1447,7 +1447,7 @@ button {
 .help-ticket-heading {
   margin: 0 0 4px;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 600;
 }
 .help-ticket-sub {
   margin: 0;
@@ -1492,7 +1492,7 @@ button {
   margin: 0 0 8px;
   color: var(--blue);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1516,7 +1516,7 @@ button {
 
 .support-email a {
   color: var(--blue);
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .support-sla {
@@ -1697,7 +1697,7 @@ button {
   border-radius: 10px;
   background: #eefaf1;
   color: #137333;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .payment-event-card .payment-processing.has-warning {
@@ -1715,7 +1715,7 @@ button {
 
 .payment-status {
   color: var(--success) !important;
-  font-weight: 900;
+  font-weight: 600;
   text-transform: capitalize;
 }
 
@@ -1761,7 +1761,7 @@ button {
   background: var(--blue-soft);
   color: var(--blue);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: capitalize;
 }
 
@@ -1843,12 +1843,12 @@ button {
 
 .legal-card a {
   color: var(--blue);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .legal-date {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink) !important;
 }
 
@@ -1896,7 +1896,7 @@ button {
 .admin-ticket-stats span {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -1910,7 +1910,7 @@ button {
 }
 
 .admin-toolbar label {
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .admin-ticket-list {
@@ -1948,7 +1948,7 @@ button {
 .dash-title {
   margin: 0 0 4px;
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
   letter-spacing: -0.02em;
 }
@@ -2016,8 +2016,8 @@ button {
 
 .metric-label {
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   color: var(--muted);
   text-transform: uppercase;
   margin-bottom: 8px;
@@ -2031,7 +2031,7 @@ button {
 
 .metric-big {
   font-size: 38px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--blue);
   line-height: 1;
 }
@@ -2053,20 +2053,20 @@ button {
   justify-content: center;
   font-size: 20px;
   color: var(--blue);
-  font-weight: 900;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
 .metric-num {
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
   margin-bottom: 4px;
 }
 
 .metric-trend {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .metric-trend.positive { color: var(--success); }
@@ -2102,7 +2102,7 @@ button {
 }
 
 .ai-spotlight-title {
-  font-weight: 800;
+  font-weight: 600;
   font-size: 15px;
   color: var(--ink);
   margin-bottom: 4px;
@@ -2128,8 +2128,8 @@ button {
 }
 
 .recent-title {
-  font-size: 17px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--ink);
 }
 
@@ -2137,8 +2137,8 @@ button {
   border: 0;
   background: transparent;
   color: var(--blue);
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: 500;
+  font-size: 13px;
   padding: 0;
 }
 
@@ -2168,7 +2168,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 13px;
   flex-shrink: 0;
 }
@@ -2189,7 +2189,7 @@ button {
   display: grid;
   place-items: center;
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 600;
   overflow: hidden;
 }
 
@@ -2211,7 +2211,7 @@ button {
 }
 
 .reviewer-name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 14px;
   color: var(--ink);
 }
@@ -2273,7 +2273,7 @@ button {
 .review-link-panel h3 {
   margin: 0 0 6px;
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .qr-panel {
@@ -2330,7 +2330,7 @@ button {
 .qr-preview-card span {
   color: var(--muted);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -3191,7 +3191,7 @@ button {
 .gmb-connected-dot { width: 8px; height: 8px; border-radius: 50%; background: #34A853; flex-shrink: 0; }
 .gmb-dash-metrics { display: flex; align-items: center; gap: 16px; }
 .gmb-score-ring { width: 64px; height: 64px; border-radius: 50%; background: conic-gradient(var(--score-color, #34A853) 0%, var(--surface-container) 0%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.gmb-score-num { font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.gmb-score-num { font-size: 1.3rem; font-weight: 700; line-height: 1; }
 .gmb-score-lbl { font-size: 0.62rem; color: var(--muted); text-align: center; }
 .gmb-dash-stats { display: flex; gap: 20px; }
 .gmb-stat { display: flex; flex-direction: column; align-items: center; }
@@ -3294,10 +3294,10 @@ button {
   text-align: center;
   pointer-events: none;
 }
-.gmb-score-big { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+.gmb-score-big { font-size: 1.5rem; font-weight: 700; line-height: 1; }
 .gmb-score-tag { font-size: 0.65rem; color: var(--muted); font-weight: 600; }
 .gmb-health-right { flex: 1; min-width: 0; }
-.gmb-health-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 10px; }
+.gmb-health-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 10px; }
 .gmb-health-bars { display: flex; flex-direction: column; gap: 7px; }
 .gmb-bar-row { display: flex; align-items: center; gap: 8px; }
 .gmb-bar-label { font-size: 0.73rem; color: var(--muted); width: 90px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3306,7 +3306,7 @@ button {
 
 /* ── Tips panel ─────────────────────────────────────────────────── */
 .gmb-tips-panel { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
-.gmb-tips-title { font-weight: 700; font-size: 0.875rem; margin-bottom: 8px; color: #92400e; }
+.gmb-tips-title { font-weight: 600; font-size: 0.875rem; margin-bottom: 8px; color: #92400e; }
 .gmb-tip-item { font-size: 0.82rem; color: #78350f; margin-bottom: 5px; line-height: 1.5; }
 [data-theme="dark"] .gmb-tips-panel { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); }
 [data-theme="dark"] .gmb-tips-title, [data-theme="dark"] .gmb-tip-item { color: #fcd34d; }
@@ -3332,7 +3332,7 @@ button {
   justify-content: space-between;
   margin-bottom: 10px;
 }
-.gmb-section-title { font-weight: 700; font-size: 0.95rem; }
+.gmb-section-title { font-weight: 600; font-size: 0.9rem; }
 .gmb-review-count { font-size: 0.78rem; color: var(--muted); }
 .gmb-review-card { padding: 14px 16px; margin-bottom: 8px; }
 .gmb-review-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
@@ -3390,7 +3390,7 @@ button {
 }
 .onb-wizard-brand {
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--brand);
   letter-spacing: -0.5px;
 }
@@ -3411,8 +3411,8 @@ button {
 [data-theme="dark"] .onb-wizard-card { background: var(--surface); }
 [data-theme="dark"] .onb-wizard-shell { background: var(--bg); }
 .onb-wizard-title {
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.1rem;
+  font-weight: 600;
   color: var(--text);
   margin: 0 0 4px;
 }
@@ -3638,9 +3638,9 @@ button {
   border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
 }
-.growth-title { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.growth-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
 .growth-sub { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
-.growth-overall-pct { font-size: 1.1rem; font-weight: 800; }
+.growth-overall-pct { font-size: 1.1rem; font-weight: 700; }
 .growth-list { display: flex; flex-direction: column; gap: 10px; }
 .growth-item {
   display: flex;
