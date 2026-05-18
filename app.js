@@ -96,12 +96,15 @@ let slideDirection = null;
 let bottomNavFromIndex = 0;
 let bottomNavShouldAnimate = false;
 let currentSession = null;
+let isApplyingSession = false;
+let lastStatsLoadTime = 0;       // epoch ms — throttle dashboard stat refreshes
+let publicReviewRequestId = null; // set after QR session saves, used to mark draft_copied
 let isGeneratingReply = false;
 let isGeneratingReview = false;
 let analyticsSessionId = getAnalyticsSessionId();
 let lastTrackedPageKey = "";
-const navOrder = ["dashboard", "business", "reply", "pricing", "profile"];
-const profileSubViews = ["about", "orders", "support", "adminSupport", "terms", "privacy"];
+const navOrder = ["dashboard", "business", "reply", "gmb", "profile"];
+const profileSubViews = ["about", "orders", "support", "adminSupport", "terms", "privacy", "pricing"];
 
 const defaultState = {
   view: "dashboard",
@@ -146,6 +149,14 @@ const defaultState = {
     generated: 0,
     copied: 0
   },
+  dashboardStats: {
+    totalReviews: 0,
+    avgRating: 0,
+    recentReviews: [],
+    loaded: false
+  },
+  guestRepliesUsed: 0,
+  showGuestLimitModal: false,
   suggestions: [],
   smartReplies: [],
   theme: "default",
@@ -164,6 +175,24 @@ const defaultState = {
   replyDraft: {
     customerName: "",
     reviewText: ""
+  },
+  gmb: {
+    connected: false,
+    connecting: false,
+    locationId: null,
+    locationName: null,
+    accountName: null,
+    profile: null,
+    reviews: [],
+    healthScore: null,
+    healthDetails: null,
+    optimizations: [],
+    lastSync: null,
+    syncing: false,
+    replyingTo: null,    // review id currently being replied to
+    replyDraft: "",
+    locationOptions: [], // list of locations shown in picker modal
+    showLocationPicker: false
   }
 };
 
@@ -202,13 +231,26 @@ function loadState() {
       user: { ...freshState.user, ...(parsed.user || {}) },
       business: { ...freshState.business, ...(parsed.business || {}) },
       stats: { ...freshState.stats, ...(parsed.stats || {}) },
+      dashboardStats: { ...freshState.dashboardStats, loaded: false },
+      guestRepliesUsed: parsed.guestRepliesUsed || 0,
+      showGuestLimitModal: false,
       supportTickets: Array.isArray(parsed.supportTickets) ? parsed.supportTickets : [],
       adminTickets: Array.isArray(parsed.adminTickets) ? parsed.adminTickets : [],
       paymentEvents: Array.isArray(parsed.paymentEvents) ? parsed.paymentEvents : [],
       adminPaymentEvents: Array.isArray(parsed.adminPaymentEvents) ? parsed.adminPaymentEvents : [],
       adminTicketFilter: parsed.adminTicketFilter || freshState.adminTicketFilter,
       reviewDraft: { ...freshState.reviewDraft, ...(parsed.reviewDraft || {}) },
-      replyDraft: { ...freshState.replyDraft, ...(parsed.replyDraft || {}) }
+      replyDraft: { ...freshState.replyDraft, ...(parsed.replyDraft || {}) },
+      gmb: {
+        ...freshState.gmb,
+        ...(parsed.gmb || {}),
+        connecting: false,
+        syncing: false,
+        locationOptions: [],
+        showLocationPicker: false,
+        replyingTo: null,
+        replyDraft: ""
+      }
     };
     if (isDemoBusiness(merged.business, merged.stats)) {
       merged.business = emptyBusiness({
@@ -226,6 +268,12 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+let _saveDebounceTimer = null;
+function debouncedSaveState() {
+  clearTimeout(_saveDebounceTimer);
+  _saveDebounceTimer = setTimeout(saveState, 400);
 }
 
 function getAnalyticsSessionId() {
@@ -339,7 +387,7 @@ function updateBusinessField(field, value) {
     state.business[field] = field === "services" ? trimToFiveList(value) : value;
   }
   if (field === "mobile") state.user.mobile = value;
-  saveState();
+  debouncedSaveState();
 }
 
 function handleProfileImageUpload(file) {
@@ -403,7 +451,7 @@ function handleProfileImageUpload(file) {
 function updateUserField(field, value) {
   state.user[field] = value;
   if (field === "mobile") state.business.mobile = value;
-  saveState();
+  debouncedSaveState();
 }
 
 function preserveBusinessFromDom() {
@@ -518,43 +566,55 @@ function getSupabaseUserProfile(user) {
 }
 
 async function applySupabaseSession(session) {
-  currentSession = session;
+  // Guard against concurrent calls (e.g. getSession + onAuthStateChange firing simultaneously)
+  if (isApplyingSession) return;
+  isApplyingSession = true;
 
-  if (!session?.user) {
-    if (state.isLoggedIn && state.user?.provider === "guest") {
+  try {
+    currentSession = session;
+
+    if (!session?.user) {
+      if (state.isLoggedIn && state.user?.provider === "guest") {
+        return;
+      }
+
+      state.isLoggedIn = false;
+      state.authMode = "signin";
+      saveState();
       return;
     }
 
-    state.isLoggedIn = false;
+    state.user = {
+      ...clone(defaultState.user),
+      ...getSupabaseUserProfile(session.user),
+      plan: state.user.plan || "free"
+    };
+    state.stats = clone(defaultState.stats);
+    state.suggestions = [];
+    state.smartReplies = [];
+    state.supportTickets = [];
+    state.adminTickets = [];
+    state.paymentEvents = [];
+    state.adminPaymentEvents = [];
+    state.isLoggedIn = true;
     state.authMode = "signin";
+    await loadSupabaseProfile();
+    await loadSupabaseBusiness();
+    // Overlay any unsaved DOM edits (e.g. user was typing in a field when a token
+    // refresh fired onAuthStateChange) so they are not lost by the DB reload above.
+    preserveBusinessFromDom();
+    await saveSupabaseProfile();
+    await loadDashboardStats();
+    await loadPaymentEvents();
+    await loadSupportTickets();
+    if (state.user.isAdmin) {
+      await loadAdminTickets();
+      await loadAdminPaymentEvents();
+    }
     saveState();
-    return;
+  } finally {
+    isApplyingSession = false;
   }
-
-  state.user = {
-    ...clone(defaultState.user),
-    ...getSupabaseUserProfile(session.user),
-    plan: state.user.plan || "free"
-  };
-  state.stats = clone(defaultState.stats);
-  state.suggestions = [];
-  state.smartReplies = [];
-  state.supportTickets = [];
-  state.adminTickets = [];
-  state.paymentEvents = [];
-  state.adminPaymentEvents = [];
-  state.isLoggedIn = true;
-  state.authMode = "signin";
-  await loadSupabaseProfile();
-  await saveSupabaseProfile();
-  await loadSupabaseBusiness();
-  await loadPaymentEvents();
-  await loadSupportTickets();
-  if (state.user.isAdmin) {
-    await loadAdminTickets();
-    await loadAdminPaymentEvents();
-  }
-  saveState();
 }
 
 async function loadSupabaseProfile() {
@@ -665,6 +725,55 @@ async function loadSupabaseBusiness() {
   };
 }
 
+async function loadDashboardStats() {
+  if (!supabaseClient || !currentSession?.user || !state.business.id) {
+    state.dashboardStats = { totalReviews: 0, avgRating: 0, recentReviews: [], loaded: true };
+    return;
+  }
+  try {
+    // Fetch all review sessions for this business — every scan+generate counts
+    const { data, error } = await supabaseClient
+      .from("review_requests")
+      .select("id,rating,customer_experience,created_at")
+      .eq("business_id", state.business.id)
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    if (error) {
+      console.warn("[RevYne] loadDashboardStats error:", error.message);
+      state.dashboardStats = { totalReviews: 0, avgRating: 0, recentReviews: [], loaded: true };
+      return;
+    }
+
+    const total = (data || []).length;
+    const avgRating = total > 0
+      ? Math.round((data.reduce((sum, r) => sum + (r.rating || 0), 0) / total) * 10) / 10
+      : 0;
+
+    // Also fetch current-month AI reply usage
+    let aiRepliesUsed = 0;
+    try {
+      const { data: usageData } = await supabaseClient
+        .from("usage_limits")
+        .select("reply_generations")
+        .eq("user_id", currentSession.user.id)
+        .eq("month_key", getMonthKey())
+        .maybeSingle();
+      aiRepliesUsed = usageData?.reply_generations || 0;
+    } catch { /* non-critical */ }
+
+    state.dashboardStats = {
+      totalReviews: total,
+      avgRating,
+      recentReviews: (data || []).slice(0, 5),
+      aiRepliesUsed,
+      loaded: true
+    };
+  } catch {
+    state.dashboardStats = { totalReviews: 0, avgRating: 0, recentReviews: [], aiRepliesUsed: 0, loaded: true };
+  }
+}
+
 async function loadSupportTickets() {
   if (!supabaseClient || !currentSession?.user) return;
 
@@ -750,6 +859,7 @@ async function saveSupabaseBusiness() {
     owner_plan: state.user.plan || "free",
     owner_plan_status: state.user.planStatus || "free",
     owner_plan_current_end: state.user.planCurrentEnd || null,
+    public_reviews_enabled: true,
     updated_at: new Date().toISOString()
   };
 
@@ -1152,39 +1262,28 @@ async function saveGeneratedReviewsToSupabase(experience) {
   }
 
   if (!state.business.id) {
-    showToast("Please save your business profile before collecting reviews");
+    console.warn("[RevYne] save skipped: business id missing");
     return;
   }
 
-  const { data: request, error: requestError } = await supabaseClient
-    .from("review_requests")
-    .insert({
-      business_id: state.business.id,
-      rating: state.rating,
-      customer_experience: experience || null,
-      customer_language: state.business.language || "English",
-      source: "public_page"
-    })
-    .select("id")
-    .single();
+  // Use the SECURITY DEFINER RPC function — bypasses RLS entirely,
+  // works for any caller (anon, authenticated, or publishable-key client)
+  try {
+    const { data: requestId, error } = await supabaseClient.rpc("save_review_request", {
+      p_business_id: state.business.id,
+      p_rating: state.rating,
+      p_experience: experience || null,
+      p_language: state.business.language || "English",
+      p_suggestions: state.suggestions.slice(0, 3)
+    });
 
-  if (requestError) {
-    showToast(requestError.message || "Could not save review request");
-    return;
-  }
-
-  const rows = state.suggestions.map((suggestion) => ({
-    review_request_id: request.id,
-    business_id: state.business.id,
-    suggestion
-  }));
-
-  const { error: suggestionsError } = await supabaseClient
-    .from("generated_reviews")
-    .insert(rows);
-
-  if (suggestionsError) {
-    showToast(suggestionsError.message || "Could not save suggestions");
+    if (error) {
+      console.warn("[RevYne] save_review_request RPC error:", error.message);
+    } else if (requestId) {
+      publicReviewRequestId = requestId;
+    }
+  } catch (err) {
+    console.warn("[RevYne] save_review_request failed:", err);
   }
 }
 
@@ -1463,6 +1562,15 @@ async function createReviewSuggestions() {
 async function createSmartReplies() {
   if (isGeneratingReply) return;
 
+  // Guest mode: hard cap at 5 free replies, then prompt sign-in
+  if (state.user?.provider === "guest") {
+    if ((state.guestRepliesUsed || 0) >= 5) {
+      state.showGuestLimitModal = true;
+      render();
+      return;
+    }
+  }
+
   const customerNameInput = document.querySelector("#customerName");
   const customerReviewInput = document.querySelector("#customerReview");
   state.replyDraft.customerName = customerNameInput?.value.trim() || state.replyDraft.customerName.trim();
@@ -1514,6 +1622,18 @@ async function createSmartReplies() {
     }
 
     isGeneratingReply = false;
+
+    // Track guest usage
+    if (state.user?.provider === "guest") {
+      state.guestRepliesUsed = (state.guestRepliesUsed || 0) + 1;
+      if (state.guestRepliesUsed >= 5) {
+        showToast(`You've used all 5 free replies. Sign in to get 20 more!`, 4000);
+      } else {
+        const remaining = 5 - state.guestRepliesUsed;
+        showToast(`${remaining} free repl${remaining === 1 ? "y" : "ies"} remaining. Sign in for more.`, 3000);
+      }
+    }
+
     saveState();
     render();
 
@@ -1534,6 +1654,20 @@ async function createSmartReplies() {
     console.warn("Could not generate smart replies:", error);
     showToast("Could not generate replies");
     render();
+  }
+}
+
+async function markReviewDraftCopied() {
+  if (!publicReviewRequestId || !supabaseClient) return;
+  const id = publicReviewRequestId;
+  publicReviewRequestId = null; // prevent double-marking
+  try {
+    await supabaseClient.functions.invoke("generate-ai", {
+      body: { action: "mark_review_copied", request_id: id }
+    });
+  } catch (e) {
+    console.warn("[RevYne] Could not mark review copied:", e);
+    publicReviewRequestId = id; // restore on failure so retry is possible
   }
 }
 
@@ -1913,24 +2047,335 @@ function loadCanvasImage(src) {
 }
 
 async function getQrTemplateDataUrl() {
+  // Step 1: render QR onto an off-screen canvas
   const qrCanvas = await buildQrCanvas(getReviewUrl(), 600);
-  const template = await loadCanvasImage("./assets/qr-poster-template-v2.png?v=20260513-1");
 
-  const W = 900;
-  const H = 1600;
+  // Step 2: draw branded template matching the RevYne QR poster design
+  const W = 900, H = 1200;
   const c = document.createElement("canvas");
-  c.width = W;
-  c.height = H;
-
+  c.width = W; c.height = H;
   const ctx = c.getContext("2d");
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, W, H);
-  ctx.drawImage(template, 0, 0, W, H);
+  const PI = Math.PI;
 
-  const qrX = 268;
-  const qrY = 777;
-  const qrSize = 368;
-  ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
+  // ── helpers ────────────────────────────────────────────────────────────────
+  const rrPath = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+    ctx.arc(x + w - r, y + r, r, -PI / 2, 0);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arc(x + w - r, y + h - r, r, 0, PI / 2);
+    ctx.lineTo(x + r, y + h);
+    ctx.arc(x + r, y + h - r, r, PI / 2, PI);
+    ctx.lineTo(x, y + r);
+    ctx.arc(x + r, y + r, r, PI, PI * 3 / 2);
+    ctx.closePath();
+  };
+  const rrFill = (x, y, w, h, r, color) => { rrPath(x, y, w, h, r); ctx.fillStyle = color; ctx.fill(); };
+  const rrStroke = (x, y, w, h, r, color, lw) => {
+    rrPath(x, y, w, h, r); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.stroke();
+  };
+  const txt = (str, x, y, font, color, align) => {
+    ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || "center"; ctx.fillText(str, x, y);
+  };
+  const seg = (col, x1, y1, x2, y2, lw) => {
+    ctx.strokeStyle = col; ctx.lineWidth = lw || ctx.lineWidth;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  };
+  const arcSeg = (col, cx, cy, r, s, e, lw) => {
+    ctx.strokeStyle = col; if (lw) ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.arc(cx, cy, r, s, e); ctx.stroke();
+  };
+
+  // ── background: soft lavender gradient ────────────────────────────────────
+  const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+  bgGrad.addColorStop(0, "#F6F2FF");
+  bgGrad.addColorStop(0.5, "#FDF8FF");
+  bgGrad.addColorStop(1, "#F8F0FF");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // subtle dot grid
+  ctx.fillStyle = "rgba(99,102,241,0.07)";
+  for (let ry = 20; ry < H; ry += 28) {
+    for (let rx = 20; rx < W; rx += 28) {
+      ctx.beginPath(); ctx.arc(rx, ry, 1.5, 0, PI * 2); ctx.fill();
+    }
+  }
+
+  // decorative sparkle crosses (✦) at corners
+  const sparkle = (sx, sy, size, color) => {
+    ctx.fillStyle = color; ctx.font = `${size}px Arial`; ctx.textAlign = "center";
+    ctx.fillText("✦", sx, sy);
+  };
+  sparkle(58, 180, 18, "rgba(99,102,241,0.25)");
+  sparkle(72, 210, 11, "rgba(99,102,241,0.18)");
+  sparkle(840, 180, 14, "rgba(99,102,241,0.2)");
+  sparkle(860, 310, 18, "rgba(99,102,241,0.25)");
+  sparkle(120, 330, 11, "rgba(99,102,241,0.15)");
+
+  // ── Google + RevYne header ─────────────────────────────────────────────────
+  const G_FONT = "bold 48px Arial";
+  ctx.font = G_FONT;
+  const gls = [["G","#4285F4"],["o","#EA4335"],["o","#FBBC05"],["g","#4285F4"],["l","#34A853"],["e","#EA4335"]];
+  const gw = gls.reduce((s, [ch]) => s + ctx.measureText(ch).width, 0);
+  const SEP = 2, SPAD = 24, IICON = 44, IPAD = 10, RTW = 150;
+  let hx = (W - (gw + SPAD * 2 + SEP + IICON + IPAD + RTW)) / 2;
+  const hy = 80;
+  gls.forEach(([ch, col]) => { txt(ch, hx, hy, G_FONT, col, "left"); hx += ctx.measureText(ch).width; });
+  hx += SPAD;
+  ctx.fillStyle = "#d1d5db"; ctx.fillRect(hx, hy - 44, SEP, 54);
+  hx += SEP + SPAD;
+  // RevYne icon bubble
+  // RevYne icon — gradient bg + chat bubble + sparkle (matches actual brand logo)
+  rrPath(hx, hy - 42, IICON, IICON, 11);
+  const rvGrad = ctx.createLinearGradient(hx, hy - 42, hx + IICON, hy + 2);
+  rvGrad.addColorStop(0, "#9B2EFA"); rvGrad.addColorStop(1, "#4F46E5");
+  ctx.fillStyle = rvGrad; ctx.fill();
+  // chat bubble body + tail as one path
+  const cbx = hx + 5, cby = hy - 39, cbw = 28, cbh = 20, cbr = 4;
+  ctx.beginPath();
+  ctx.moveTo(cbx + cbr, cby); ctx.lineTo(cbx + cbw - cbr, cby);
+  ctx.arc(cbx + cbw - cbr, cby + cbr, cbr, -PI/2, 0);
+  ctx.lineTo(cbx + cbw, cby + cbh - cbr);
+  ctx.arc(cbx + cbw - cbr, cby + cbh - cbr, cbr, 0, PI/2);
+  ctx.lineTo(cbx + 14, cby + cbh); ctx.lineTo(cbx + 8, cby + cbh + 7);
+  ctx.lineTo(cbx + cbr, cby + cbh);
+  ctx.arc(cbx + cbr, cby + cbh - cbr, cbr, PI/2, PI);
+  ctx.lineTo(cbx, cby + cbr); ctx.arc(cbx + cbr, cby + cbr, cbr, PI, PI * 3/2);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fill();
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.2; ctx.stroke();
+  // two text lines inside bubble
+  rrFill(cbx + 4, cby + 5,  cbw - 8, 3, 1.5, "#fff");
+  rrFill(cbx + 4, cby + 11, cbw - 8, 3, 1.5, "#fff");
+  // three pill dots (typing indicator row)
+  rrFill(cbx + 4,  cby + 16, 7, 2.5, 1.5, "#fff");
+  rrFill(cbx + 13, cby + 16, 7, 2.5, 1.5, "#fff");
+  rrFill(cbx + 20, cby + 16, 5, 2.5, 1.5, "#fff");
+  // 4-pointed sparkle star (top-right, overlapping bubble corner)
+  const spX = hx + IICON - 10, spY = hy - 42 + 9;
+  ctx.beginPath();
+  for (let k = 0; k < 8; k++) {
+    const a = (PI/4)*k - PI/2, r = k % 2 === 0 ? 6 : 2.5;
+    k === 0 ? ctx.moveTo(spX + r*Math.cos(a), spY + r*Math.sin(a))
+            : ctx.lineTo(spX + r*Math.cos(a), spY + r*Math.sin(a));
+  }
+  ctx.closePath(); ctx.fillStyle = "#fff"; ctx.fill();
+  // sparkle dashes
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.lineCap = "round";
+  [[spX+6,spY,spX+9,spY-1],[spX+4,spY+5,spX+6,spY+8],[spX+1,spY-6,spX+1,spY-9]].forEach(([x1,y1,x2,y2]) => {
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  });
+  ctx.lineCap = "butt";
+  hx += IICON + IPAD;
+  txt("RevYne", hx, hy, "bold 40px Arial", "#111827", "left");
+
+  // ── AI Powered Review sub-header ───────────────────────────────────────────
+  ctx.font = "500 16px Arial"; ctx.textAlign = "center";
+  const airLabel = "AI Powered Review";
+  const airW = ctx.measureText(airLabel).width;
+  ctx.fillStyle = "#6366f1";
+  ctx.fillText(airLabel, W / 2, 118);
+  ctx.strokeStyle = "#6366f1"; ctx.lineWidth = 1.5;
+  [[-airW / 2 - 32, -airW / 2 - 8], [airW / 2 + 8, airW / 2 + 32]].forEach(([x1, x2]) => {
+    ctx.beginPath(); ctx.moveTo(W / 2 + x1, 112); ctx.lineTo(W / 2 + x2, 112); ctx.stroke();
+  });
+
+  // ── SMART REVIEW QR pill ───────────────────────────────────────────────────
+  const pillW = 268, pillH = 40, pillX = (W - pillW) / 2, pillY = 140;
+  rrFill(pillX, pillY, pillW, pillH, 20, "#4F46E5");
+  ctx.fillStyle = "#fff"; ctx.font = "bold 15px Arial"; ctx.textAlign = "center";
+  ctx.fillText("✦  SMART REVIEW QR", W / 2, pillY + 26);
+
+  // ── Main headline ──────────────────────────────────────────────────────────
+  const headGrad = ctx.createLinearGradient(W / 2 - 240, 0, W / 2 + 240, 0);
+  headGrad.addColorStop(0, "#4338CA");
+  headGrad.addColorStop(1, "#7C3AED");
+  ctx.font = "bold 60px Arial"; ctx.textAlign = "center";
+  ctx.fillStyle = headGrad;
+  ctx.fillText("Share Your Experience", W / 2, 234);
+  ctx.fillStyle = "#111827";
+  ctx.fillText("in Seconds", W / 2, 298);
+
+  // ── sub-text ───────────────────────────────────────────────────────────────
+  txt("Scan the smart QR to post your genuine Google review", W / 2, 334, "16px Arial", "#6b7280");
+
+  // ── Scan. Share. Support. tagline ──────────────────────────────────────────
+  const ssY = 366;
+  sparkle(W / 2 - 148, ssY + 3, 14, "#6366f1");
+  sparkle(W / 2 + 140, ssY + 3, 14, "#6366f1");
+  const ssParts = [["Scan.", "#06B6D4"], [" Share.", "#EA4335"], [" Support.", "#34A853"]];
+  ctx.font = "bold 17px Arial";
+  let ssTotalW = ssParts.reduce((s, [t]) => { ctx.font = "bold 17px Arial"; return s + ctx.measureText(t).width; }, 0);
+  let ssx = W / 2 - ssTotalW / 2;
+  ssParts.forEach(([t, col]) => {
+    ctx.font = "bold 17px Arial"; ctx.textAlign = "left"; ctx.fillStyle = col;
+    ctx.fillText(t, ssx, ssY); ssx += ctx.measureText(t).width;
+  });
+
+  // ── QR card container ──────────────────────────────────────────────────────
+  const cardX = 80, cardY = 390, cardW = W - 160, cardH = 375;
+  ctx.shadowColor = "rgba(79,70,229,0.13)"; ctx.shadowBlur = 28; ctx.shadowOffsetY = 10;
+  rrFill(cardX, cardY, cardW, cardH, 26, "#ffffff");
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  // ── "G  Leave a Google Review" header inside card ──────────────────────────
+  const glrY = cardY + 42;
+  // Google G circle
+  const gciX = W / 2 - 115, gciY = glrY - 10, gcR = 14;
+  ctx.beginPath(); ctx.arc(gciX, gciY, gcR, 0, PI * 2);
+  ctx.fillStyle = "#fff"; ctx.fill();
+  ctx.strokeStyle = "#4285F4"; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.font = "bold 15px Arial"; ctx.fillStyle = "#4285F4"; ctx.textAlign = "center";
+  ctx.fillText("G", gciX, gciY + 5);
+  // dashes and label
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(cardX + 28, glrY - 10); ctx.lineTo(gciX - gcR - 10, glrY - 10); ctx.stroke();
+  txt("Leave a Google Review", W / 2 + 12, glrY, "bold 21px Arial", "#111827");
+  ctx.font = "bold 21px Arial";
+  const lgrW = ctx.measureText("Leave a Google Review").width;
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(W / 2 + 12 + lgrW / 2 + 12, glrY - 10); ctx.lineTo(cardX + cardW - 28, glrY - 10); ctx.stroke();
+
+  // ── QR area: white square with Google-colored rounded border ───────────────
+  const QW = 320, QH = 300, QX = (W - QW) / 2, QY = cardY + 62, QR_ = 24;
+  rrFill(QX, QY, QW, QH, QR_, "#ffffff");
+
+  // Google 4-color border (blue→red→yellow→green)
+  const bx = QX, by = QY, bw = QW, bh = QH, br = QR_;
+  ctx.lineCap = "butt"; ctx.lineWidth = 9;
+  seg("#4285F4", bx + br, by, bx + bw - br, by);
+  arcSeg("#4285F4", bx + bw - br, by + br, br, -PI / 2, -PI / 4);
+  arcSeg("#EA4335", bx + bw - br, by + br, br, -PI / 4, 0);
+  seg("#EA4335", bx + bw, by + br, bx + bw, by + bh - br);
+  arcSeg("#EA4335", bx + bw - br, by + bh - br, br, 0, PI / 4);
+  arcSeg("#FBBC05", bx + bw - br, by + bh - br, br, PI / 4, PI / 2);
+  seg("#FBBC05", bx + bw - br, by + bh, bx + br, by + bh);
+  arcSeg("#FBBC05", bx + br, by + bh - br, br, PI / 2, PI * 3 / 4);
+  arcSeg("#34A853", bx + br, by + bh - br, br, PI * 3 / 4, PI);
+  seg("#34A853", bx, by + bh - br, bx, by + br);
+  arcSeg("#34A853", bx + br, by + br, br, PI, PI * 5 / 4);
+  arcSeg("#4285F4", bx + br, by + br, br, PI * 5 / 4, PI * 3 / 2);
+
+  // ── QR code drawn inside the white square ──────────────────────────────────
+  const pad = 16;
+  ctx.drawImage(qrCanvas, QX + pad, QY + pad, QW - pad * 2, QH - pad * 2);
+
+  // ── Feature icons row ──────────────────────────────────────────────────────
+  const FEATS = [
+    { col: "#4285F4", label: "Easy to Scan",          desc: ["Just one quick",    "scan to begin"],          icon: "scan"   },
+    { col: "#EA4335", label: "Your Voice Matters",    desc: ["Share your real",   "experience"],             icon: "shield" },
+    { col: "#FBBC05", label: "Help Others Decide",    desc: ["Your review guides","future customers"],       icon: "star"   },
+    { col: "#34A853", label: "Support Small Business",desc: ["Your feedback",     "helps us grow"],          icon: "people" },
+  ];
+  const FY = 865, FS = W / 4;
+  FEATS.forEach((f, i) => {
+    const fx = FS * i + FS / 2, R = 37;
+    ctx.beginPath(); ctx.arc(fx, FY, R, 0, PI * 2); ctx.fillStyle = f.col; ctx.fill();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+    if (f.icon === "scan") {
+      const s = 10, d = 8;
+      [[fx-d-s,FY-d,fx-d,FY-d],[fx-d,FY-d,fx-d,FY-d-s],[fx+d+s,FY-d,fx+d,FY-d],[fx+d,FY-d,fx+d,FY-d-s],
+       [fx-d-s,FY+d,fx-d,FY+d],[fx-d,FY+d,fx-d,FY+d+s],[fx+d+s,FY+d,fx+d,FY+d],[fx+d,FY+d,fx+d,FY+d+s]
+      ].forEach(([x1,y1,x2,y2]) => { ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); });
+    } else if (f.icon === "shield") {
+      ctx.beginPath();
+      ctx.moveTo(fx, FY-R*0.58); ctx.lineTo(fx+R*0.52, FY-R*0.28); ctx.lineTo(fx+R*0.52, FY+R*0.12);
+      ctx.quadraticCurveTo(fx+R*0.52, FY+R*0.6, fx, FY+R*0.75);
+      ctx.quadraticCurveTo(fx-R*0.52, FY+R*0.6, fx-R*0.52, FY+R*0.12);
+      ctx.lineTo(fx-R*0.52, FY-R*0.28); ctx.closePath(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx-R*0.22, FY+R*0.1); ctx.lineTo(fx, FY+R*0.32); ctx.lineTo(fx+R*0.28, FY-R*0.12); ctx.stroke();
+    } else if (f.icon === "star") {
+      ctx.beginPath(); ctx.fillStyle = "#fff";
+      for (let j = 0; j < 5; j++) {
+        const a1 = (PI*2/5)*j - PI/2, a2 = a1 + PI/5;
+        j === 0 ? ctx.moveTo(fx+R*0.55*Math.cos(a1), FY+R*0.55*Math.sin(a1))
+                : ctx.lineTo(fx+R*0.55*Math.cos(a1), FY+R*0.55*Math.sin(a1));
+        ctx.lineTo(fx+R*0.22*Math.cos(a2), FY+R*0.22*Math.sin(a2));
+      }
+      ctx.closePath(); ctx.fill();
+    } else if (f.icon === "people") {
+      ctx.fillStyle = "#fff";
+      [[-R*0.37, 0], [0, -R*0.05], [R*0.37, 0]].forEach(([ox, oy]) => {
+        ctx.beginPath(); ctx.arc(fx+ox, FY-R*0.2+oy, R*0.16, 0, PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(fx+ox, FY+R*0.26+oy, R*0.2, PI, PI*2); ctx.fill();
+      });
+    }
+    ctx.lineWidth = 1; ctx.lineCap = "butt";
+    const words = f.label.split(" ");
+    const lines = []; let cur = ""; ctx.font = "bold 13px Arial";
+    words.forEach(w => {
+      const test = cur ? cur + " " + w : w;
+      if (ctx.measureText(test).width > FS - 14) { if (cur) lines.push(cur); cur = w; } else cur = test;
+    });
+    if (cur) lines.push(cur);
+    lines.forEach((ln, li) => txt(ln, fx, FY + 52 + li * 17, "bold 13px Arial", "#111827"));
+    const descY = FY + 52 + lines.length * 17;
+    f.desc.forEach((ln, li) => txt(ln, fx, descY + li * 15, "11px Arial", "#6b7280"));
+  });
+
+  // ── Bottom info bar: website + play store ──────────────────────────────────
+  const barX = 62, barY = 988, barW = W - 124, barH = 70;
+  ctx.shadowColor = "rgba(0,0,0,0.06)"; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+  rrFill(barX, barY, barW, barH, 18, "#F1F0FF");
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  rrStroke(barX, barY, barW, barH, 18, "#e0e7ff", 1);
+
+  // globe icon — circle with equator + meridian oval
+  const giX = barX + 40, giY = barY + barH / 2;
+  ctx.beginPath(); ctx.arc(giX, giY, 15, 0, PI * 2); ctx.fillStyle = "#ede9fe"; ctx.fill();
+  ctx.strokeStyle = "#5B21B6"; ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.arc(giX, giY, 11, 0, PI * 2); ctx.stroke();
+  // equator
+  ctx.beginPath(); ctx.moveTo(giX - 11, giY); ctx.lineTo(giX + 11, giY); ctx.stroke();
+  // vertical centre line
+  ctx.beginPath(); ctx.moveTo(giX, giY - 11); ctx.lineTo(giX, giY + 11); ctx.stroke();
+  // meridian oval (ellipse gives depth to globe)
+  ctx.beginPath(); ctx.ellipse(giX, giY, 6, 11, 0, 0, PI * 2); ctx.stroke();
+  txt("Visit us at", barX + 64, barY + 28, "12px Arial", "#6b7280", "left");
+  txt("www.revyneai.com", barX + 64, barY + 48, "bold 14px Arial", "#111827", "left");
+
+  // center divider
+  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(W / 2, barY + 14); ctx.lineTo(W / 2, barY + barH - 14); ctx.stroke();
+
+  // play store icon — colorful Google Play triangle
+  const psX = W / 2 + 22, psY = barY + barH / 2;
+  const psCX = psX + 18;
+  ctx.beginPath(); ctx.arc(psCX, psY, 15, 0, PI * 2); ctx.fillStyle = "#e8f5e9"; ctx.fill();
+  // clip to play-triangle shape then fill 4 quadrants with Google colors
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(psCX - 8, psY - 11); ctx.lineTo(psCX + 10, psY); ctx.lineTo(psCX - 8, psY + 11);
+  ctx.closePath(); ctx.clip();
+  // top-left quadrant: teal
+  ctx.fillStyle = "#00ACC1";
+  ctx.beginPath(); ctx.moveTo(psCX-8,psY-11); ctx.lineTo(psCX+10,psY); ctx.lineTo(psCX-8,psY); ctx.closePath(); ctx.fill();
+  // bottom-left quadrant: green
+  ctx.fillStyle = "#43A047";
+  ctx.beginPath(); ctx.moveTo(psCX-8,psY); ctx.lineTo(psCX+10,psY); ctx.lineTo(psCX-8,psY+11); ctx.closePath(); ctx.fill();
+  // split top half diagonally: top-right area yellow
+  ctx.fillStyle = "#FDD835";
+  ctx.beginPath(); ctx.moveTo(psCX-1,psY-6); ctx.lineTo(psCX+10,psY); ctx.lineTo(psCX-1,psY); ctx.closePath(); ctx.fill();
+  // split bottom half diagonally: bottom-right area red
+  ctx.fillStyle = "#E53935";
+  ctx.beginPath(); ctx.moveTo(psCX-1,psY); ctx.lineTo(psCX+10,psY); ctx.lineTo(psCX-1,psY+6); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  txt("Install RevYne", psX + 42, barY + 28, "12px Arial", "#6b7280", "left");
+  txt("from Play Store", psX + 42, barY + 48, "bold 14px Arial", "#111827", "left");
+
+  // ── footer: Powered by RevYne ──────────────────────────────────────────────
+  const footY = 1086;
+  txt("Powered by", W / 2 - 68, footY, "16px Arial", "#374151");
+  rrFill(W / 2 - 46, footY - 18, 30, 30, 7, "#7c3aed");
+  ctx.fillStyle = "#fff"; ctx.font = "bold 13px Arial"; ctx.textAlign = "center";
+  ctx.fillText("R", W / 2 - 31, footY - 1);
+  txt("RevYne", W / 2 - 10, footY, "bold 20px Arial", "#7c3aed", "left");
+
+  // ── contact line ───────────────────────────────────────────────────────────
+  txt("Contact us for Order QR :", W / 2 - 46, 1136, "14px Arial", "#374151");
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(W / 2 + 66, 1131); ctx.lineTo(W / 2 + 215, 1131); ctx.stroke();
 
   return c.toDataURL("image/png");
 }
@@ -1994,6 +2439,17 @@ function navIcon(view) {
     profile: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 2 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"
   };
 
+  // GMB tab uses a custom multi-color Google "G" icon rendered inline
+  if (view === "gmb") {
+    const connected = state?.gmb?.connected;
+    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="${connected ? "#4285F4" : "currentColor"}" opacity="${connected ? "1" : "0.5"}"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="${connected ? "#34A853" : "currentColor"}" opacity="${connected ? "1" : "0.5"}"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="${connected ? "#FBBC05" : "currentColor"}" opacity="${connected ? "1" : "0.5"}"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="${connected ? "#EA4335" : "currentColor"}" opacity="${connected ? "1" : "0.5"}"/>
+    </svg>`;
+  }
+
   return `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="${paths[view] || ""}"/></svg>`;
 }
 
@@ -2007,6 +2463,37 @@ function bottomNavItem(view, label) {
   `;
 }
 
+function onboardingShell(content) {
+  return `
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-main">
+          <div class="brand">
+            <img class="brand-mark" src="./assets/favicon.png?v=20260514-1" alt="" />
+            <span>RevYne</span>
+          </div>
+        </div>
+      </header>
+      <div class="layout">
+        <main class="main">
+          <div class="onboarding-header">
+            <h2 class="onboarding-title">👋 Welcome to RevYne!</h2>
+            <p class="onboarding-sub">Let's set up your business profile first. This takes 2 minutes and unlocks your Google review link, QR code, and AI tools.</p>
+            <div class="onboarding-steps">
+              <div class="onb-step active"><span class="onb-num">1</span> Business Details</div>
+              <div class="onb-step-sep">→</div>
+              <div class="onb-step"><span class="onb-num">2</span> Share QR</div>
+              <div class="onb-step-sep">→</div>
+              <div class="onb-step"><span class="onb-num">3</span> Get Reviews</div>
+            </div>
+          </div>
+          ${content}
+        </main>
+      </div>
+    </div>
+  `;
+}
+
 function appShell(content) {
   const activeBottomIndex = Math.max(0, navOrder.indexOf(getBottomNavView()));
   const navAnimationClass = bottomNavShouldAnimate ? " animate" : "";
@@ -2016,13 +2503,14 @@ function appShell(content) {
       <header class="topbar">
         <div class="topbar-main">
           <div class="brand">
-            <img class="brand-mark" src="./assets/favicon.png?v=20260512-2" alt="" />
+            <img class="brand-mark" src="./assets/favicon.png?v=20260514-1" alt="" />
             <span>RevYne</span>
           </div>
         </div>
         <nav class="nav">
           ${navButton("Dashboard", "dashboard")}
           ${navButton("Smart Reply", "reply")}
+          ${navButton("Google Business", "gmb")}
           ${navButton("Pricing", "pricing")}
           ${navButton("My Business", "business")}
           ${navButton("Profile", "profile")}
@@ -2036,17 +2524,82 @@ function appShell(content) {
         ${bottomNavItem("dashboard", "Home")}
         ${bottomNavItem("business", "Business")}
         ${bottomNavItem("reply", "AI Reply")}
-        ${bottomNavItem("pricing", "Pricing")}
+        ${bottomNavItem("gmb", "Google")}
         ${bottomNavItem("profile", "Profile")}
       </nav>
     </div>
     <div class="copy-toast"></div>
+
+    ${state.showGuestLimitModal ? `
+    <div class="modal-overlay" id="guest-limit-modal">
+      <div class="modal-card">
+        <div class="modal-icon">🔒</div>
+        <h2 class="modal-title">You've used your 5 free replies</h2>
+        <p class="modal-body">Sign in with Google to get <strong>20 free AI replies</strong> every month — plus your personal review link and QR code.</p>
+        <button class="button full" type="button" data-auth-google style="margin-bottom:10px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:8px;"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Continue with Google — it's free
+        </button>
+        <button class="button ghost full" type="button" data-close-guest-modal>Maybe later</button>
+      </div>
+    </div>
+    ` : ""}
   `;
 }
 
 function navButton(label, view) {
   return `<button class="${state.view === view ? "active" : ""}" type="button" data-view="${view}">${label}</button>`;
 }
+function dashboardGmbCard() {
+  const gmb = state.gmb || {};
+  if (!gmb.connected) {
+    return `
+      <div class="panel gmb-dash-card gmb-dash-connect">
+        <div class="gmb-dash-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+        </div>
+        <div class="gmb-dash-text">
+          <strong>Connect Google Business</strong>
+          <p>Track your GMB health score, reply to reviews, and optimize your profile with AI.</p>
+        </div>
+        <button class="button secondary small" type="button" data-view="gmb">Connect →</button>
+      </div>`;
+  }
+
+  const score = gmb.healthScore;
+  const scoreColor = score >= 80 ? "#34A853" : score >= 55 ? "#FBBC05" : "#EA4335";
+  const scoreLabel = score >= 80 ? "Excellent" : score >= 55 ? "Good" : "Needs Work";
+  const gmrCount = (gmb.reviews || []).length;
+
+  return `
+    <div class="panel gmb-dash-card gmb-dash-live" data-view="gmb" style="cursor:pointer;">
+      <div class="gmb-dash-header">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        <span class="gmb-dash-loc">${escapeHtml(gmb.locationName || "Google Business")}</span>
+        <span class="gmb-connected-dot"></span>
+      </div>
+      <div class="gmb-dash-metrics">
+        <div class="gmb-score-ring" style="--score-color:${scoreColor}">
+          <div class="gmb-score-num">${score !== null ? score : "–"}</div>
+          <div class="gmb-score-lbl">${score !== null ? scoreLabel : "Tap to load"}</div>
+        </div>
+        <div class="gmb-dash-stats">
+          <div class="gmb-stat"><span class="gmb-stat-val">${gmrCount > 0 ? gmrCount : "–"}</span><span class="gmb-stat-key">Reviews</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function dashboardPage() {
   return dashboardPageClean();
 }
@@ -2055,89 +2608,107 @@ function dashboardPageClean() {
   const reviewUrl = getReviewUrl();
   const hasBusiness = hasBusinessProfile();
   const hasPublicToken = Boolean(state.business.publicToken);
+  const ds = state.dashboardStats || {};
+  const totalReviews = ds.totalReviews || 0;
+  const avgRating = ds.avgRating || 0;
+  const recentReviews = ds.recentReviews || [];
+  const statsLoaded = ds.loaded !== false;
+
+  const starBar = (rating) => {
+    const full = Math.floor(rating);
+    const half = rating - full >= 0.5 ? 1 : 0;
+    const empty = 5 - full - half;
+    return `<span class="db-stars">${"★".repeat(full)}${"½".repeat(half)}${"☆".repeat(empty)}</span>`;
+  };
+
+  const recentReviewsHTML = recentReviews.length > 0
+    ? recentReviews.map(r => {
+        const date = new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+        const stars = "★".repeat(r.rating || 0) + "☆".repeat(5 - (r.rating || 0));
+        const preview = r.customer_experience ? escapeHtml(r.customer_experience).slice(0, 120) + (r.customer_experience.length > 120 ? "…" : "") : "No message left";
+        return `
+          <div class="panel dash-review-card">
+            <div class="dash-review-top">
+              <span class="dash-review-stars">${stars}</span>
+              <span class="dash-review-date">${date}</span>
+            </div>
+            <p class="dash-review-text">${preview}</p>
+            <button class="button ghost small" type="button" data-view="reply" style="margin-top:8px;">✦ Generate Reply</button>
+          </div>`;
+      }).join("")
+    : `<div class="panel empty-state">
+        <strong>No sessions yet</strong>
+        <p>Once a customer scans your QR, generates a draft, and copies it — it'll appear here.</p>
+       </div>`;
 
   return `
     <section class="dash-wrap">
       <div class="dash-welcome">
-        <p class="dash-sub">${hasBusiness ? "Welcome back. Your reputation workspace is ready." : "Welcome. Add your business profile to start collecting real customer reviews."} Current plan: ${escapeHtml(getEffectivePlan().toUpperCase())}</p>
+        <p class="dash-sub">Welcome back, <strong>${escapeHtml(state.user.name || state.business.name || "there")}</strong>. Current plan: <strong>${escapeHtml(getEffectivePlan().toUpperCase())}</strong></p>
       </div>
-
-      ${hasBusiness ? "" : `
-        <div class="panel onboarding-panel">
-          <div>
-            <p class="eyebrow">First step</p>
-            <h3>Add your business details</h3>
-            <p>Once you save your business profile, RevYne will create your public review link and QR code for customers.</p>
-          </div>
-          <button class="button" type="button" data-view="business">Add Business Profile</button>
-        </div>
-      `}
 
       <div class="dash-metrics">
         <div class="panel metric-wide">
           <div>
             <div class="metric-label">Average Rating</div>
             <div class="metric-big-row">
-              <span class="metric-big">${hasBusiness ? "0.0" : "--"}</span>
-              <span class="metric-stars">${hasBusiness ? "No reviews yet" : "Not started"}</span>
+              <span class="metric-big">${statsLoaded ? (totalReviews > 0 ? avgRating.toFixed(1) : "—") : "…"}</span>
+              ${totalReviews > 0 ? starBar(avgRating) : `<span class="metric-stars">${totalReviews === 0 && statsLoaded ? "No reviews yet" : ""}</span>`}
             </div>
           </div>
-          <div class="metric-icon-circle">+</div>
+          <button class="metric-icon-circle" type="button" data-refresh-dashboard title="Refresh stats">↻</button>
         </div>
         <div class="panel metric-half">
-          <div class="metric-label">Total Reviews</div>
-          <div class="metric-num">${state.stats.scans}</div>
-          <div class="metric-trend positive">${hasBusiness ? "Ready to collect" : "Create profile first"}</div>
+          <div class="metric-label">Reviews Copied</div>
+          <div class="metric-num">${statsLoaded ? totalReviews : "…"}</div>
+          <div class="metric-trend positive">${totalReviews > 0 ? "Via your QR link" : "Scan QR to start"}</div>
         </div>
         <div class="panel metric-half">
-          <div class="metric-label">AI Replies</div>
-          <div class="metric-num">${state.stats.generated}</div>
-          <div class="metric-trend brand">${hasBusiness ? "Available" : "Waiting for reviews"}</div>
+          <div class="metric-label">AI Replies Used</div>
+          <div class="metric-num">${statsLoaded ? (ds.aiRepliesUsed ?? 0) : "…"}</div>
+          <div class="metric-trend brand">This month</div>
         </div>
       </div>
+
+      ${dashboardGmbCard()}
 
       <div class="ai-spotlight">
         <div class="ai-spotlight-inner">
           <div class="ai-icon-box">&#10022;</div>
           <div>
-            <div class="ai-spotlight-title">${hasBusiness ? "Smart Reply Ready" : "Set Up Before Replies"}</div>
-            <p class="ai-spotlight-sub">${hasBusiness ? "Paste a real customer review and generate professional draft replies instantly." : "Add your business profile first, then use AI replies for real customer reviews."}</p>
+            <div class="ai-spotlight-title">Smart Reply Ready</div>
+            <p class="ai-spotlight-sub">Paste a real customer review and generate professional draft replies instantly.</p>
           </div>
         </div>
-        <button class="button full" type="button" data-view="${hasBusiness ? "reply" : "business"}" style="margin-top:14px;">${hasBusiness ? "Generate Reply" : "Add Business Profile"}</button>
+        <button class="button full" type="button" data-view="reply" style="margin-top:14px;">Generate Reply</button>
       </div>
 
       <div class="recent-reviews">
         <div class="recent-header">
           <span class="recent-title">Recent Reviews</span>
-          <button class="view-all" type="button">View All</button>
+          ${totalReviews > 5 ? `<button class="view-all" type="button" data-view="reply">View All</button>` : ""}
         </div>
-        <div class="panel empty-state">
-          <strong>No reviews yet</strong>
-          <p>Your real customer reviews will appear here after customers start using your review link.</p>
-        </div>
+        ${recentReviewsHTML}
       </div>
 
-      ${hasBusiness ? `
-        <div class="panel review-link-panel qr-panel">
-          <div class="qr-panel-copy">
-            <h3>Your Review QR</h3>
-            <p class="hint">Put this on bills, WhatsApp messages, front desk posters, and delivery cards.</p>
-            ${hasPublicToken ? "" : `<p class="qr-warning">Save your business profile once to create a permanent public review link.</p>`}
-            <input class="input" readonly value="${escapeHtml(reviewUrl)}" style="margin:12px 0;" />
-            <div class="option-row qr-actions">
-              <button class="button" type="button" data-copy="${escapeHtml(reviewUrl)}">Copy Link</button>
-              <button class="button secondary" type="button" data-download-qr>Download QR</button>
-              <button class="button ghost" type="button" data-print-qr>Print QR</button>
-              <button class="button ghost" type="button" data-view="public">Preview Page</button>
-            </div>
-          </div>
-          <div class="qr-preview-card">
-            <canvas class="qr-canvas" data-qr-code="${escapeHtml(reviewUrl)}" width="220" height="220"></canvas>
-            <span>Scan to review</span>
+      <div class="panel review-link-panel qr-panel">
+        <div class="qr-panel-copy">
+          <h3>Your Review QR</h3>
+          <p class="hint">Put this on bills, WhatsApp messages, front desk posters, and delivery cards.</p>
+          ${hasPublicToken ? "" : `<p class="qr-warning">Save your business profile once to create a permanent public review link.</p>`}
+          <input class="input" readonly value="${escapeHtml(reviewUrl)}" style="margin:12px 0;" />
+          <div class="option-row qr-actions">
+            <button class="button" type="button" data-copy="${escapeHtml(reviewUrl)}">Copy Link</button>
+            <button class="button secondary" type="button" data-download-qr>Download QR</button>
+            <button class="button ghost" type="button" data-print-qr>Print QR</button>
+            <button class="button ghost" type="button" data-view="public">Preview Page</button>
           </div>
         </div>
-      ` : ""}
+        <div class="qr-preview-card">
+          <canvas class="qr-canvas" data-qr-code="${escapeHtml(reviewUrl)}" width="220" height="220"></canvas>
+          <span>Scan to review</span>
+        </div>
+      </div>
     </section>
   `;
 }
@@ -3118,7 +3689,7 @@ function supportPage() {
       cat: "✍️ Review Generation",
       items: [
         { q: "How does the AI review suggestion work?", a: "Your customer gives a star rating and optionally their name and city. RevYne generates 3 natural, unique review drafts in the language and tone you've configured. The customer picks one, copies it, and posts it on Google." },
-        { q: "Can I generate reviews in Indian languages?", a: "Yes! The <strong>Free plan</strong> supports English, Hindi, Hinglish, and Marathi. <strong>Pro plan</strong> lets you choose up to 5 languages from all 24 Indian languages — including Tamil, Telugu, Gujarati, Bengali, Kannada, Malayalam, Punjabi, Odia, and more." },
+        { q: "Can I generate reviews in Indian languages?", a: "Yes! The <strong>Free plan</strong> supports English and Hindi. <strong>Pro plan</strong> lets you choose up to 5 languages from all 24 Indian languages — including Tamil, Telugu, Gujarati, Bengali, Kannada, Malayalam, Punjabi, Odia, and more. <strong>Pro Max</strong> unlocks all 24 languages." },
         { q: "Can I change the tone of the reviews?", a: "Yes. In <strong>My Business → Default Tone</strong>, choose Professional, Friendly, or Enthusiastic. This tone is applied to all AI-generated review drafts for your business." },
         { q: "Why doesn't the review post directly to Google?", a: "Google's policies do not allow any third-party app to post reviews on behalf of users — only the customer can publish. RevYne makes it as frictionless as possible by pre-writing the review so the customer just copies and pastes it." },
         { q: "The AI review doesn't sound natural. What should I do?", a: "Try switching the tone (Professional / Friendly / Enthusiastic) or changing the language. If a specific language output seems off, raise a ticket with an example — we actively improve language templates." },
@@ -3128,14 +3699,14 @@ function supportPage() {
       cat: "💬 Smart Reply",
       items: [
         { q: "What is Smart Reply?", a: "Smart Reply helps you write professional, personalised responses to reviews you've already received on Google. Paste the review text, select the star rating, and get a polished AI reply you can post directly on your Google Business Profile." },
-        { q: "How many Smart Replies can I use per month?", a: "<strong>Free</strong>: 10 replies/month. <strong>Pro</strong>: 100 replies/month. <strong>Pro Max</strong>: unlimited replies. Your usage resets on the 1st of every month." },
+        { q: "How many Smart Replies can I use per month?", a: "<strong>Free</strong>: 20 replies/month. <strong>Pro</strong>: 1,000 replies/month. <strong>Pro Max / Yearly</strong>: 2,500 replies/month. Your usage resets on the 1st of every month." },
         { q: "Can I edit the AI reply before posting?", a: "Yes — copy the reply, then paste and edit it directly in your Google Business Profile before hitting publish." },
       ]
     },
     {
       cat: "💳 Plans & Billing",
       items: [
-        { q: "What plans are available?", a: "<strong>Free</strong>: core features, 4 languages, 10 AI generations/month. <strong>Pro (₹149/mo)</strong>: 100 generations, 5 custom languages, 100 smart replies. <strong>Pro Max (₹199/mo)</strong>: unlimited everything. <strong>Yearly (₹999/yr)</strong>: best value, all Pro Max features." },
+        { q: "What plans are available?", a: "<strong>Free</strong>: core features, English &amp; Hindi, 20 AI generations/month. <strong>Pro (₹149/mo)</strong>: 1,000 generations, 5 custom languages, 1,000 smart replies. <strong>Pro Max (₹199/mo)</strong>: 2,500 generations, all 24 languages. <strong>Yearly (₹999/yr)</strong>: best value, all Pro Max features." },
         { q: "How do I upgrade my plan?", a: "Go to <strong>Pricing</strong> from the top menu. Choose a plan and tap Upgrade. We use Razorpay — UPI, cards, net banking, and wallets are all accepted." },
         { q: "Can I cancel my subscription anytime?", a: "Yes. Go to <strong>Pricing → Cancel Subscription</strong>. Your plan stays active until the end of the current billing cycle and won't renew after that." },
         { q: "I was charged but my plan didn't activate. What should I do?", a: "Wait 2 minutes and refresh the app — payment webhooks occasionally have a short delay. If your plan is still not activated after 5 minutes, raise a ticket below with your <strong>Razorpay Payment ID</strong> — we resolve payment issues within 2 hours." },
@@ -3397,6 +3968,275 @@ function adminTicketCard(ticket) {
   `;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GMB Page
+// ─────────────────────────────────────────────────────────────────────────────
+function gmbPage() {
+  const gmb = state.gmb || {};
+  const clientId = (window.REVYNE_SUPABASE || {}).googleClientId || "";
+  const isConfigured = Boolean(clientId);
+
+  // ── Location picker modal ─────────────────────────────────────────────────
+  if (gmb.showLocationPicker && gmb.locationOptions?.length) {
+    return `
+      <section class="gmb-page">
+        <div class="gmb-header">
+          <h2 class="gmb-title">Choose Your Business</h2>
+          <p class="gmb-sub">Select the Google Business Profile you want to connect to RevYne.</p>
+        </div>
+        <div class="gmb-location-list">
+          ${gmb.locationOptions.map(loc => `
+            <button class="panel gmb-loc-item" type="button"
+              data-gmb-select-location="${escapeHtml(loc.locationId)}"
+              data-gmb-location-name="${escapeHtml(loc.locationName)}"
+              data-gmb-account-name="${escapeHtml(loc.accountName || "")}">
+              <div class="gmb-loc-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+              </div>
+              <div class="gmb-loc-info">
+                <div class="gmb-loc-name">${escapeHtml(loc.locationName)}</div>
+                ${loc.address ? `<div class="gmb-loc-addr">${escapeHtml(loc.address)}</div>` : ""}
+              </div>
+              <span class="gmb-loc-arrow">›</span>
+            </button>
+          `).join("")}
+        </div>
+        <button class="button ghost full" type="button" data-gmb-cancel-connect style="margin-top:12px;">Cancel</button>
+      </section>`;
+  }
+
+  // ── Not connected ─────────────────────────────────────────────────────────
+  if (!gmb.connected) {
+    return `
+      <section class="gmb-page">
+        <div class="gmb-header">
+          <div class="gmb-g-logo">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+          </div>
+          <h2 class="gmb-title">Connect Google Business</h2>
+          <p class="gmb-sub">Link your Google Business Profile to unlock powerful features — all in one place.</p>
+        </div>
+
+        <div class="gmb-features-list">
+          ${[
+            ["📊", "Health Score", "See a 0–100 score based on profile completeness, ratings, and response rate"],
+            ["⭐", "Reviews Inbox", "Read all your Google reviews without opening another app"],
+            ["✦", "AI Reply", "Generate and post professional replies to reviews directly from RevYne"],
+            ["✨", "SEO Optimizer", "Get AI-generated descriptions that rank higher on Google Search"]
+          ].map(([icon, title, desc]) => `
+            <div class="gmb-feature-item">
+              <div class="gmb-feature-icon">${icon}</div>
+              <div><strong>${title}</strong><p>${desc}</p></div>
+            </div>`).join("")}
+        </div>
+
+        ${!isConfigured
+          ? `<div class="panel" style="background:#fef3c7;border:1px solid #f59e0b;padding:14px 16px;margin:0 0 16px;border-radius:12px;">
+              <strong>⚠ Setup required</strong>
+              <p style="margin:4px 0 0;font-size:0.85rem;">Add your Google OAuth Client ID to <code>supabase-config.js</code> to enable this feature.</p>
+             </div>`
+          : ""}
+
+        <button class="button full gmb-connect-btn" type="button" data-gmb-connect
+          ${!isConfigured || gmb.connecting ? "disabled" : ""}>
+          ${gmb.connecting
+            ? `<span class="gmb-spinner"></span> Connecting…`
+            : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:8px;">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              Connect with Google`}
+        </button>
+        <p class="gmb-disclaimer">You'll be asked to sign into Google and grant access to your Business Profile. RevYne never posts or modifies anything without your confirmation.</p>
+      </section>`;
+  }
+
+  // ── Connected — main GMB dashboard ───────────────────────────────────────
+  const score = gmb.healthScore;
+  const scoreColor = score === null ? "#9ca3af" : score >= 80 ? "#34A853" : score >= 55 ? "#FBBC05" : "#EA4335";
+  const scoreLabel = score === null ? "Loading…" : score >= 80 ? "Excellent" : score >= 55 ? "Good" : "Needs Work";
+  const scoreCircumference = 2 * Math.PI * 36;
+  const scoreDash = score !== null ? (score / 100) * scoreCircumference : 0;
+  const details = gmb.healthDetails || {};
+  const tips = Object.values(details).filter(d => d.tip).slice(0, 3);
+  const reviews = gmb.reviews || [];
+  const profile = gmb.profile || {};
+  const currentDesc = profile.profile?.description || profile.description || "";
+
+  const starRatingMap = { FIVE: 5, FOUR: 4, THREE: 3, TWO: 2, ONE: 1 };
+
+  return `
+    <section class="gmb-page connected">
+      <!-- Header -->
+      <div class="gmb-connected-header">
+        <div class="gmb-biz-name">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          <span>${escapeHtml(gmb.locationName || "Google Business Profile")}</span>
+          <span class="gmb-connected-badge">Connected</span>
+        </div>
+        <div class="gmb-header-actions">
+          <button class="button ghost small" type="button" data-gmb-refresh title="Sync from Google">${gmb.syncing ? "Syncing…" : "↻ Sync"}</button>
+          <button class="button ghost small danger-ghost" type="button" data-gmb-disconnect>Disconnect</button>
+        </div>
+      </div>
+
+      <!-- Health Score -->
+      <div class="panel gmb-health-card">
+        <div class="gmb-health-left">
+          <svg class="gmb-score-circle" width="88" height="88" viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="36" fill="none" stroke="var(--surface-container)" stroke-width="8"/>
+            <circle cx="44" cy="44" r="36" fill="none"
+              stroke="${scoreColor}" stroke-width="8"
+              stroke-linecap="round"
+              stroke-dasharray="${scoreDash.toFixed(1)} ${scoreCircumference.toFixed(1)}"
+              transform="rotate(-90 44 44)"
+              style="transition:stroke-dasharray 0.6s ease"/>
+          </svg>
+          <div class="gmb-score-overlay">
+            <div class="gmb-score-big" style="color:${scoreColor}">${score !== null ? score : "–"}</div>
+            <div class="gmb-score-tag">${scoreLabel}</div>
+          </div>
+        </div>
+        <div class="gmb-health-right">
+          <div class="gmb-health-title">Profile Health Score</div>
+          ${score === null
+            ? `<button class="button secondary small" type="button" data-gmb-load-health>Calculate Score</button>`
+            : `<div class="gmb-health-bars">
+                ${Object.entries(details).slice(0, 4).map(([, d]) => `
+                  <div class="gmb-bar-row">
+                    <span class="gmb-bar-label">${escapeHtml(d.label)}</span>
+                    <div class="gmb-bar-track"><div class="gmb-bar-fill" style="width:${d.max > 0 ? Math.round((d.earned/d.max)*100) : 0}%;background:${d.earned >= d.max ? "#34A853" : d.earned > 0 ? "#FBBC05" : "#EA4335"}"></div></div>
+                  </div>`).join("")}
+              </div>
+              ${tips.length > 0 ? `<button class="button ghost small" type="button" data-gmb-show-tips>View ${tips.length} tip${tips.length > 1 ? "s" : ""} →</button>` : ""}`}
+        </div>
+      </div>
+
+      <!-- Improvement tips (hidden by default) -->
+      ${tips.length > 0 ? `
+      <div class="gmb-tips-panel" id="gmb-tips-panel" hidden>
+        <div class="gmb-tips-title">💡 Improvement Tips</div>
+        ${tips.map(t => `<div class="gmb-tip-item">• ${escapeHtml(t.tip)}</div>`).join("")}
+      </div>` : ""}
+
+      <!-- AI Optimize Description -->
+      <div class="panel gmb-optimize-card">
+        <div class="gmb-opt-header">
+          <span class="gmb-opt-icon">✨</span>
+          <div>
+            <strong>AI SEO Description</strong>
+            <p>Generate a keyword-rich description and update your Google Business Profile.</p>
+          </div>
+        </div>
+        ${currentDesc ? `<div class="gmb-current-desc"><span class="gmb-desc-lbl">Current:</span> ${escapeHtml(currentDesc.slice(0, 180))}${currentDesc.length > 180 ? "…" : ""}</div>` : ""}
+        ${gmb.optimizations.length > 0
+          ? `<div class="gmb-opt-results">
+              ${gmb.optimizations.map((desc, i) => `
+                <div class="gmb-opt-item">
+                  <p class="gmb-opt-text">${escapeHtml(desc)}</p>
+                  <div class="gmb-opt-actions">
+                    <button class="button ghost small" type="button" data-copy="${escapeHtml(desc)}">Copy</button>
+                    <button class="button secondary small" type="button" data-gmb-apply-desc="${i}">Apply to GMB</button>
+                  </div>
+                </div>`).join("")}
+             </div>`
+          : ""}
+        <button class="button full" type="button" data-gmb-optimize style="margin-top:12px;">
+          ${gmb.syncing ? "Generating…" : "✨ Generate SEO Description"}
+        </button>
+      </div>
+
+      <!-- Reviews Inbox -->
+      <div class="gmb-reviews-section">
+        <div class="gmb-section-header">
+          <span class="gmb-section-title">⭐ Google Reviews</span>
+          <span class="gmb-review-count">${reviews.length > 0 ? reviews.length + " reviews" : ""}</span>
+        </div>
+
+        ${reviews.length === 0
+          ? `<div class="panel empty-state">
+              <strong>No reviews loaded yet</strong>
+              <p>Tap Sync to pull your latest Google reviews.</p>
+              <button class="button secondary" type="button" data-gmb-refresh style="margin-top:12px;">Sync Reviews</button>
+             </div>`
+          : reviews.map(r => {
+              const stars = starRatingMap[r.starRating] || 0;
+              const hasReply = Boolean(r.reviewReply || r.reply_comment);
+              const replyText = r.reviewReply?.comment || r.reply_comment || "";
+              const isReplying = gmb.replyingTo === r.name;
+              const reviewDate = r.createTime ? new Date(r.createTime).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
+              return `
+                <div class="panel gmb-review-card" data-review-id="${escapeHtml(r.name || "")}">
+                  <div class="gmb-review-top">
+                    <div class="gmb-reviewer">
+                      ${r.reviewer?.profilePhotoUrl || r.reviewer_photo
+                        ? `<img class="gmb-avatar" src="${escapeHtml(r.reviewer?.profilePhotoUrl || r.reviewer_photo)}" alt="" />`
+                        : `<div class="gmb-avatar-fallback">${escapeHtml((r.reviewer?.displayName || r.reviewer_name || "?").charAt(0).toUpperCase())}</div>`}
+                      <div>
+                        <div class="gmb-reviewer-name">${escapeHtml(r.reviewer?.displayName || r.reviewer_name || "Anonymous")}</div>
+                        <div class="gmb-review-meta">${"★".repeat(stars)}${"☆".repeat(5 - stars)} ${reviewDate ? "· " + reviewDate : ""}</div>
+                      </div>
+                    </div>
+                    ${hasReply ? `<span class="gmb-replied-badge">Replied</span>` : ""}
+                  </div>
+                  ${r.comment ? `<p class="gmb-review-body">${escapeHtml(r.comment)}</p>` : ""}
+
+                  ${hasReply && !isReplying
+                    ? `<div class="gmb-existing-reply">
+                        <span class="gmb-reply-label">Your reply:</span>
+                        <p>${escapeHtml(replyText)}</p>
+                        <div class="gmb-reply-btns">
+                          <button class="button ghost small" type="button"
+                            data-gmb-reply="${escapeHtml(r.name || "")}"
+                            data-gmb-reply-prefill="${escapeHtml(replyText)}">Edit</button>
+                          <button class="button ghost small danger-ghost" type="button"
+                            data-gmb-delete-reply="${escapeHtml(r.name || "")}">Delete</button>
+                        </div>
+                       </div>`
+                    : ""}
+
+                  ${isReplying
+                    ? `<div class="gmb-reply-form">
+                        <textarea class="textarea" id="gmb-reply-textarea" rows="3"
+                          placeholder="Write your reply…">${escapeHtml(gmb.replyDraft)}</textarea>
+                        <div class="gmb-reply-form-actions">
+                          <button class="button ghost small" type="button" data-gmb-generate-reply="${escapeHtml(r.name || "")}"
+                            data-gmb-review-text="${escapeHtml((r.comment || "").slice(0, 400))}"
+                            data-gmb-star="${stars}">✦ AI Draft</button>
+                          <div style="display:flex;gap:8px;">
+                            <button class="button ghost small" type="button" data-gmb-cancel-reply>Cancel</button>
+                            <button class="button small" type="button" data-gmb-submit-reply="${escapeHtml(r.name || "")}">Post Reply</button>
+                          </div>
+                        </div>
+                       </div>`
+                    : `<button class="button ghost small" type="button"
+                        data-gmb-reply="${escapeHtml(r.name || "")}"
+                        style="margin-top:8px;">
+                        ${hasReply ? "Edit Reply" : "✦ Reply"}
+                       </button>`}
+                </div>`;
+            }).join("")}
+      </div>
+
+      <!-- Disconnect warning -->
+      <div class="gmb-disconnect-row">
+        <button class="button ghost small danger-ghost" type="button" data-gmb-disconnect>Disconnect Google Business</button>
+      </div>
+    </section>`;
+}
+
 function profilePage() {
   const b = state.business;
   const u = state.user;
@@ -3412,14 +4252,16 @@ function profilePage() {
   const svgHelp = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>`;
   const svgAdmin = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>`;
   const svgTerms = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
+  const svgPricing = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>`;
   const svgLogout = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
 
   const items = [
-    { icon: svgAbout, label: "About RevYne", view: "about", color: "var(--surface-container)", fg: "var(--blue)" },
-    { icon: svgOrders, label: "Order History", view: "orders", color: "var(--surface-container)", fg: "var(--blue)" },
-    { icon: svgHelp, label: "Help & Support", view: "support", color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgAbout,   label: "About RevYne",   view: "about",   color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgOrders,  label: "Order History",  view: "orders",  color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgPricing, label: "Plans & Pricing", view: "pricing", color: "var(--surface-container)", fg: "var(--blue)" },
+    { icon: svgHelp,    label: "Help & Support",  view: "support", color: "var(--surface-container)", fg: "var(--blue)" },
     ...(u.isAdmin ? [{ icon: svgAdmin, label: "Admin Support", view: "adminSupport", color: "var(--blue-soft)", fg: "var(--blue)" }] : []),
-    { icon: svgTerms, label: "Terms & Privacy", view: "terms", color: "var(--surface-container)", fg: "var(--blue)" }
+    { icon: svgTerms,   label: "Terms & Privacy", view: "terms",   color: "var(--surface-container)", fg: "var(--blue)" }
   ];
 
   const currentTheme = state.theme || "default";
@@ -3472,11 +4314,17 @@ function currentPage() {
   if (state.view === "privacy") return state.isLoggedIn ? appShell(privacyPage()) : privacyPage();
   if (!state.isLoggedIn) return authPage();
 
+  // Real (non-guest) users who haven't set up their business yet get the onboarding shell
+  if (state.user?.provider !== "guest" && !hasBusinessProfile()) {
+    return onboardingShell(businessPage());
+  }
+
   const pages = {
     dashboard: dashboardPageClean,
     business: businessPage,
     reply: replyPage,
     pricing: pricingPageV2,
+    gmb: gmbPage,
     orders: ordersPage,
     about: aboutPage,
     support: supportPage,
@@ -3610,11 +4458,21 @@ function bindEvents() {
     btn.disabled = true;
     btn.textContent = "Saving…";
     try {
+      const wasNewUser = !state.business.id;
       const profileSaved = await saveSupabaseProfile();
       if (!profileSaved) return;
       const businessSaved = await saveSupabaseBusiness();
       if (!businessSaved) return;
-      showToast("✓ Profile saved successfully");
+      if (wasNewUser) {
+        // First-time setup complete — load stats then go to dashboard
+        await loadDashboardStats();
+        saveState();
+        showToast("🎉 Business profile saved! Your review link is ready.");
+        state.view = "dashboard";
+        render();
+      } else {
+        showToast("✓ Profile saved successfully");
+      }
     } finally {
       btn.disabled = false;
       btn.textContent = origText;
@@ -3710,6 +4568,21 @@ function bindEvents() {
     render();
   });
 
+  // Close guest limit modal
+  document.querySelector("[data-close-guest-modal]")?.addEventListener("click", () => {
+    state.showGuestLimitModal = false;
+    saveState();
+    render();
+  });
+
+  // Refresh dashboard stats
+  document.querySelector("[data-refresh-dashboard]")?.addEventListener("click", async () => {
+    await loadDashboardStats();
+    saveState();
+    render();
+    showToast("Stats refreshed");
+  });
+
   document.querySelector("[data-auth-google]")?.addEventListener("click", signInWithGoogle);
 
   document.querySelector("[data-auth-save-profile]")?.addEventListener("click", completeGoogleProfile);
@@ -3798,7 +4671,13 @@ function bindEvents() {
   });
 
   document.querySelectorAll("[data-copy]").forEach((button) => {
-    button.addEventListener("click", () => copyText(button.dataset.copy));
+    button.addEventListener("click", () => {
+      copyText(button.dataset.copy);
+      // On public review page, track that the customer copied a draft
+      if (isPublicReviewRoute() && state.suggestions.includes(button.dataset.copy)) {
+        markReviewDraftCopied();
+      }
+    });
   });
 
   document.querySelector("[data-download-qr]")?.addEventListener("click", downloadReviewQr);
@@ -3806,6 +4685,94 @@ function bindEvents() {
 
   document.querySelectorAll("[data-open-google]").forEach((button) => {
     button.addEventListener("click", () => window.open(state.business.googleUrl, "_blank", "noopener"));
+  });
+
+  // ── GMB event bindings ────────────────────────────────────────────────────
+  document.querySelector("[data-gmb-connect]")?.addEventListener("click", startGmbConnect);
+
+  document.querySelector("[data-gmb-cancel-connect]")?.addEventListener("click", () => {
+    state.gmb.showLocationPicker = false;
+    state.gmb.locationOptions = [];
+    state.gmb.connecting = false;
+    saveState();
+    render();
+  });
+
+  document.querySelectorAll("[data-gmb-select-location]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectGmbLocation(
+        btn.dataset.gmbSelectLocation,
+        btn.dataset.gmbLocationName || "",
+        btn.dataset.gmbAccountName || ""
+      );
+    });
+  });
+
+  document.querySelector("[data-gmb-refresh]")?.addEventListener("click", async () => {
+    await syncGmbData();
+    render();
+  });
+
+  document.querySelectorAll("[data-gmb-disconnect]").forEach(btn => {
+    btn.addEventListener("click", disconnectGmb);
+  });
+
+  document.querySelector("[data-gmb-load-health]")?.addEventListener("click", async () => {
+    await loadGmbHealthScore();
+    render();
+  });
+
+  document.querySelector("[data-gmb-show-tips]")?.addEventListener("click", () => {
+    const panel = document.getElementById("gmb-tips-panel");
+    if (panel) panel.hidden = !panel.hidden;
+  });
+
+  document.querySelector("[data-gmb-optimize]")?.addEventListener("click", optimizeGmbDescription);
+
+  document.querySelectorAll("[data-gmb-apply-desc]").forEach(btn => {
+    btn.addEventListener("click", () => applyGmbDescription(Number(btn.dataset.gmbApplyDesc)));
+  });
+
+  document.querySelectorAll("[data-gmb-reply]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.gmb.replyingTo = btn.dataset.gmbReply;
+      state.gmb.replyDraft = btn.dataset.gmbReplyPrefill || "";
+      saveState();
+      render();
+    });
+  });
+
+  document.querySelector("[data-gmb-cancel-reply]")?.addEventListener("click", () => {
+    state.gmb.replyingTo = null;
+    state.gmb.replyDraft = "";
+    saveState();
+    render();
+  });
+
+  document.querySelectorAll("[data-gmb-generate-reply]").forEach(btn => {
+    btn.addEventListener("click", () => generateGmbReply(
+      btn.dataset.gmbGenerateReply,
+      btn.dataset.gmbReviewText || "",
+      Number(btn.dataset.gmbStar) || 3
+    ));
+  });
+
+  document.querySelectorAll("[data-gmb-submit-reply]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const textarea = document.getElementById("gmb-reply-textarea");
+      const comment = textarea?.value?.trim() || "";
+      if (!comment) { showToast("Please write a reply first"); return; }
+      submitGmbReply(btn.dataset.gmbSubmitReply, comment);
+    });
+  });
+
+  document.querySelectorAll("[data-gmb-delete-reply]").forEach(btn => {
+    btn.addEventListener("click", () => deleteGmbReply(btn.dataset.gmbDeleteReply));
+  });
+
+  // Keep reply textarea draft in sync
+  document.getElementById("gmb-reply-textarea")?.addEventListener("input", (e) => {
+    state.gmb.replyDraft = e.target.value;
   });
 }
 
@@ -3816,7 +4783,21 @@ async function render() {
 
   const dir = slideDirection;
   slideDirection = null;
-  document.querySelector("#app").innerHTML = currentPage();
+
+  let pageHTML;
+  try {
+    pageHTML = currentPage();
+  } catch (err) {
+    console.error("[RevYne] render error:", err);
+    pageHTML = `<div class="main" style="padding:48px 24px;text-align:center;">
+      <div style="font-size:2.5rem;margin-bottom:16px;">⚠️</div>
+      <h2 style="margin:0 0 8px;">Something went wrong</h2>
+      <p style="color:#6b7280;margin:0 0 24px;">An unexpected error occurred. Please refresh the page.</p>
+      <button onclick="location.reload()" style="background:#8127cf;color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:600;">Refresh Page</button>
+    </div>`;
+  }
+
+  document.querySelector("#app").innerHTML = pageHTML;
   document.documentElement.setAttribute("data-theme", state.theme || "default");
 
   if (dir) {
@@ -3829,6 +4810,46 @@ async function render() {
   bindEvents();
   renderQrCodes();
   trackPageView();
+
+  // Auto-refresh dashboard stats in the background whenever the user is on the dashboard.
+  // Throttled to once every 60 seconds so rapid navigation doesn't spam Supabase.
+  if (
+    state.view === "dashboard" &&
+    state.isLoggedIn &&
+    state.user?.provider !== "guest" &&
+    state.business?.id &&
+    currentSession?.user
+  ) {
+    const now = Date.now();
+    if (now - lastStatsLoadTime > 60_000) {
+      lastStatsLoadTime = now;
+      loadDashboardStats().then(() => {
+        saveState();
+        // Re-render only the metrics section to avoid a full page flash
+        const dashWrap = document.querySelector(".dash-wrap");
+        if (dashWrap) {
+          // Lightweight re-render: replace the dash-metrics block only
+          const tmp = document.createElement("div");
+          tmp.innerHTML = dashboardPageClean();
+          const fresh = tmp.querySelector(".dash-metrics");
+          const current = dashWrap.querySelector(".dash-metrics");
+          if (fresh && current) current.replaceWith(fresh);
+          // Also update recent reviews
+          const freshRecent = tmp.querySelector(".recent-reviews");
+          const currentRecent = dashWrap.querySelector(".recent-reviews");
+          if (freshRecent && currentRecent) currentRecent.replaceWith(freshRecent);
+          // Re-bind the refresh button
+          document.querySelector("[data-refresh-dashboard]")?.addEventListener("click", async () => {
+            lastStatsLoadTime = 0; // force reload
+            await loadDashboardStats();
+            saveState();
+            render();
+            showToast("Stats refreshed");
+          });
+        }
+      }).catch(() => {});
+    }
+  }
 }
 
 window.addEventListener("hashchange", render);
@@ -3840,7 +4861,418 @@ window.addEventListener("unhandledrejection", (event) => {
   trackClientError("unhandledrejection", reason);
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Google Business Profile integration functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function callGmbConnect(body) {
+  const session = currentSession;
+  if (!session?.access_token) return null;
+  const supabaseUrl = (window.REVYNE_SUPABASE || {}).url || "";
+  if (!supabaseUrl) return null;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/gmb-connect`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "GMB connect request failed");
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("[GMB connect]", err);
+    throw err;
+  }
+}
+
+async function callGmbApi(body) {
+  const session = currentSession;
+  if (!session?.access_token) return null;
+  const supabaseUrl = (window.REVYNE_SUPABASE || {}).url || "";
+  if (!supabaseUrl) return null;
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/gmb-api`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "GMB API request failed");
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("[GMB API]", err);
+    throw err;
+  }
+}
+
+// Generate PKCE code_verifier + code_challenge
+async function generatePkce() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  const codeVerifier = btoa(String.fromCharCode(...array))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  const encoder = new TextEncoder();
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(codeVerifier));
+  const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  return { codeVerifier, codeChallenge };
+}
+
+// Step 1: redirect to Google OAuth
+async function startGmbConnect() {
+  const clientId = (window.REVYNE_SUPABASE || {}).googleClientId || "";
+  if (!clientId) {
+    showToast("Google integration not configured — add googleClientId to supabase-config.js");
+    return;
+  }
+  state.gmb.connecting = true;
+  saveState();
+  render();
+
+  try {
+    const { codeVerifier, codeChallenge } = await generatePkce();
+    sessionStorage.setItem("gmb_code_verifier", codeVerifier);
+
+    const redirectUri = location.origin + "/";
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "https://www.googleapis.com/auth/business.manage",
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+      state: "gmb",
+      access_type: "offline",
+      prompt: "consent"
+    });
+
+    location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  } catch (err) {
+    state.gmb.connecting = false;
+    saveState();
+    showToast("Could not start Google sign-in. Please try again.");
+    render();
+  }
+}
+
+// Step 2: handle OAuth callback (called from initializeApp when code+state=gmb in URL)
+async function handleGmbOAuthCallback(code) {
+  const codeVerifier = sessionStorage.getItem("gmb_code_verifier") || "";
+  sessionStorage.removeItem("gmb_code_verifier");
+
+  if (!codeVerifier) {
+    showToast("OAuth session expired. Please try connecting again.");
+    state.gmb.connecting = false;
+    saveState();
+    return;
+  }
+
+  state.gmb.connecting = true;
+  // Clean the URL so the code doesn't persist in browser history
+  history.replaceState(null, "", location.pathname);
+  saveState();
+  render();
+
+  try {
+    const redirectUri = location.origin + "/";
+    const result = await callGmbConnect({
+      action: "exchange_token",
+      code,
+      code_verifier: codeVerifier,
+      redirect_uri: redirectUri
+    });
+
+    if (!result?.locations?.length) {
+      showToast("No Google Business locations found on that account.");
+      state.gmb.connecting = false;
+      saveState();
+      render();
+      return;
+    }
+
+    if (result.locations.length === 1) {
+      // Only one location — auto-select it
+      const loc = result.locations[0];
+      await selectGmbLocation(loc.locationId, loc.locationName, loc.accountName || "");
+    } else {
+      // Multiple locations — show picker
+      state.gmb.locationOptions = result.locations;
+      state.gmb.showLocationPicker = true;
+      state.gmb.connecting = false;
+      state.view = "gmb";
+      saveState();
+      render();
+    }
+  } catch (err) {
+    state.gmb.connecting = false;
+    saveState();
+    showToast("Could not connect to Google Business. " + (err.message || "Please try again."));
+    render();
+  }
+}
+
+// Step 3: save the chosen location
+async function selectGmbLocation(locationId, locationName, accountName) {
+  state.gmb.connecting = true;
+  saveState();
+
+  try {
+    await callGmbConnect({ action: "select_location", location_id: locationId, location_name: locationName, account_name: accountName });
+
+    state.gmb.connected = true;
+    state.gmb.connecting = false;
+    state.gmb.locationId = locationId;
+    state.gmb.locationName = locationName;
+    state.gmb.accountName = accountName;
+    state.gmb.showLocationPicker = false;
+    state.gmb.locationOptions = [];
+    state.view = "gmb";
+    saveState();
+    showToast("✓ Google Business connected!");
+    trackEvent("gmb_connected");
+    render();
+
+    // Kick off initial data sync in background
+    syncGmbData().catch(() => {});
+  } catch (err) {
+    state.gmb.connecting = false;
+    saveState();
+    showToast("Could not save location. Please try again.");
+    render();
+  }
+}
+
+// Disconnect GMB
+async function disconnectGmb() {
+  if (!confirm("Disconnect Google Business Profile? Your cached reviews will be cleared.")) return;
+  try {
+    await callGmbConnect({ action: "disconnect" });
+  } catch (err) {
+    console.warn("GMB disconnect error (proceeding anyway):", err);
+  }
+  state.gmb = { ...clone(defaultState.gmb) };
+  saveState();
+  showToast("Google Business disconnected");
+  trackEvent("gmb_disconnected");
+  render();
+}
+
+// Load GMB connection status from the server
+async function loadGmbStatus() {
+  if (!currentSession?.access_token) return;
+  try {
+    const result = await callGmbConnect({ action: "get_status" });
+    if (result?.connected) {
+      state.gmb.connected = true;
+      state.gmb.locationId = result.location_id;
+      state.gmb.locationName = result.location_name;
+      state.gmb.accountName = result.account_name;
+    } else {
+      state.gmb.connected = false;
+      state.gmb.locationId = null;
+    }
+    saveState();
+  } catch (err) {
+    console.warn("[GMB status]", err);
+  }
+}
+
+// Sync profile + reviews + health score from Google
+async function syncGmbData() {
+  if (!state.gmb.connected) return;
+  state.gmb.syncing = true;
+  saveState();
+
+  try {
+    // Fetch reviews
+    const reviewsResult = await callGmbApi({ action: "list_reviews" });
+    if (reviewsResult?.reviews) {
+      state.gmb.reviews = reviewsResult.reviews;
+      state.gmb.lastSync = new Date().toISOString();
+    }
+
+    // Fetch profile
+    const profileResult = await callGmbApi({ action: "get_profile" });
+    if (profileResult?.profile) {
+      state.gmb.profile = profileResult.profile;
+    }
+
+    // Compute health score
+    await loadGmbHealthScore();
+
+    saveState();
+    showToast("✓ Google Business synced");
+  } catch (err) {
+    showToast("Could not sync from Google. " + (err.message || ""));
+  } finally {
+    state.gmb.syncing = false;
+    saveState();
+  }
+}
+
+async function loadGmbHealthScore() {
+  try {
+    const result = await callGmbApi({ action: "health_score" });
+    if (result?.score !== undefined) {
+      state.gmb.healthScore = result.score;
+      state.gmb.healthDetails = result.details;
+      if (result.profile) state.gmb.profile = result.profile;
+      if (result.reviewCount !== undefined && state.gmb.reviews.length === 0) {
+        // health_score also returned reviews — sync them
+      }
+      saveState();
+    }
+  } catch (err) {
+    console.warn("[GMB health score]", err);
+  }
+}
+
+async function optimizeGmbDescription() {
+  if (state.gmb.syncing) return;
+  state.gmb.syncing = true;
+  saveState();
+  render();
+
+  try {
+    const profile = state.gmb.profile || {};
+    const currentDesc = profile.profile?.description || profile.description || "";
+    const result = await callGmbApi({
+      action: "optimize_profile",
+      current_description: currentDesc,
+      business_name: state.business.name || profile.title || "",
+      business_category: state.business.category || "",
+      city: state.business.city || "",
+      services: state.business.services || "",
+      keywords: state.business.keywords || ""
+    });
+
+    if (result?.descriptions?.length) {
+      state.gmb.optimizations = result.descriptions;
+      saveState();
+      showToast("✓ SEO descriptions generated");
+    } else {
+      showToast("Could not generate descriptions. Please try again.");
+    }
+  } catch (err) {
+    showToast("AI optimization failed. " + (err.message || ""));
+  } finally {
+    state.gmb.syncing = false;
+    saveState();
+    render();
+  }
+}
+
+async function applyGmbDescription(index) {
+  const desc = state.gmb.optimizations[index];
+  if (!desc) return;
+  if (!confirm("Apply this description to your Google Business Profile?")) return;
+
+  showToast("Updating Google Business Profile…");
+  // Note: updating description requires the Business Information API PATCH endpoint.
+  // For now, we copy the description and open GMB in a new tab.
+  await navigator.clipboard.writeText(desc).catch(() => {});
+  window.open("https://business.google.com/", "_blank", "noopener");
+  showToast("Description copied! Paste it in the Google Business editor.");
+}
+
+async function generateGmbReply(reviewName, reviewText, stars) {
+  const textarea = document.getElementById("gmb-reply-textarea");
+  if (textarea) textarea.value = "Generating…";
+
+  try {
+    const result = await callEdgeFunction("generate-ai", {
+      action: "smart_replies",
+      rating: stars,
+      reviewText,
+      business: {
+        name: state.business.name,
+        category: state.business.category,
+        city: state.business.city,
+        language: state.business.language || "English",
+        tone: state.business.tone || "Professional"
+      }
+    });
+
+    const firstReply = result?.replies?.[0] || "";
+    state.gmb.replyDraft = firstReply;
+    if (textarea) textarea.value = firstReply;
+    saveState();
+  } catch (err) {
+    if (textarea) textarea.value = state.gmb.replyDraft;
+    showToast("Could not generate reply. Please write one manually.");
+  }
+}
+
+async function submitGmbReply(reviewName, comment) {
+  try {
+    await callGmbApi({ action: "post_reply", review_name: reviewName, comment });
+
+    // Update local cache
+    state.gmb.reviews = state.gmb.reviews.map(r => {
+      if (r.name === reviewName) return { ...r, reviewReply: { comment }, reply_comment: comment };
+      return r;
+    });
+    state.gmb.replyingTo = null;
+    state.gmb.replyDraft = "";
+    saveState();
+    showToast("✓ Reply posted to Google!");
+    trackEvent("gmb_reply_posted");
+    render();
+  } catch (err) {
+    showToast("Could not post reply: " + (err.message || "Please try again."));
+  }
+}
+
+async function deleteGmbReply(reviewName) {
+  if (!confirm("Delete this reply from Google?")) return;
+  try {
+    await callGmbApi({ action: "delete_reply", review_name: reviewName });
+    state.gmb.reviews = state.gmb.reviews.map(r => {
+      if (r.name === reviewName) return { ...r, reviewReply: null, reply_comment: null };
+      return r;
+    });
+    saveState();
+    showToast("Reply deleted");
+    render();
+  } catch (err) {
+    showToast("Could not delete reply: " + (err.message || ""));
+  }
+}
+
+// Generic edge function caller (reuses Supabase session)
+async function callEdgeFunction(fnName, body) {
+  const session = currentSession;
+  if (!session?.access_token) throw new Error("Not authenticated");
+  const supabaseUrl = (window.REVYNE_SUPABASE || {}).url || "";
+  const res = await fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `${fnName} failed`);
+  }
+  return res.json();
+}
+
 async function initializeApp() {
+  // ── Check for Google OAuth callback (state=gmb) ──────────────────────────
+  const urlParams = new URLSearchParams(location.search);
+  const oauthCode  = urlParams.get("code");
+  const oauthState = urlParams.get("state");
+  const isGmbCallback = oauthCode && oauthState === "gmb";
+
   if (!supabaseClient) {
     render();
     return;
@@ -3851,6 +5283,22 @@ async function initializeApp() {
   try {
     const { data } = await supabaseClient.auth.getSession();
     await applySupabaseSession(data.session);
+
+    // If this is a GMB OAuth callback, handle it after the Supabase session is restored
+    if (isGmbCallback) {
+      // Clean URL first so the code is never re-used
+      history.replaceState(null, "", location.pathname);
+      state.view = "gmb";
+      saveState();
+      await handleGmbOAuthCallback(oauthCode);
+      return; // handleGmbOAuthCallback calls render() itself
+    }
+
+    // On normal app load: refresh GMB connection status quietly in the background
+    if (state.isLoggedIn && state.user?.provider !== "guest") {
+      loadGmbStatus().catch(() => {});
+    }
+
     render();
   } catch (error) {
     console.warn("Could not restore Supabase session:", error);

@@ -19,24 +19,24 @@
     <meta name="twitter:title" content="RevYne AI - Smart Review Assistant for Businesses" />
     <meta name="twitter:description" content="AI-powered review collection, QR review links, and smart customer review replies for businesses." />
     <meta name="twitter:image" content="https://revyneai.com/assets/revyne-icon-512.png" />
-    <link rel="icon" type="image/png" href="./assets/favicon.png?v=20260512-2" />
-    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260512-2" />
-    <link rel="manifest" href="./manifest.webmanifest?v=20260512-2" />
+    <link rel="icon" type="image/png" href="./assets/favicon.png?v=20260518-2" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260518-2" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260518-2" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260512-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260518-2" />
   </head>
   <body>
     <div id="app"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./assets/vendor/qrcode-generator.js?v=20260512-2"></script>
-    <script src="./supabase-config.js?v=20260512-2"></script>
-    <script src="./app.js?v=20260512-2"></script>
+    <script src="./assets/vendor/qrcode-generator.js?v=20260518-2"></script>
+    <script src="./supabase-config.js?v=20260518-2"></script>
+    <script src="./app.js?v=20260518-2"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
-          const swVersion = "20260512-2";
+          const swVersion = "20260514-1";
           const savedVersion = localStorage.getItem("revyne_sw_version");
           const resetOldCaches = async () => {
             const keys = "caches" in window ? await caches.keys() : [];
@@ -55,7 +55,7 @@
             return;
           }
 
-          navigator.serviceWorker.register("./sw.js?v=20260512-2").catch(() => {});
+          navigator.serviceWorker.register("./sw.js?v=20260518-2").catch(() => {});
         });
       }
     </script>

@@ -39,6 +39,26 @@ async function getAuthenticatedUser(req: Request) {
   return await response.json();
 }
 
+async function checkIsAdmin(userId: string): Promise<boolean> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return false;
+
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?select=is_admin&id=eq.${encodeURIComponent(userId)}&limit=1`,
+    {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        Accept: "application/json"
+      }
+    }
+  );
+  if (!res.ok) return false;
+  const rows = await res.json().catch(() => []);
+  return Array.isArray(rows) && rows.length > 0 && rows[0].is_admin === true;
+}
+
 function clean(value: unknown, fallback = "") {
   return String(value || fallback).replace(/\s+/g, " ").trim();
 }
@@ -107,6 +127,15 @@ Deno.serve(async (req) => {
   }
 
   const type = body.type || "new_ticket";
+
+  // admin_reply emails are privileged — verify the caller is actually an admin
+  if (type === "admin_reply") {
+    const isAdmin = await checkIsAdmin(user.id);
+    if (!isAdmin) {
+      return jsonResponse({ error: "Admin privileges required" }, 403);
+    }
+  }
+
   const ticket = body.ticket || {};
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
   const from = Deno.env.get("SUPPORT_EMAIL_FROM");

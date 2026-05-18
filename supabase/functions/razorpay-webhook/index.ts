@@ -151,8 +151,51 @@ Deno.serve(async (req) => {
   }
 
   const nextPlan = shouldDowngrade(eventName, status) ? "free" : plan;
-  let processingStatus = "received";
-  let processingError: string | null = null;
+
+  // Build a stable, fine-grained idempotency key.
+  // For payments: use the payment id (globally unique).
+  // For subscription lifecycle events without a payment: include current_start so
+  // repeated state-machine events (e.g. multiple "halted" callbacks) get distinct keys.
+  const eventKey = typeof payment.id === "string"
+    ? `${eventName}:${payment.id}`
+    : subscriptionId
+      ? `${eventName}:${subscriptionId}:${subscription.current_start ?? subscription.updated_at ?? "0"}`
+      : `${eventName}:${crypto.randomUUID()}`;
+
+  // ── STEP 1: record the event first (idempotency gate) ──────────────────────
+  // Insert with ignore-duplicates so a re-delivery of the same webhook does not
+  // proceed past this point if the event was already fully processed.
+  const initialEventRow: Record<string, unknown> = {
+    user_id: userId,
+    event_id: eventKey,
+    event_name: eventName,
+    plan,
+    razorpay_subscription_id: subscriptionId,
+    razorpay_payment_id: typeof payment.id === "string" ? payment.id : null,
+    status: typeof status === "string" ? status : null,
+    processing_status: "received",
+    processing_error: null,
+    profile_updated: false,
+    payload
+  };
+
+  await insertPaymentEvent(initialEventRow);
+
+  // Check whether a previous delivery already completed the profile update.
+  const dupCheck = await supabaseRequest(
+    `payment_events?event_id=eq.${encodeURIComponent(eventKey)}&profile_updated=eq.true&limit=1`,
+    { method: "GET", headers: { Accept: "application/json" } }
+  );
+  if (dupCheck.ok) {
+    const dupRows = await dupCheck.json().catch(() => []);
+    if (Array.isArray(dupRows) && dupRows.length > 0) {
+      return jsonResponse({ received: true }); // idempotent: already applied
+    }
+  }
+
+  // ── STEP 2: mutate user state ──────────────────────────────────────────────
+  let processingStatus = "unmatched_profile";
+  let processingError: string | null = "Could not match Razorpay event to a RevYne profile";
   let profileUpdated = false;
 
   if (userId && nextPlan && subscriptionId) {
@@ -179,28 +222,19 @@ Deno.serve(async (req) => {
     } else {
       profileUpdated = true;
       processingStatus = "profile_updated";
+      processingError = null;
       await syncBusinessPlanSnapshot(userId, nextPlan, nextStatus, currentEnd);
     }
-  } else {
-    processingStatus = "unmatched_profile";
-    processingError = "Could not match Razorpay event to a RevYne profile";
   }
 
-  const eventRow = {
-    user_id: userId,
-    event_id: typeof payment.id === "string" ? `${eventName}:${payment.id}` : `${eventName}:${subscriptionId || crypto.randomUUID()}`,
-    event_name: eventName,
-    plan,
-    razorpay_subscription_id: subscriptionId,
-    razorpay_payment_id: typeof payment.id === "string" ? payment.id : null,
-    status: typeof status === "string" ? status : null,
-    processing_status: processingStatus,
-    processing_error: processingError,
-    profile_updated: profileUpdated,
-    payload
-  };
-
-  await insertPaymentEvent(eventRow);
+  // ── STEP 3: update event record with final outcome ─────────────────────────
+  await supabaseRequest(
+    `payment_events?event_id=eq.${encodeURIComponent(eventKey)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ processing_status: processingStatus, processing_error: processingError, profile_updated: profileUpdated })
+    }
+  );
 
   if (processingStatus === "profile_update_failed") {
     return jsonResponse({ error: "Could not update profile", detail: processingError }, 500);

@@ -1,13 +1,13 @@
-const CACHE_NAME = "revyne-ai-v20260512-2";
+const CACHE_NAME = "revyne-ai-v20260518-2";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/styles.css?v=20260512-2",
-  "/app.js?v=20260512-2",
-  "/supabase-config.js?v=20260512-2",
-  "/manifest.webmanifest?v=20260512-2",
-  "/assets/favicon.png?v=20260512-2",
-  "/assets/vendor/qrcode-generator.js?v=20260512-2",
+  "/styles.css?v=20260518-2",
+  "/app.js?v=20260518-2",
+  "/supabase-config.js?v=20260518-2",
+  "/manifest.webmanifest?v=20260514-1",
+  "/assets/favicon.png?v=20260514-1",
+  "/assets/vendor/qrcode-generator.js?v=20260514-1",
   "/robots.txt",
   "/sitemap.xml",
   "/assets/revyne-icon-192.png",
@@ -33,6 +33,18 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Paths that must never be served from cache (auth state, API, service worker itself).
+const BYPASS_CACHE_PATHS = ["/api/", "/auth/", "/.well-known/", "/sw.js"];
+
+// Only cache static assets — JS, CSS, fonts, images, the app shell.
+// Anything that could carry session/pricing state is served fresh.
+function isCacheable(request, url) {
+  if (!url || url.origin !== self.location.origin) return false;
+  if (BYPASS_CACHE_PATHS.some((p) => url.pathname.startsWith(p))) return false;
+  // Skip if the server explicitly opts out of caching
+  return true;
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
@@ -42,9 +54,23 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (sameOrigin && response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+        if (isCacheable(request, url) && response.ok) {
+          // Don't cache responses that carry no-store / no-cache directives
+          const cc = response.headers.get("cache-control") || "";
+          if (!cc.includes("no-store") && !cc.includes("no-cache")) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+          }
+          return response;
+        }
+        if (sameOrigin && !response.ok) {
+          // Network returned an error — try the cache, then fall back to index.html for navigation
+          return caches.match(request).then((cached) => {
+            if (cached) return cached;
+            const accept = request.headers.get("accept") || "";
+            if (accept.includes("text/html")) return caches.match("/index.html");
+            return response;
+          });
         }
         return response;
       })

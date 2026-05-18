@@ -15,7 +15,7 @@ type BusinessInput = {
 };
 
 type RequestBody = {
-  action?: "review_suggestions" | "smart_replies";
+  action?: "review_suggestions" | "smart_replies" | "save_review_request" | "mark_review_copied";
   rating?: number;
   experience?: string;
   selectedService?: string;
@@ -24,6 +24,13 @@ type RequestBody = {
   customerName?: string;
   reviewText?: string;
   business?: BusinessInput;
+  // save_review_request fields
+  business_id?: string;
+  customer_experience?: string | null;
+  customer_language?: string;
+  suggestions?: string[];
+  // mark_review_copied fields
+  request_id?: string;
 };
 
 const FIELD_LIMITS = {
@@ -84,6 +91,122 @@ function normalizeBody(body: RequestBody) {
       tone: cleanText(business.tone, FIELD_LIMITS.tone) || "Professional"
     }
   };
+}
+
+async function saveReviewRequest(body: RequestBody): Promise<Response> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonResponse({ error: "Server configuration missing" }, 500);
+  }
+
+  const businessId = typeof body.business_id === "string" ? body.business_id.trim() : "";
+  const rating = normalizeRating(body.rating);
+
+  if (!businessId || !rating) {
+    return jsonResponse({ error: "business_id and rating are required" }, 400);
+  }
+
+  const headers = {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
+    "Content-Type": "application/json",
+    Prefer: "return=representation"
+  };
+
+  // Insert into review_requests using service role (bypasses RLS for anonymous visitors)
+  const reqRes = await fetch(`${supabaseUrl}/rest/v1/review_requests`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      business_id: businessId,
+      rating,
+      customer_experience: body.customer_experience || null,
+      customer_language: typeof body.customer_language === "string" ? body.customer_language.slice(0, 40) : "English",
+      source: "public_page"
+    })
+  });
+
+  if (!reqRes.ok) {
+    const errText = await reqRes.text();
+    console.error("review_requests insert failed:", errText);
+    return jsonResponse({ error: "Could not save review request" }, 500);
+  }
+
+  const [reviewRequest] = await reqRes.json();
+  const requestId = reviewRequest?.id;
+
+  // Insert generated_reviews if suggestions are provided
+  if (requestId && Array.isArray(body.suggestions) && body.suggestions.length > 0) {
+    const rows = body.suggestions
+      .filter((s) => typeof s === "string" && s.trim())
+      .slice(0, 3)
+      .map((suggestion) => ({
+        review_request_id: requestId,
+        business_id: businessId,
+        suggestion: suggestion.trim()
+      }));
+
+    if (rows.length > 0) {
+      const genRes = await fetch(`${supabaseUrl}/rest/v1/generated_reviews`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(rows)
+      });
+      if (!genRes.ok) {
+        const errText = await genRes.text();
+        console.warn("generated_reviews insert failed:", errText);
+        // Non-fatal — review_request was saved, just log the warning
+      }
+    }
+  }
+
+  return jsonResponse({ saved: true, request_id: requestId });
+}
+
+async function markReviewCopied(body: RequestBody): Promise<Response> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return jsonResponse({ error: "Server config missing" }, 500);
+
+  const requestId = typeof body.request_id === "string" ? body.request_id.trim() : "";
+  if (!requestId) return jsonResponse({ error: "request_id required" }, 400);
+
+  // Ownership guard: only allow marking if the request was created in the last 24 h.
+  // This prevents arbitrary callers from falsifying analytics on old / unrelated rows.
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const checkRes = await fetch(
+    `${supabaseUrl}/rest/v1/review_requests?id=eq.${encodeURIComponent(requestId)}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`,
+    { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}`, Accept: "application/json" } }
+  );
+  if (!checkRes.ok) return jsonResponse({ error: "Could not verify request" }, 500);
+  const rows = await checkRes.json().catch(() => []);
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return jsonResponse({ error: "Request not found or expired" }, 404);
+  }
+
+  const res = await fetch(`${supabaseUrl}/rest/v1/review_requests?id=eq.${encodeURIComponent(requestId)}`, {
+    method: "PATCH",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({
+      draft_copied: true,
+      copied_at: new Date().toISOString()
+    })
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("mark_review_copied failed:", errText);
+    return jsonResponse({ error: "Could not mark review copied" }, 500);
+  }
+
+  return jsonResponse({ marked: true });
 }
 
 function validateBody(body: RequestBody) {
@@ -243,6 +366,16 @@ Deno.serve(async (req) => {
     body = await req.json();
   } catch {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  // save_review_request: persist public QR review submissions using service role (bypasses RLS)
+  if (body.action === "save_review_request") {
+    return saveReviewRequest(body);
+  }
+
+  // mark_review_copied: called when customer clicks Copy on a draft (tracks completed sessions)
+  if (body.action === "mark_review_copied") {
+    return markReviewCopied(body);
   }
 
   const validationError = validateBody(body);
