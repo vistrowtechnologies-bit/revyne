@@ -596,12 +596,34 @@ async function applySupabaseSession(session) {
     state.adminTickets = [];
     state.paymentEvents = [];
     state.adminPaymentEvents = [];
+    const wasAlreadyLoggedIn = state.isLoggedIn;
     state.isLoggedIn = true;
     state.authMode = "signin";
     await loadSupabaseProfile();
+
+    // Snapshot local business state BEFORE the DB reload.
+    // On a token refresh (wasAlreadyLoggedIn=true) the user may have unsaved
+    // edits in fields like googleUrl that loadSupabaseBusiness() would clobber.
+    const localBusinessSnapshot = clone(state.business);
     await loadSupabaseBusiness();
-    // Overlay any unsaved DOM edits (e.g. user was typing in a field when a token
-    // refresh fired onAuthStateChange) so they are not lost by the DB reload above.
+
+    // If this is a token refresh (not first login), restore any locally-edited
+    // fields that the DB reload just overwrote with the old saved value.
+    // We detect "locally edited" by comparing the snapshot to the fresh DB data:
+    // if the snapshot had a non-empty value that DIFFERS from what the DB returned
+    // for the same business, it means the user typed something new → keep it.
+    if (wasAlreadyLoggedIn && localBusinessSnapshot.id && localBusinessSnapshot.id === state.business.id) {
+      const editableFields = ["googleUrl", "name", "city", "services", "serviceTypes", "keywords", "language", "tone", "mobile"];
+      editableFields.forEach(field => {
+        const localVal = localBusinessSnapshot[field];
+        const dbVal    = state.business[field];
+        if (typeof localVal === "string" && localVal.trim() !== "" && localVal !== dbVal) {
+          state.business[field] = localVal;
+        }
+      });
+    }
+
+    // Also overlay any unsaved DOM edits if the user is currently on the business page.
     preserveBusinessFromDom();
     await saveSupabaseProfile();
     await loadDashboardStats();
