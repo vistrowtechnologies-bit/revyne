@@ -612,6 +612,8 @@ async function applySupabaseSession(session) {
     state.paymentEvents = [];
     state.adminPaymentEvents = [];
     const wasAlreadyLoggedIn = state.isLoggedIn;
+    const freshProviderToken = !wasAlreadyLoggedIn ? (session.provider_token || null) : null;
+    const freshProviderRefreshToken = !wasAlreadyLoggedIn ? (session.provider_refresh_token || null) : null;
     state.isLoggedIn = true;
     state.authMode = "signin";
     await loadSupabaseProfile();
@@ -647,6 +649,10 @@ async function applySupabaseSession(session) {
     if (state.user.isAdmin) {
       await loadAdminTickets();
       await loadAdminPaymentEvents();
+    }
+    // On fresh Google login: auto-connect GMB using provider_token (no separate OAuth needed)
+    if (freshProviderToken && !state.gmb.connected) {
+      autoConnectGmbFromSession(freshProviderToken, freshProviderRefreshToken).catch(() => {});
     }
     saveState();
   } finally {
@@ -1127,7 +1133,14 @@ async function signInWithGoogle() {
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${location.origin}${location.pathname}`
+      redirectTo: `${location.origin}${location.pathname}`,
+      // Request GMB scope alongside basic profile — provider_token will be available
+      // in the session after redirect, enabling auto-connect without a separate OAuth step
+      scopes: "https://www.googleapis.com/auth/business.manage",
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent"   // always ask so Google returns a refresh_token
+      }
     }
   });
 
@@ -3754,7 +3767,7 @@ function onboardingWizard() {
       "This helps us personalise your review link, AI replies, and QR code.",
       `<div class="field">
         <label for="onb-biz-name">Business Name <span class="req">*</span></label>
-        <input id="onb-biz-name" class="input" placeholder="e.g. Shree Saraswati Opticals"
+        <input id="onb-biz-name" class="input" placeholder="Your business name"
           value="${escapeHtml(b.name || u.name || "")}" data-field="name" />
       </div>
       <div class="field">
@@ -5444,6 +5457,35 @@ async function generatePkce() {
 }
 
 // Step 1: redirect to Google OAuth
+// Auto-connect GMB using the provider_token that Supabase returns after Google sign-in.
+// This runs silently on fresh login — no separate OAuth popup needed.
+async function autoConnectGmbFromSession(providerToken, providerRefreshToken) {
+  if (!currentSession?.access_token) return;
+  try {
+    const result = await callGmbConnect({
+      action: "use_provider_token",
+      provider_token: providerToken,
+      provider_refresh_token: providerRefreshToken || null
+    });
+    if (!result?.locations?.length) return; // No GMB account on this Google account
+
+    if (result.locations.length === 1) {
+      // Only one location — auto-select silently
+      const loc = result.locations[0];
+      await selectGmbLocation(loc.locationId, loc.locationName, loc.accountName || "");
+    } else {
+      // Multiple locations — show the picker
+      state.gmb.showLocationPicker = true;
+      state.gmb.locationOptions = result.locations;
+      state.gmb.connecting = false;
+      saveState();
+      render();
+    }
+  } catch (err) {
+    console.warn("[GMB auto-connect]", err);
+  }
+}
+
 async function startGmbConnect() {
   const clientId = (window.REVYNE_SUPABASE || {}).googleClientId || "";
   if (!clientId) {

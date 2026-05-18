@@ -84,6 +84,81 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ── use_provider_token ──────────────────────────────────────────────────────
+  // Called after Supabase Google sign-in when business.manage scope was requested.
+  // The provider_token (Google access token) is available in the Supabase session
+  // immediately after OAuth redirect — no separate PKCE dance needed.
+  if (action === "use_provider_token") {
+    const providerToken        = typeof body.provider_token         === "string" ? body.provider_token.trim()         : "";
+    const providerRefreshToken = typeof body.provider_refresh_token === "string" ? body.provider_refresh_token.trim() : null;
+
+    if (!providerToken) return jsonResponse({ error: "provider_token is required" }, 400);
+
+    const accessToken  = providerToken;
+    const refreshToken = providerRefreshToken;
+    const expiresAt    = new Date(Date.now() + 3600 * 1000).toISOString(); // 1 hr; refreshed by gmb-api
+
+    // Verify the token has the right scope by attempting to list accounts
+    const accountsRes = await fetch(
+      "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!accountsRes.ok) {
+      const errText = await accountsRes.text();
+      console.error("GMB accounts fetch (provider_token) failed:", errText);
+      // Return empty rather than error — user may not have a GMB account
+      return jsonResponse({ locations: [] });
+    }
+
+    const accountsData = await accountsRes.json() as Record<string, unknown>;
+    const accounts = (accountsData.accounts as Array<Record<string, unknown>>) || [];
+    if (!accounts.length) return jsonResponse({ locations: [] });
+
+    // Fetch locations for each account (up to 5 accounts, 20 locations each)
+    const locations: Array<{ locationId: string; locationName: string; accountName: string; address?: string }> = [];
+    for (const account of accounts.slice(0, 5)) {
+      const accountName = account.name as string;
+      const locRes = await fetch(
+        `https://mybusinessbusinessinformation.googleapis.com/v1/${accountName}/locations?readMask=name,title,storefrontAddress`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (locRes.ok) {
+        const locData = await locRes.json() as Record<string, unknown>;
+        const locs = (locData.locations as Array<Record<string, unknown>>) || [];
+        for (const loc of locs.slice(0, 20)) {
+          const addr = loc.storefrontAddress as Record<string, unknown> | undefined;
+          const city = addr?.locality as string ?? "";
+          locations.push({
+            locationId: loc.name as string,
+            locationName: (loc.title as string) || (loc.name as string),
+            accountName,
+            address: city || undefined
+          });
+        }
+      }
+    }
+
+    // Persist tokens (location not yet selected)
+    const firstAccount = accounts[0]?.name as string ?? null;
+    await supabaseRequest("gmb_tokens", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({
+        user_id: user.id,
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_at: expiresAt,
+        account_name: firstAccount,
+        location_id: null,
+        location_name: null,
+        updated_at: new Date().toISOString()
+      })
+    });
+
+    return jsonResponse({ locations });
+  }
+
   // ── exchange_token ──────────────────────────────────────────────────────────
   if (action === "exchange_token") {
     const code = typeof body.code === "string" ? body.code.trim() : "";

@@ -3447,7 +3447,7 @@ button {
   transition: all 0.3s;
 }
 .onb-dot.active .onb-dot-circle {
-  background: linear-gradient(135deg, var(--brand), var(--brand2));
+  background: linear-gradient(135deg, var(--blue), var(--secondary));
   color: #fff;
   box-shadow: 0 2px 8px rgba(129,39,207,0.35);
 }
@@ -3460,7 +3460,7 @@ button {
   color: var(--muted);
   white-space: nowrap;
 }
-.onb-dot.active .onb-dot-label { color: var(--brand); font-weight: 600; }
+.onb-dot.active .onb-dot-label { color: var(--blue); font-weight: 600; }
 .onb-dot-line {
   width: 24px; height: 2px;
   background: #e5e7eb;
