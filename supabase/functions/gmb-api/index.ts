@@ -383,5 +383,93 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ── create_local_post ───────────────────────────────────────────────────────
+  if (action === "create_local_post") {
+    const postType  = typeof body.post_type  === "string" ? body.post_type.toUpperCase()  : "STANDARD";
+    const summary   = typeof body.summary    === "string" ? body.summary.trim()           : "";
+    const mediaB64  = typeof body.media_base64 === "string" ? body.media_base64           : null;
+
+    if (!summary) return jsonResponse({ error: "summary is required" }, 400);
+    if (summary.length > 1500) return jsonResponse({ error: "summary too long (max 1500 chars)" }, 400);
+
+    // Map our UI types to GMB topic types
+    const topicTypeMap: Record<string, string> = {
+      UPDATE: "STANDARD",
+      OFFER:  "OFFER",
+      EVENT:  "EVENT",
+      STANDARD: "STANDARD"
+    };
+    const topicType = topicTypeMap[postType] || "STANDARD";
+
+    // Build the GMB local post payload
+    const postPayload: Record<string, unknown> = {
+      languageCode: "en",
+      summary,
+      topicType
+    };
+
+    // If a base64 image was provided, attach it as a media item via sourceUrl trick
+    // GMB local posts support mediaItems with PHOTO format
+    if (mediaB64) {
+      // We upload the image to Supabase Storage first, then pass the public URL to GMB
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+      const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+      // Parse the base64 data URL
+      const matches = mediaB64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
+      if (matches) {
+        const mimeType   = matches[1];
+        const base64Data = matches[2];
+        const ext        = mimeType.split("/")[1] || "jpg";
+        const fileName   = `gmb-posts/${user.id}/${Date.now()}.${ext}`;
+
+        // Convert base64 to binary
+        const binaryStr = atob(base64Data);
+        const bytes     = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+        // Upload to Supabase Storage
+        const uploadRes = await fetch(`${supabaseUrl}/storage/v1/object/gmb-media/${fileName}`, {
+          method: "POST",
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": mimeType,
+            "x-upsert": "true"
+          },
+          body: bytes
+        });
+
+        if (uploadRes.ok) {
+          const publicUrl = `${supabaseUrl}/storage/v1/object/public/gmb-media/${fileName}`;
+          postPayload.media = [{ mediaFormat: "PHOTO", sourceUrl: publicUrl }];
+        }
+      }
+    }
+
+    // Post to GMB Local Posts API
+    const res = await gmb(`${locationId}/localPosts`, {
+      method: "POST",
+      body: JSON.stringify(postPayload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("GMB create_local_post failed:", errText);
+      return jsonResponse({ error: "Could not create post on Google Business Profile" }, 502);
+    }
+
+    const postData = await res.json() as Record<string, unknown>;
+    return jsonResponse({ posted: true, name: postData.name });
+  }
+
+  // ── list_local_posts ────────────────────────────────────────────────────────
+  if (action === "list_local_posts") {
+    const res = await gmb(`${locationId}/localPosts?pageSize=20`);
+    if (!res.ok) return jsonResponse({ error: "Could not fetch posts" }, 502);
+    const data = await res.json() as Record<string, unknown>;
+    return jsonResponse({ posts: (data.localPosts as unknown[]) || [] });
+  }
+
   return jsonResponse({ error: "Unknown action" }, 400);
 });

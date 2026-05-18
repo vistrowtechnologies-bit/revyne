@@ -1,10 +1,10 @@
-const CACHE_NAME = "revyne-ai-v20260518-2";
+const CACHE_NAME = "revyne-ai-v20260518-3";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/styles.css?v=20260518-2",
-  "/app.js?v=20260518-2",
-  "/supabase-config.js?v=20260518-2",
+  "/styles.css?v=20260518-3",
+  "/app.js?v=20260518-3",
+  "/supabase-config.js?v=20260518-3",
   "/manifest.webmanifest?v=20260514-1",
   "/assets/favicon.png?v=20260514-1",
   "/assets/vendor/qrcode-generator.js?v=20260514-1",

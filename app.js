@@ -192,7 +192,16 @@ const defaultState = {
     replyingTo: null,    // review id currently being replied to
     replyDraft: "",
     locationOptions: [], // list of locations shown in picker modal
-    showLocationPicker: false
+    showLocationPicker: false,
+    posts: [],           // cached GMB local posts
+    posting: false,      // post-to-GMB in progress
+    postDraft: { text: "", type: "UPDATE", mediaPreview: "" }
+  },
+  onboarding: {
+    step: 1,             // 1-4 wizard step
+    topProducts: [],     // user-entered top product/service tags
+    reviewLinkConsent: false,
+    completed: false
   }
 };
 
@@ -241,11 +250,17 @@ function loadState() {
       adminTicketFilter: parsed.adminTicketFilter || freshState.adminTicketFilter,
       reviewDraft: { ...freshState.reviewDraft, ...(parsed.reviewDraft || {}) },
       replyDraft: { ...freshState.replyDraft, ...(parsed.replyDraft || {}) },
+      onboarding: {
+        ...freshState.onboarding,
+        ...(parsed.onboarding || {})
+      },
       gmb: {
         ...freshState.gmb,
         ...(parsed.gmb || {}),
         connecting: false,
         syncing: false,
+        posting: false,
+        postDraft: { text: "", type: "UPDATE", mediaPreview: "" },
         locationOptions: [],
         showLocationPicker: false,
         replyingTo: null,
@@ -2622,6 +2637,81 @@ function dashboardGmbCard() {
     </div>`;
 }
 
+function requestReviewViaWhatsApp() {
+  const reviewUrl = getReviewUrl();
+  const biz = state.business.name || "our business";
+  const msg = `Hi! Thank you for visiting ${biz}. We'd love your feedback! ⭐\n\nLeave us a Google review (takes 30 seconds): ${reviewUrl}\n\nThank you! 🙏`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+  trackEvent("whatsapp_review_request");
+}
+
+function dashboardGrowthActions() {
+  const b = state.business;
+  const gmb = state.gmb || {};
+  const ds = state.dashboardStats || {};
+
+  // Profile completeness — 6 fields
+  const profileFields = [b.name, b.category, b.city, b.googleUrl, b.services, b.logo];
+  const profileDone  = profileFields.filter(Boolean).length;
+  const profileTotal = 6;
+
+  // Reviews collected this week (approx)
+  const weekReviews = (ds.recentReviews || []).filter(r => {
+    const d = new Date(r.created_at || 0);
+    return (Date.now() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
+  }).length;
+  const reviewGoal = 5;
+
+  // Replies
+  const repliesUsed = ds.aiRepliesUsed || 0;
+  const repliesGoal = 5;
+
+  // GMB connected
+  const gmbDone = gmb.connected ? 1 : 0;
+
+  const actions = [
+    { icon: "✏️", label: "Complete Profile", done: profileDone, total: profileTotal, view: "business", pct: Math.round((profileDone / profileTotal) * 100) },
+    { icon: "💬", label: "Request Reviews", sub: "this week", done: Math.min(weekReviews, reviewGoal), total: reviewGoal, action: "whatsapp", pct: Math.round((Math.min(weekReviews, reviewGoal) / reviewGoal) * 100) },
+    { icon: "📊", label: "Connect Google", done: gmbDone, total: 1, view: "gmb", pct: gmbDone * 100 },
+    { icon: "✦", label: "Reply to Reviews", sub: "this month", done: Math.min(repliesUsed, repliesGoal), total: repliesGoal, view: "reply", pct: Math.round((Math.min(repliesUsed, repliesGoal) / repliesGoal) * 100) }
+  ];
+
+  const totalComplete = actions.filter(a => a.done >= a.total).length;
+  const overallPct = Math.round((totalComplete / actions.length) * 100);
+
+  return `
+    <div class="panel growth-actions-card">
+      <div class="growth-header">
+        <div class="growth-header-left">
+          <span class="growth-lightning">⚡</span>
+          <div>
+            <div class="growth-title">Growth Actions</div>
+            <div class="growth-sub">${totalComplete} of ${actions.length} done this week</div>
+          </div>
+        </div>
+        <div class="growth-overall-pct" style="color:${overallPct >= 75 ? '#34A853' : overallPct >= 40 ? '#FBBC05' : '#EA4335'}">${overallPct}%</div>
+      </div>
+      <div class="growth-list">
+        ${actions.map(a => `
+          <div class="growth-item" ${a.view ? `data-growth-view="${escapeHtml(a.view)}"` : ""} ${a.action === "whatsapp" ? "data-wa-review-request" : ""} style="cursor:pointer">
+            <div class="growth-item-left">
+              <span class="growth-icon">${a.icon}</span>
+              <div>
+                <div class="growth-item-label">${escapeHtml(a.label)}</div>
+                ${a.sub ? `<div class="growth-item-sub">${escapeHtml(a.sub)}</div>` : ""}
+              </div>
+            </div>
+            <div class="growth-item-right">
+              <div class="growth-bar-wrap">
+                <div class="growth-bar" style="width:${a.pct}%;background:${a.done >= a.total ? '#34A853' : 'var(--brand)'}"></div>
+              </div>
+              <span class="growth-count ${a.done >= a.total ? 'done' : ''}">${a.done}/${a.total}</span>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
 function dashboardPage() {
   return dashboardPageClean();
 }
@@ -2693,6 +2783,22 @@ function dashboardPageClean() {
       </div>
 
       ${dashboardGmbCard()}
+
+      ${dashboardGrowthActions()}
+
+      <!-- WhatsApp Review Request -->
+      <div class="panel wa-request-card">
+        <div class="wa-request-inner">
+          <div class="wa-request-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#25D366"><path d="M20.52 3.48A11.9 11.9 0 0 0 12 0C5.37 0 0 5.37 0 12c0 2.11.55 4.17 1.6 5.99L0 24l6.17-1.62A11.94 11.94 0 0 0 12 24c6.63 0 12-5.37 12-12 0-3.21-1.25-6.22-3.48-8.52zm-8.52 18.4a9.87 9.87 0 0 1-5.04-1.38l-.36-.21-3.73.98 1-3.64-.24-.38A9.88 9.88 0 0 1 2.1 12c0-5.46 4.44-9.9 9.9-9.9a9.88 9.88 0 0 1 9.9 9.9c0 5.46-4.44 9.88-9.9 9.88zm5.43-7.4c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.79-1.47-1.76-1.64-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.44-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.87 1.21 3.07c.15.2 2.1 3.2 5.08 4.49.71.31 1.27.49 1.7.62.72.23 1.37.2 1.88.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35z"/></svg>
+          </div>
+          <div class="wa-request-text">
+            <strong>Request Reviews via WhatsApp</strong>
+            <p>Send your Google review link to customers in one tap</p>
+          </div>
+          <button class="button wa-btn" type="button" data-wa-review-request>Request</button>
+        </div>
+      </div>
 
       <div class="ai-spotlight">
         <div class="ai-spotlight-inner">
@@ -3605,21 +3711,279 @@ function suggestionList(items, reviewMode = false) {
   `;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 4-Step Onboarding Wizard
+// ─────────────────────────────────────────────────────────────────────────────
+
+function onboardingWizard() {
+  const ob = state.onboarding || {};
+  const step = ob.step || 1;
+  const b = state.business;
+  const u = state.user;
+
+  const stepLabels = ["Business", "Products", "Review Link", "Google"];
+  const stepDots = `
+    <div class="onb-wizard-dots">
+      ${stepLabels.map((label, i) => {
+        const s = i + 1;
+        const cls = s < step ? "onb-dot done" : s === step ? "onb-dot active" : "onb-dot";
+        return `
+          <div class="${cls}">
+            <div class="onb-dot-circle">${s < step ? "✓" : s}</div>
+            <span class="onb-dot-label">${label}</span>
+          </div>
+          ${s < 4 ? `<div class="onb-dot-line${s < step ? " done" : ""}"></div>` : ""}
+        `;
+      }).join("")}
+    </div>`;
+
+  const shell = (title, sub, body) => `
+    <div class="onb-wizard-shell">
+      <div class="onb-wizard-header">
+        <img class="onb-wizard-logo" src="./assets/revyne-icon-192.png?v=20260518-2" alt="RevYne" />
+        <div class="onb-wizard-brand">RevYne</div>
+        <p class="onb-wizard-tagline">India's AI Review Assistant for Businesses</p>
+        ${stepDots}
+      </div>
+      <div class="onb-wizard-card">
+        <h2 class="onb-wizard-title">${title}</h2>
+        <p class="onb-wizard-sub">${sub}</p>
+        ${body}
+      </div>
+    </div>
+    <div class="copy-toast"></div>`;
+
+  // ── Step 1: Business details ──────────────────────────────────────────────
+  if (step === 1) {
+    return shell(
+      "Tell us about your business",
+      "This helps us personalise your review link, AI replies, and QR code.",
+      `<div class="field">
+        <label for="onb-biz-name">Business Name <span class="req">*</span></label>
+        <input id="onb-biz-name" class="input" placeholder="e.g. Shree Saraswati Opticals"
+          value="${escapeHtml(b.name || u.name || "")}" data-field="name" />
+      </div>
+      <div class="field">
+        <label>Business Type <span class="req">*</span></label>
+        <select class="input" data-field="category">
+          <option value="">Select category…</option>
+          ${BUSINESS_CATEGORIES.map(c =>
+            `<option value="${escapeHtml(c.value)}" ${b.category === c.value ? "selected" : ""}>${escapeHtml(c.value)}</option>`
+          ).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label for="onb-city">City</label>
+        <input id="onb-city" class="input" placeholder="e.g. Mumbai"
+          value="${escapeHtml(b.city || "")}" data-field="city" />
+      </div>
+      <div id="onb-error" class="onb-error" hidden></div>
+      <button class="button full onb-cta" type="button" data-onb-next="1">
+        Next → Products &amp; Services
+      </button>`
+    );
+  }
+
+  // ── Step 2: Top products ──────────────────────────────────────────────────
+  const products = ob.topProducts || [];
+  return shell(
+    step === 2 ? "What do you offer?" : (step === 3 ? "Your Google Review Link" : "Connect Google Business"),
+    step === 2
+      ? "Add up to 5 top products or services — these personalise your AI-generated reviews."
+      : (step === 3
+        ? "Paste your Google review link so customers can be directed straight to Google."
+        : "Connect your Google Business Profile to unlock reviews inbox, health score, and auto-posting."),
+    step === 2 ? `
+      <div class="onb-tags-wrap" id="onb-tags-wrap">
+        ${products.map((p, i) => `
+          <span class="onb-tag">
+            ${escapeHtml(p)}
+            <button type="button" class="onb-tag-remove" data-onb-remove-product="${i}">✕</button>
+          </span>`).join("")}
+        ${products.length < 5
+          ? `<div class="onb-tag-input-row">
+              <input class="input onb-tag-input" id="onb-product-input" placeholder="${
+                products.length === 0 ? 'e.g. Sunglasses, Frames, Contact Lenses' : 'Add another…'
+              }" maxlength="40" />
+              <button class="button secondary" type="button" data-onb-add-product>Add</button>
+            </div>`
+          : `<p class="hint">Maximum 5 items added.</p>`}
+      </div>
+      <div id="onb-error" class="onb-error" hidden></div>
+      <div class="onb-nav-row">
+        <button class="button ghost" type="button" data-onb-back="2">← Back</button>
+        <button class="button onb-cta" type="button" data-onb-next="2">
+          Next → Review Link
+        </button>
+      </div>
+      <button class="button ghost full onb-skip" type="button" data-onb-skip>Skip this step</button>`
+
+    : step === 3 ? `
+      <div class="field">
+        <label for="onb-review-url">Google Review Link</label>
+        <input id="onb-review-url" class="input" type="url"
+          placeholder="https://g.page/r/…/review"
+          value="${escapeHtml(b.googleUrl || "")}" data-field="googleUrl" />
+        <p class="hint" style="margin-top:6px;">
+          Find it in Google Business Profile → Get more reviews → Share review form.
+        </p>
+      </div>
+      <label class="onb-consent-row">
+        <input type="checkbox" id="onb-consent" ${ob.reviewLinkConsent ? "checked" : ""} />
+        <span>I allow RevYne to use this link to collect and display reviews on my behalf.</span>
+      </label>
+      <div id="onb-error" class="onb-error" hidden></div>
+      <div class="onb-nav-row">
+        <button class="button ghost" type="button" data-onb-back="3">← Back</button>
+        <button class="button onb-cta" type="button" data-onb-next="3">
+          Save &amp; Continue →
+        </button>
+      </div>
+      <button class="button ghost full onb-skip" type="button" data-onb-skip>Skip &amp; go to dashboard</button>`
+
+    : `
+      <div class="onb-gmb-value">
+        <div class="onb-gmb-stat"><span class="onb-gmb-icon">📊</span><strong>Health Score</strong><p>0–100 score for your profile completeness</p></div>
+        <div class="onb-gmb-stat"><span class="onb-gmb-icon">⭐</span><strong>Reviews Inbox</strong><p>All Google reviews in one place</p></div>
+        <div class="onb-gmb-stat"><span class="onb-gmb-icon">📢</span><strong>Post Updates</strong><p>Share offers &amp; photos — syncs to Google</p></div>
+        <div class="onb-gmb-stat"><span class="onb-gmb-icon">✦</span><strong>AI Replies</strong><p>Generate &amp; post replies from RevYne</p></div>
+      </div>
+      <div class="onb-gmb-secure">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#34A853"><path d="M12 2L3 7v5c0 5.5 3.9 10.7 9 12 5.1-1.3 9-6.5 9-12V7L12 2z"/></svg>
+        100% Safe &amp; Secure — RevYne never posts without your approval
+      </div>
+      <div class="onb-nav-row">
+        <button class="button ghost" type="button" data-onb-back="4">← Back</button>
+        <button class="button full onb-cta" type="button" data-gmb-connect
+          style="flex:1">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:6px;">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Connect with Google
+        </button>
+      </div>
+      <button class="button ghost full onb-skip" type="button" data-onb-finish>
+        Skip &amp; go to dashboard →
+      </button>`
+  );
+}
+
+async function advanceOnboarding(fromStep) {
+  const b = state.business;
+  const ob = state.onboarding;
+
+  if (fromStep === 1) {
+    const nameInput = document.querySelector("[data-field='name']");
+    const catInput  = document.querySelector("[data-field='category']");
+    const cityInput = document.querySelector("[data-field='city']");
+    if (nameInput) state.business.name = nameInput.value.trim();
+    if (catInput)  updateBusinessField("category", catInput.value);
+    if (cityInput) state.business.city = cityInput.value.trim();
+
+    if (!state.business.name || !state.business.category) {
+      const err = document.getElementById("onb-error");
+      if (err) { err.textContent = "⚠ Business name and type are required."; err.hidden = false; }
+      return;
+    }
+    state.onboarding.step = 2;
+    saveState();
+    render();
+    return;
+  }
+
+  if (fromStep === 2) {
+    // Grab any typed-but-not-added product
+    const input = document.getElementById("onb-product-input");
+    if (input?.value.trim()) {
+      const tag = input.value.trim();
+      if (!state.onboarding.topProducts.includes(tag) && state.onboarding.topProducts.length < 5) {
+        state.onboarding.topProducts.push(tag);
+      }
+    }
+    // Sync top products into services field
+    if (state.onboarding.topProducts.length > 0) {
+      state.business.services = state.onboarding.topProducts.join(", ");
+    }
+    state.onboarding.step = 3;
+    saveState();
+    render();
+    return;
+  }
+
+  if (fromStep === 3) {
+    const urlInput = document.querySelector("[data-field='googleUrl']");
+    const consent  = document.getElementById("onb-consent");
+    if (urlInput) state.business.googleUrl = urlInput.value.trim();
+    state.onboarding.reviewLinkConsent = Boolean(consent?.checked);
+    state.onboarding.step = 4;
+    saveState();
+    // Save business to Supabase in background
+    saveSupabaseBusiness().catch(() => {});
+    render();
+    return;
+  }
+}
+
+function goBackOnboarding(fromStep) {
+  state.onboarding.step = Math.max(1, fromStep - 1);
+  saveState();
+  render();
+}
+
+async function finishOnboarding() {
+  state.onboarding.completed = true;
+  saveState();
+  // Ensure business is saved
+  if (!state.business.id && state.business.name && state.business.category) {
+    await saveSupabaseBusiness().catch(() => {});
+  }
+  await loadDashboardStats().catch(() => {});
+  state.view = "dashboard";
+  saveState();
+  render();
+  showToast("🎉 Welcome to RevYne! Your account is ready.");
+}
+
+function addOnboardingProduct() {
+  const input = document.getElementById("onb-product-input");
+  if (!input) return;
+  const tag = input.value.trim();
+  if (!tag) return;
+  if (state.onboarding.topProducts.length >= 5) { showToast("Maximum 5 items"); return; }
+  if (state.onboarding.topProducts.includes(tag)) { showToast("Already added"); return; }
+  state.onboarding.topProducts.push(tag);
+  saveState();
+  render();
+}
+
+function removeOnboardingProduct(index) {
+  state.onboarding.topProducts.splice(index, 1);
+  saveState();
+  render();
+}
+
 function authPage() {
   if (state.authMode === "google-profile") return googleProfileSetupPage();
 
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
-        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260512-2" alt="RevYne logo" />
+        <img class="auth-icon brand-logo-image" src="./assets/revyne-icon-192.png?v=20260518-2" alt="RevYne logo" />
         <div class="auth-brand-name">RevYne</div>
-        <div class="auth-tagline">Smart AI Review Assistant for Businesses</div>
+        <div class="auth-tagline">India's AI Review Assistant for Businesses</div>
+      </div>
+
+      <div class="auth-value-grid">
+        <div class="auth-val-item"><span>⭐</span><span>Collect Google Reviews</span></div>
+        <div class="auth-val-item"><span>📢</span><span>Post Updates to GMB</span></div>
+        <div class="auth-val-item"><span>✦</span><span>AI Reply to Reviews</span></div>
+        <div class="auth-val-item"><span>📊</span><span>Profile Health Score</span></div>
       </div>
 
       <div class="panel auth-card">
-        <h2>Welcome Back</h2>
-        <p class="auth-sub">Sign in to manage your reviews and replies</p>
-
         <button class="button-google" type="button" data-auth-google>
           <svg width="20" height="20" viewBox="0 0 48 48">
             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -3630,11 +3994,12 @@ function authPage() {
           </svg>
           Continue with Google
         </button>
-
-        <div class="auth-divider">or</div>
-
-        <button class="button full" type="button" data-auth-demo style="min-height:48px; font-size:14px;">
-          Continue as Guest (Demo)
+        <div class="auth-secure-note">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#34A853"><path d="M12 2L3 7v5c0 5.5 3.9 10.7 9 12 5.1-1.3 9-6.5 9-12V7L12 2z"/></svg>
+          100% Safe &amp; Secure · Free to start
+        </div>
+        <button class="auth-demo-link" type="button" data-auth-demo>
+          Try as Guest (Demo)
         </button>
       </div>
 
@@ -3993,6 +4358,43 @@ function adminTicketCard(ticket) {
 // ─────────────────────────────────────────────────────────────────────────────
 // GMB Page
 // ─────────────────────────────────────────────────────────────────────────────
+async function postToGmb() {
+  const textarea = document.getElementById("gmb-post-text");
+  const text = (textarea?.value || state.gmb.postDraft?.text || "").trim();
+  if (!text) { showToast("⚠ Please write something to post"); return; }
+  if (text.length > 1500) { showToast("⚠ Post is too long (max 1500 characters)"); return; }
+
+  state.gmb.postDraft.text = text;
+  state.gmb.posting = true;
+  saveState();
+  render();
+
+  try {
+    const result = await callGmbApi({
+      action: "create_local_post",
+      post_type: state.gmb.postDraft?.type || "UPDATE",
+      summary: text,
+      media_base64: state.gmb.postDraft?.mediaPreview || null
+    });
+
+    if (result?.posted) {
+      showToast("✓ Posted to Google Business Profile!");
+      trackEvent("gmb_post_created", { type: state.gmb.postDraft?.type || "UPDATE" });
+      // Clear draft
+      state.gmb.postDraft = { text: "", type: "UPDATE", mediaPreview: "" };
+      saveState();
+    } else {
+      showToast("Could not post to Google. Please try again.");
+    }
+  } catch (err) {
+    showToast("Post failed: " + (err.message || "Please try again."));
+  } finally {
+    state.gmb.posting = false;
+    saveState();
+    render();
+  }
+}
+
 function gmbPage() {
   const gmb = state.gmb || {};
   const clientId = (window.REVYNE_SUPABASE || {}).googleClientId || "";
@@ -4152,6 +4554,44 @@ function gmbPage() {
         <div class="gmb-tips-title">💡 Improvement Tips</div>
         ${tips.map(t => `<div class="gmb-tip-item">• ${escapeHtml(t.tip)}</div>`).join("")}
       </div>` : ""}
+
+      <!-- Post to Google -->
+      <div class="panel gmb-post-section">
+        <div class="gmb-section-header" style="margin-bottom:12px;">
+          <span class="gmb-section-title">📢 Post to Google Business</span>
+          <span class="gmb-post-hint">Appears on your Google listing within minutes</span>
+        </div>
+        <div class="gmb-post-type-row">
+          ${["UPDATE","OFFER","EVENT"].map(t => {
+            const icons = { UPDATE: "📝", OFFER: "🏷️", EVENT: "📅" };
+            const labels = { UPDATE: "Update", OFFER: "Offer", EVENT: "Event" };
+            return `<button class="gmb-post-type-btn${(gmb.postDraft?.type || "UPDATE") === t ? " active" : ""}"
+              type="button" data-gmb-post-type="${t}">${icons[t]} ${labels[t]}</button>`;
+          }).join("")}
+        </div>
+        <textarea class="textarea" id="gmb-post-text" rows="3"
+          placeholder="${(gmb.postDraft?.type || "UPDATE") === "OFFER" ? "e.g. 20% off on all sunglasses this weekend! Visit us today." : (gmb.postDraft?.type || "UPDATE") === "EVENT" ? "e.g. Grand Sale Event — 15–17 May, 10am to 8pm. All are welcome!" : "Share a business update, news, or announcement with your customers…"}"
+          maxlength="1500">${escapeHtml(gmb.postDraft?.text || "")}</textarea>
+        <div class="gmb-post-char"><span id="gmb-post-char-count">${(gmb.postDraft?.text || "").length}</span>/1500</div>
+
+        ${gmb.postDraft?.mediaPreview
+          ? `<div class="gmb-post-img-preview">
+              <img src="${escapeHtml(gmb.postDraft.mediaPreview)}" alt="Post image" />
+              <button class="gmb-post-clear-img" type="button" data-gmb-clear-media>✕ Remove</button>
+             </div>`
+          : `<label class="gmb-post-media-label" for="gmb-post-media-input">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Add Photo (optional)
+              <input type="file" id="gmb-post-media-input" accept="image/jpeg,image/png,image/webp" style="display:none" data-gmb-post-media />
+            </label>`}
+
+        <button class="button full" type="button" data-gmb-post-submit
+          ${gmb.posting ? "disabled" : ""} style="margin-top:12px;">
+          ${gmb.posting
+            ? `<span class="gmb-spinner"></span> Posting…`
+            : `📤 Post to Google Business`}
+        </button>
+      </div>
 
       <!-- AI Optimize Description -->
       <div class="panel gmb-optimize-card">
@@ -4336,9 +4776,9 @@ function currentPage() {
   if (state.view === "privacy") return state.isLoggedIn ? appShell(privacyPage()) : privacyPage();
   if (!state.isLoggedIn) return authPage();
 
-  // Real (non-guest) users who haven't set up their business yet get the onboarding shell
-  if (state.user?.provider !== "guest" && !hasBusinessProfile()) {
-    return onboardingShell(businessPage());
+  // Real (non-guest) users who haven't completed onboarding get the 4-step wizard
+  if (state.user?.provider !== "guest" && !hasBusinessProfile() && !state.onboarding?.completed) {
+    return onboardingWizard();
   }
 
   const pages = {
@@ -4796,6 +5236,93 @@ function bindEvents() {
   document.getElementById("gmb-reply-textarea")?.addEventListener("input", (e) => {
     state.gmb.replyDraft = e.target.value;
   });
+
+  // ── Onboarding wizard ────────────────────────────────────────────────────
+  document.querySelectorAll("[data-onb-next]").forEach(btn => {
+    btn.addEventListener("click", () => advanceOnboarding(Number(btn.dataset.onbNext)));
+  });
+  document.querySelectorAll("[data-onb-back]").forEach(btn => {
+    btn.addEventListener("click", () => goBackOnboarding(Number(btn.dataset.onbBack)));
+  });
+  document.querySelector("[data-onb-skip]")?.addEventListener("click", () => {
+    // For step 3 skip — still advance to step 4 so they get the GMB pitch
+    const step = state.onboarding?.step || 1;
+    if (step === 2) { state.onboarding.step = 3; saveState(); render(); }
+    else if (step === 3) { state.onboarding.step = 4; saveState(); render(); }
+    else { finishOnboarding(); }
+  });
+  document.querySelector("[data-onb-finish]")?.addEventListener("click", finishOnboarding);
+  document.querySelector("[data-onb-add-product]")?.addEventListener("click", addOnboardingProduct);
+  document.getElementById("onb-product-input")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addOnboardingProduct(); }
+  });
+  document.querySelectorAll("[data-onb-remove-product]").forEach(btn => {
+    btn.addEventListener("click", () => removeOnboardingProduct(Number(btn.dataset.onbRemoveProduct)));
+  });
+  document.getElementById("onb-consent")?.addEventListener("change", (e) => {
+    state.onboarding.reviewLinkConsent = e.target.checked;
+    saveState();
+  });
+
+  // ── WhatsApp review request ───────────────────────────────────────────────
+  document.querySelectorAll("[data-wa-review-request]").forEach(btn => {
+    btn.addEventListener("click", requestReviewViaWhatsApp);
+  });
+
+  // ── Growth Actions card navigation ───────────────────────────────────────
+  document.querySelectorAll("[data-growth-view]").forEach(el => {
+    el.addEventListener("click", () => setView(el.dataset.growthView));
+  });
+
+  // ── GMB post section ─────────────────────────────────────────────────────
+  document.querySelectorAll("[data-gmb-post-type]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.gmb.postDraft.type = btn.dataset.gmbPostType;
+      saveState();
+      render();
+    });
+  });
+
+  document.getElementById("gmb-post-text")?.addEventListener("input", (e) => {
+    state.gmb.postDraft.text = e.target.value;
+    const counter = document.getElementById("gmb-post-char-count");
+    if (counter) counter.textContent = e.target.value.length;
+  });
+
+  document.querySelector("[data-gmb-post-media]")?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg","image/png","image/webp"].includes(file.type)) { showToast("Please choose a JPG, PNG, or WebP image"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      // Compress via canvas
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1200;
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > MAX || h > MAX) {
+          if (w >= h) { h = Math.round((h/w)*MAX); w = MAX; }
+          else { w = Math.round((w/h)*MAX); h = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        state.gmb.postDraft.mediaPreview = canvas.toDataURL("image/jpeg", 0.8);
+        saveState();
+        render();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.querySelector("[data-gmb-clear-media]")?.addEventListener("click", () => {
+    state.gmb.postDraft.mediaPreview = "";
+    saveState();
+    render();
+  });
+
+  document.querySelector("[data-gmb-post-submit]")?.addEventListener("click", postToGmb);
 }
 
 async function render() {
