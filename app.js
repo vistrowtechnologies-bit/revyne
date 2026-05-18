@@ -3719,7 +3719,7 @@ function onboardingWizard() {
   const b = state.business;
   const u = state.user;
 
-  const stepLabels = ["Business", "Products", "Review Link", "Google"];
+  const stepLabels = ["Business", "Products", "Consent", "Google"];
   const stepDots = `
     <div class="onb-wizard-dots">
       ${stepLabels.map((label, i) => {
@@ -3784,12 +3784,17 @@ function onboardingWizard() {
 
   // ── Step 2: Top products ──────────────────────────────────────────────────
   const products = ob.topProducts || [];
+  const catMeta = BUSINESS_CATEGORIES.find(c => c.value === (b.category || "")) || {};
+  const productPlaceholder = products.length === 0
+    ? `e.g. ${catMeta.typePlaceholder || "your top products or services"}`
+    : "Add another…";
+
   return shell(
-    step === 2 ? "What do you offer?" : (step === 3 ? "Your Google Review Link" : "Connect Google Business"),
+    step === 2 ? "What do you offer?" : (step === 3 ? "Allow review collection" : "Connect Google Business"),
     step === 2
-      ? "Add up to 5 top products or services — these personalise your AI-generated reviews."
+      ? `Add up to 5 top ${catMeta.typeLabel ? catMeta.typeLabel.toLowerCase() + "s" : "products or services"} — these personalise your AI-generated reviews.`
       : (step === 3
-        ? "Paste your Google review link so customers can be directed straight to Google."
+        ? "Give RevYne permission to collect and display Google reviews on your behalf."
         : "Connect your Google Business Profile to unlock reviews inbox, health score, and auto-posting."),
     step === 2 ? `
       <div class="onb-tags-wrap" id="onb-tags-wrap">
@@ -3800,9 +3805,7 @@ function onboardingWizard() {
           </span>`).join("")}
         ${products.length < 5
           ? `<div class="onb-tag-input-row">
-              <input class="input onb-tag-input" id="onb-product-input" placeholder="${
-                products.length === 0 ? 'e.g. Sunglasses, Frames, Contact Lenses' : 'Add another…'
-              }" maxlength="40" />
+              <input class="input onb-tag-input" id="onb-product-input" placeholder="${productPlaceholder}" maxlength="40" />
               <button class="button secondary" type="button" data-onb-add-product>Add</button>
             </div>`
           : `<p class="hint">Maximum 5 items added.</p>`}
@@ -3811,30 +3814,27 @@ function onboardingWizard() {
       <div class="onb-nav-row">
         <button class="button ghost" type="button" data-onb-back="2">← Back</button>
         <button class="button onb-cta" type="button" data-onb-next="2">
-          Next → Review Link
+          Next →
         </button>
       </div>
       <button class="button ghost full onb-skip" type="button" data-onb-skip>Skip this step</button>`
 
     : step === 3 ? `
-      <div class="field">
-        <label for="onb-review-url">Google Review Link</label>
-        <input id="onb-review-url" class="input" type="url"
-          placeholder="https://g.page/r/…/review"
-          value="${escapeHtml(b.googleUrl || "")}" data-field="googleUrl" />
-        <p class="hint" style="margin-top:6px;">
-          Find it in Google Business Profile → Get more reviews → Share review form.
-        </p>
+      <div class="onb-consent-intro">
+        <div class="onb-consent-auto-badge">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#34A853" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Your Google Review link will be fetched automatically when you connect Google in the next step — no copy-pasting needed.
+        </div>
       </div>
       <label class="onb-consent-row">
         <input type="checkbox" id="onb-consent" ${ob.reviewLinkConsent ? "checked" : ""} />
-        <span>I allow RevYne to use this link to collect and display reviews on my behalf.</span>
+        <span>I allow RevYne to collect and display my Google reviews on my behalf.</span>
       </label>
       <div id="onb-error" class="onb-error" hidden></div>
       <div class="onb-nav-row">
         <button class="button ghost" type="button" data-onb-back="3">← Back</button>
         <button class="button onb-cta" type="button" data-onb-next="3">
-          Save &amp; Continue →
+          Agree &amp; Continue →
         </button>
       </div>
       <button class="button ghost full onb-skip" type="button" data-onb-skip>Skip &amp; go to dashboard</button>`
@@ -3912,9 +3912,7 @@ async function advanceOnboarding(fromStep) {
   }
 
   if (fromStep === 3) {
-    const urlInput = document.querySelector("[data-field='googleUrl']");
-    const consent  = document.getElementById("onb-consent");
-    if (urlInput) state.business.googleUrl = urlInput.value.trim();
+    const consent = document.getElementById("onb-consent");
     state.onboarding.reviewLinkConsent = Boolean(consent?.checked);
     state.onboarding.step = 4;
     saveState();
@@ -5654,6 +5652,12 @@ async function syncGmbData() {
     const profileResult = await callGmbApi({ action: "get_profile" });
     if (profileResult?.profile) {
       state.gmb.profile = profileResult.profile;
+      // Auto-save Google Review URL from GMB metadata (no manual paste needed)
+      const reviewUri = profileResult.profile?.metadata?.newReviewUri;
+      if (reviewUri && !state.business.googleUrl) {
+        state.business.googleUrl = reviewUri;
+        saveSupabaseBusiness().catch(() => {});
+      }
     }
 
     // Compute health score
@@ -5675,9 +5679,14 @@ async function loadGmbHealthScore() {
     if (result?.score !== undefined) {
       state.gmb.healthScore = result.score;
       state.gmb.healthDetails = result.details;
-      if (result.profile) state.gmb.profile = result.profile;
-      if (result.reviewCount !== undefined && state.gmb.reviews.length === 0) {
-        // health_score also returned reviews — sync them
+      if (result.profile) {
+        state.gmb.profile = result.profile;
+        // Auto-save Google Review URL from GMB metadata if not already set
+        const reviewUri = result.profile?.metadata?.newReviewUri;
+        if (reviewUri && !state.business.googleUrl) {
+          state.business.googleUrl = reviewUri;
+          saveSupabaseBusiness().catch(() => {});
+        }
       }
       saveState();
     }
