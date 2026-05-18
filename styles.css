@@ -3477,14 +3477,17 @@ button {
   margin-top: 16px;
 }
 .onb-cta {
-  background: linear-gradient(135deg, var(--brand), var(--brand2));
-  color: #fff;
+  background: linear-gradient(135deg, var(--blue), var(--secondary));
+  color: #fff !important;
   flex: 1;
+  border: none;
 }
 .onb-skip {
   margin-top: 10px;
-  font-size: 0.8rem;
-  color: var(--muted);
+  font-size: 0.82rem;
+  color: var(--blue);
+  background: transparent;
+  border: none;
 }
 .onb-error {
   color: var(--danger);

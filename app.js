@@ -1113,16 +1113,12 @@ async function notifySupportEmail(type, ticket) {
 async function signInWithGoogle() {
   trackEvent("google_login_clicked");
   if (!supabaseClient) {
-    if (state.user.provider === "google" && state.user.email) {
-      state.isLoggedIn = true;
-      state.view = "dashboard";
-      state.user.lastLogin = new Date().toISOString();
-      saveState();
-      render();
-      return;
-    }
-
-    state.authMode = "google-profile";
+    // No Supabase — log in directly; onboarding wizard handles profile collection
+    state.isLoggedIn = true;
+    state.user.provider = "google";
+    state.user.lastLogin = new Date().toISOString();
+    if (!state.user.name) state.user.name = "";
+    state.view = "dashboard";
     saveState();
     render();
     return;
@@ -3719,7 +3715,7 @@ function onboardingWizard() {
   const b = state.business;
   const u = state.user;
 
-  const stepLabels = ["Business", "Products", "Consent", "Google"];
+  const stepLabels = ["Business", "Products", "Google"];
   const stepDots = `
     <div class="onb-wizard-dots">
       ${stepLabels.map((label, i) => {
@@ -3730,7 +3726,7 @@ function onboardingWizard() {
             <div class="onb-dot-circle">${s < step ? "✓" : s}</div>
             <span class="onb-dot-label">${label}</span>
           </div>
-          ${s < 4 ? `<div class="onb-dot-line${s < step ? " done" : ""}"></div>` : ""}
+          ${s < stepLabels.length ? `<div class="onb-dot-line${s < step ? " done" : ""}"></div>` : ""}
         `;
       }).join("")}
     </div>`;
@@ -3775,9 +3771,13 @@ function onboardingWizard() {
         <input id="onb-city" class="input" placeholder="e.g. Mumbai"
           value="${escapeHtml(b.city || "")}" data-field="city" />
       </div>
+      <label class="onb-consent-row">
+        <input type="checkbox" id="onb-consent" ${ob.reviewLinkConsent ? "checked" : ""} />
+        <span>I allow RevYne to collect and display my Google reviews on my behalf.</span>
+      </label>
       <div id="onb-error" class="onb-error" hidden></div>
       <button class="button full onb-cta" type="button" data-onb-next="1">
-        Next → Products &amp; Services
+        Continue →
       </button>`
     );
   }
@@ -3790,12 +3790,10 @@ function onboardingWizard() {
     : "Add another…";
 
   return shell(
-    step === 2 ? "What do you offer?" : (step === 3 ? "Allow review collection" : "Connect Google Business"),
+    step === 2 ? "What do you offer?" : "Connect Google Business",
     step === 2
       ? `Add up to 5 top ${catMeta.typeLabel ? catMeta.typeLabel.toLowerCase() + "s" : "products or services"} — these personalise your AI-generated reviews.`
-      : (step === 3
-        ? "Give RevYne permission to collect and display Google reviews on your behalf."
-        : "Connect your Google Business Profile to unlock reviews inbox, health score, and auto-posting."),
+      : "Connect your Google Business Profile to unlock reviews inbox, health score, and auto-posting.",
     step === 2 ? `
       <div class="onb-tags-wrap" id="onb-tags-wrap">
         ${products.map((p, i) => `
@@ -3814,30 +3812,10 @@ function onboardingWizard() {
       <div class="onb-nav-row">
         <button class="button ghost" type="button" data-onb-back="2">← Back</button>
         <button class="button onb-cta" type="button" data-onb-next="2">
-          Next →
+          Continue →
         </button>
       </div>
       <button class="button ghost full onb-skip" type="button" data-onb-skip>Skip this step</button>`
-
-    : step === 3 ? `
-      <div class="onb-consent-intro">
-        <div class="onb-consent-auto-badge">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#34A853" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Your Google Review link will be fetched automatically when you connect Google in the next step — no copy-pasting needed.
-        </div>
-      </div>
-      <label class="onb-consent-row">
-        <input type="checkbox" id="onb-consent" ${ob.reviewLinkConsent ? "checked" : ""} />
-        <span>I allow RevYne to collect and display my Google reviews on my behalf.</span>
-      </label>
-      <div id="onb-error" class="onb-error" hidden></div>
-      <div class="onb-nav-row">
-        <button class="button ghost" type="button" data-onb-back="3">← Back</button>
-        <button class="button onb-cta" type="button" data-onb-next="3">
-          Agree &amp; Continue →
-        </button>
-      </div>
-      <button class="button ghost full onb-skip" type="button" data-onb-skip>Skip &amp; go to dashboard</button>`
 
     : `
       <div class="onb-gmb-value">
@@ -3851,7 +3829,7 @@ function onboardingWizard() {
         100% Safe &amp; Secure — RevYne never posts without your approval
       </div>
       <div class="onb-nav-row">
-        <button class="button ghost" type="button" data-onb-back="4">← Back</button>
+        <button class="button ghost" type="button" data-onb-back="3">← Back</button>
         <button class="button full onb-cta" type="button" data-gmb-connect
           style="flex:1">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:6px;">
@@ -3877,9 +3855,11 @@ async function advanceOnboarding(fromStep) {
     const nameInput = document.querySelector("[data-field='name']");
     const catInput  = document.querySelector("[data-field='category']");
     const cityInput = document.querySelector("[data-field='city']");
+    const consent   = document.getElementById("onb-consent");
     if (nameInput) state.business.name = nameInput.value.trim();
     if (catInput)  updateBusinessField("category", catInput.value);
     if (cityInput) state.business.city = cityInput.value.trim();
+    state.onboarding.reviewLinkConsent = Boolean(consent?.checked);
 
     if (!state.business.name || !state.business.category) {
       const err = document.getElementById("onb-error");
@@ -3905,19 +3885,10 @@ async function advanceOnboarding(fromStep) {
     if (state.onboarding.topProducts.length > 0) {
       state.business.services = state.onboarding.topProducts.join(", ");
     }
-    state.onboarding.step = 3;
-    saveState();
-    render();
-    return;
-  }
-
-  if (fromStep === 3) {
-    const consent = document.getElementById("onb-consent");
-    state.onboarding.reviewLinkConsent = Boolean(consent?.checked);
-    state.onboarding.step = 4;
-    saveState();
     // Save business to Supabase in background
     saveSupabaseBusiness().catch(() => {});
+    state.onboarding.step = 3;
+    saveState();
     render();
     return;
   }
@@ -3962,8 +3933,6 @@ function removeOnboardingProduct(index) {
 }
 
 function authPage() {
-  if (state.authMode === "google-profile") return googleProfileSetupPage();
-
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
@@ -5243,10 +5212,9 @@ function bindEvents() {
     btn.addEventListener("click", () => goBackOnboarding(Number(btn.dataset.onbBack)));
   });
   document.querySelector("[data-onb-skip]")?.addEventListener("click", () => {
-    // For step 3 skip — still advance to step 4 so they get the GMB pitch
+    // Step 2 skip → still show GMB connect (step 3); anything else → finish
     const step = state.onboarding?.step || 1;
     if (step === 2) { state.onboarding.step = 3; saveState(); render(); }
-    else if (step === 3) { state.onboarding.step = 4; saveState(); render(); }
     else { finishOnboarding(); }
   });
   document.querySelector("[data-onb-finish]")?.addEventListener("click", finishOnboarding);
