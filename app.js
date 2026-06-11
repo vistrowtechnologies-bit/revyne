@@ -3499,9 +3499,9 @@ function ordersPage() {
     <section class="orders-page">
       <div class="orders-hero panel">
         <div>
-          <p class="eyebrow">Billing</p>
-          <h1 class="page-title">Order History</h1>
-          <p class="page-subtitle">Your Razorpay subscription and payment events appear here after checkout.</p>
+          <p class="section-kicker">Billing</p>
+          <h1 class="orders-hero-title">Order History</h1>
+          <p class="orders-hero-sub">Your Razorpay subscription and payment events appear here after checkout.</p>
         </div>
         <button class="button secondary" type="button" data-refresh-payments>Refresh</button>
       </div>
@@ -4235,8 +4235,8 @@ function adminSupportPage() {
   if (!state.user.isAdmin) {
     return `
       <section class="panel form-panel">
-        <h1 class="page-title">Admin Support</h1>
-        <p class="page-subtitle">Admin access is required to view this page.</p>
+        <h2 style="margin:0 0 8px; font-size:22px; color:var(--ink);">Admin Support</h2>
+        <p style="color:var(--muted); margin:0;">Admin access is required to view this page.</p>
       </section>
     `;
   }
