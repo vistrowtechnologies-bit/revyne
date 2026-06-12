@@ -1133,14 +1133,7 @@ async function signInWithGoogle() {
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${location.origin}${location.pathname}`,
-      // Request GMB scope alongside basic profile — provider_token will be available
-      // in the session after redirect, enabling auto-connect without a separate OAuth step
-      scopes: "https://www.googleapis.com/auth/business.manage",
-      queryParams: {
-        access_type: "offline",
-        prompt: "consent"   // always ask so Google returns a refresh_token
-      }
+      redirectTo: `${location.origin}${location.pathname}`
     }
   });
 
