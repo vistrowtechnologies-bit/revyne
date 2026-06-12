@@ -5877,6 +5877,12 @@ async function initializeApp() {
     const { data } = await supabaseClient.auth.getSession();
     await applySupabaseSession(data.session);
 
+    // Clear OAuth tokens from URL hash so a hard refresh doesn't re-process the
+    // already-consumed one-time token (which would return null and log the user out).
+    if (location.hash && (location.hash.includes("access_token") || location.hash.includes("refresh_token"))) {
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+
     // If this is a GMB OAuth callback, handle it after the Supabase session is restored
     if (isGmbCallback) {
       // Clean URL first so the code is never re-used
