@@ -766,6 +766,9 @@ async function loadSupabaseBusiness() {
     ownerPlanStatus: data.owner_plan_status || state.user.planStatus || "free",
     ownerPlanCurrentEnd: data.owner_plan_current_end || state.user.planCurrentEnd || ""
   };
+  // User has a saved business → skip the onboarding wizard even in a fresh browser session
+  if (!state.onboarding) state.onboarding = {};
+  state.onboarding.completed = true;
 }
 
 async function loadDashboardStats() {
@@ -5864,7 +5867,18 @@ async function initializeApp() {
     return;
   }
 
-  render();
+  // Show a full-screen loader while the session + business profile load from Supabase.
+  // This prevents the onboarding wizard from flashing for returning users whose
+  // business profile hasn't been fetched yet.
+  document.getElementById("app").innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--canvas,#f8f9ff);">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+        <img src="./assets/revyne-icon-192.png" style="width:64px;height:64px;border-radius:18px;animation:authLogoBreathe 1.8s ease-in-out infinite;" alt="" />
+        <div style="width:32px;height:32px;border:3px solid rgba(129,39,207,0.2);border-top-color:#8127cf;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+      </div>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  `;
 
   try {
     const { data } = await supabaseClient.auth.getSession();
