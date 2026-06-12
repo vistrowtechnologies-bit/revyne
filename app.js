@@ -3946,6 +3946,29 @@ function removeOnboardingProduct(index) {
 }
 
 function authPage() {
+  const features = [
+    {
+      color: "#FBBC05",
+      icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`,
+      label: "Collect Google Reviews"
+    },
+    {
+      color: "#4285F4",
+      icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h13v-2H3v2zm0-5h10v-2H3v2zm0-7v2h13V6H3zm18 9.59L17.42 12 21 8.41 19.59 7l-5 5 5 5L21 15.59z"/></svg>`,
+      label: "Post Updates to GMB"
+    },
+    {
+      color: "#8127CF",
+      icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1 9.5 8.5 2 12l7.5 3.5L12 23l2.5-7.5L22 12l-7.5-3.5L12 1z"/></svg>`,
+      label: "AI Reply to Reviews"
+    },
+    {
+      color: "#34A853",
+      icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 20H3V10h2v10zm4 0H7V4h2v16zm4 0h-2v-7h2v7zm4 0h-2V8h2v12zm4 0h-2v-5h2v5z"/></svg>`,
+      label: "Profile Health Score"
+    }
+  ];
+
   return `
     <div class="auth-body">
       <div class="auth-logo-area">
@@ -3955,10 +3978,12 @@ function authPage() {
       </div>
 
       <div class="auth-value-grid">
-        <div class="auth-val-item"><span>⭐</span><span>Collect Google Reviews</span></div>
-        <div class="auth-val-item"><span>📢</span><span>Post Updates to GMB</span></div>
-        <div class="auth-val-item"><span>✦</span><span>AI Reply to Reviews</span></div>
-        <div class="auth-val-item"><span>📊</span><span>Profile Health Score</span></div>
+        ${features.map(f => `
+          <div class="auth-val-item" style="--val-c:${f.color}">
+            <div class="auth-val-icon-wrap" style="color:${f.color}">${f.icon}</div>
+            <span>${f.label}</span>
+          </div>
+        `).join("")}
       </div>
 
       <div class="panel auth-card">
