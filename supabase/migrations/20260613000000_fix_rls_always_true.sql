@@ -29,9 +29,8 @@ CREATE POLICY "anon_insert_generated_reviews"
   TO anon, authenticated
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM public.review_requests rr
-      JOIN public.businesses b ON b.id = rr.business_id
-      WHERE rr.id = request_id
-        AND b.public_reviews_enabled = true
+      SELECT 1 FROM public.businesses
+      WHERE id = business_id
+        AND public_reviews_enabled = true
     )
   );
