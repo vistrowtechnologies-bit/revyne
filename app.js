@@ -97,6 +97,7 @@ let bottomNavFromIndex = 0;
 let bottomNavShouldAnimate = false;
 let currentSession = null;
 let isApplyingSession = false;
+let lastAppliedUserId = null; // user id of the last fully-applied session
 let lastStatsLoadTime = 0;       // epoch ms — throttle dashboard stat refreshes
 let publicReviewRequestId = null; // set after QR session saves, used to mark draft_copied
 let isGeneratingReply = false;
@@ -282,7 +283,25 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  // Persist a slim copy — large blobs (GMB review cache, post image previews,
+  // AI optimization drafts) are session data and can blow the ~5MB quota.
+  try {
+    const slim = {
+      ...state,
+      gmb: {
+        ...state.gmb,
+        reviews: [],
+        profile: null,
+        posts: [],
+        optimizations: [],
+        postDraft: { text: state.gmb?.postDraft?.text || "", type: state.gmb?.postDraft?.type || "UPDATE", mediaPreview: "" }
+      },
+      dashboardStats: { ...defaultState.dashboardStats }
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
+  } catch (err) {
+    console.warn("[RevYne] Could not persist state:", err);
+  }
 }
 
 let _saveDebounceTimer = null;
@@ -593,6 +612,7 @@ async function applySupabaseSession(session) {
         return;
       }
 
+      lastAppliedUserId = null;
       state.isLoggedIn = false;
       state.authMode = "signin";
       saveState();
@@ -654,6 +674,7 @@ async function applySupabaseSession(session) {
     if (freshProviderToken && !state.gmb.connected) {
       autoConnectGmbFromSession(freshProviderToken, freshProviderRefreshToken).catch(() => {});
     }
+    lastAppliedUserId = session.user.id;
     saveState();
   } finally {
     isApplyingSession = false;
@@ -867,6 +888,8 @@ async function loadAdminTickets() {
 async function saveSupabaseProfile() {
   if (!supabaseClient || !currentSession?.user) return true;
 
+  // Never write plan/plan_status from the client — the Razorpay webhook
+  // (service role) is the only writer of billing fields.
   const { error } = await supabaseClient
     .from("profiles")
     .upsert({
@@ -874,7 +897,6 @@ async function saveSupabaseProfile() {
       full_name: state.user.name || null,
       email: state.user.email || currentSession.user.email,
       mobile: state.user.mobile || state.business.mobile || null,
-      plan: state.user.plan || "free",
       updated_at: new Date().toISOString()
     });
 
@@ -905,7 +927,6 @@ async function saveSupabaseBusiness() {
     owner_plan: state.user.plan || "free",
     owner_plan_status: state.user.planStatus || "free",
     owner_plan_current_end: state.user.planCurrentEnd || null,
-    public_reviews_enabled: true,
     updated_at: new Date().toISOString()
   };
 
@@ -931,7 +952,7 @@ async function saveSupabaseBusiness() {
 
   const query = state.business.id
     ? supabaseClient.from("businesses").update(payload).eq("id", state.business.id).select("id,public_token").single()
-    : supabaseClient.from("businesses").insert(payload).select("id,public_token").single();
+    : supabaseClient.from("businesses").insert({ ...payload, public_reviews_enabled: true }).select("id,public_token").single();
 
   const { data, error } = await query;
   if (error) {
@@ -1370,18 +1391,21 @@ async function saveSmartRepliesToSupabase({ customerName, rating, reviewText }) 
 }
 
 async function findSupabaseBusinessForPublicReview() {
-  if (!supabaseClient || !state.business.name.trim()) return;
+  // Look up strictly by the public token in the URL — never by name, which can
+  // match a different business with the same name and misattribute reviews.
+  const publicToken = getPublicReviewToken() || state.business.publicToken;
+  if (!supabaseClient || !publicToken) return;
 
   const { data } = await supabaseClient
     .from("businesses")
     .select("id,public_token")
-    .eq("name", state.business.name.trim())
+    .eq("public_token", publicToken)
     .limit(1)
     .maybeSingle();
 
   if (data?.id) {
     state.business.id = data.id;
-    state.business.publicToken = data.public_token || state.business.publicToken;
+    state.business.publicToken = data.public_token || publicToken;
     saveState();
   }
 }
@@ -2774,7 +2798,7 @@ function dashboardPageClean() {
           <button class="metric-icon-circle" type="button" data-refresh-dashboard title="Refresh stats">↻</button>
         </div>
         <div class="panel metric-half">
-          <div class="metric-label">Reviews Copied</div>
+          <div class="metric-label">Reviews Collected</div>
           <div class="metric-num">${statsLoaded ? totalReviews : "…"}</div>
           <div class="metric-trend positive">${totalReviews > 0 ? "Via your QR link" : "Scan QR to start"}</div>
         </div>
@@ -3257,7 +3281,7 @@ function getPlanStatusDetails() {
       renewalLabel = "Yearly – see Razorpay";
     } else {
       // Compute next calendar-month renewal (same day next month)
-      const start = state.user.planStartDate ? new Date(state.user.planStartDate) : new Date();
+      const start = state.user.planCurrentStart ? new Date(state.user.planCurrentStart) : new Date();
       const next = new Date(start);
       next.setMonth(next.getMonth() + 1);
       renewalLabel = formatDateOnly(next.toISOString());
@@ -3912,15 +3936,21 @@ function goBackOnboarding(fromStep) {
 async function finishOnboarding() {
   state.onboarding.completed = true;
   saveState();
-  // Ensure business is saved
+  // Ensure business is saved — and tell the user if it wasn't, otherwise the
+  // wizard silently reappears on their next device and the review link is dead.
+  let businessSaved = true;
   if (!state.business.id && state.business.name && state.business.category) {
-    await saveSupabaseBusiness().catch(() => {});
+    businessSaved = await saveSupabaseBusiness().catch(() => false);
   }
   await loadDashboardStats().catch(() => {});
   state.view = "dashboard";
   saveState();
   render();
-  showToast("🎉 Welcome to RevYne! Your account is ready.");
+  if (businessSaved) {
+    showToast("🎉 Welcome to RevYne! Your account is ready.");
+  } else {
+    showToast("⚠ Your business details could not be saved. Please open My Business and save again.", 5000);
+  }
 }
 
 function addOnboardingProduct() {
@@ -5387,6 +5417,14 @@ async function render() {
           const freshRecent = tmp.querySelector(".recent-reviews");
           const currentRecent = dashWrap.querySelector(".recent-reviews");
           if (freshRecent && currentRecent) currentRecent.replaceWith(freshRecent);
+          // Re-bind navigation buttons inside the freshly swapped-in sections —
+          // they are new DOM nodes with no listeners attached.
+          dashWrap.querySelectorAll(".recent-reviews [data-view], .dash-metrics [data-view]").forEach((button) => {
+            button.addEventListener("click", () => {
+              history.replaceState(null, "", location.pathname);
+              setView(button.dataset.view);
+            });
+          });
           // Re-bind the refresh button
           document.querySelector("[data-refresh-dashboard]")?.addEventListener("click", async () => {
             lastStatsLoadTime = 0; // force reload
@@ -5549,9 +5587,11 @@ async function handleGmbOAuthCallback(code) {
   sessionStorage.removeItem("gmb_code_verifier");
 
   if (!codeVerifier) {
-    showToast("OAuth session expired. Please try connecting again.");
     state.gmb.connecting = false;
+    state.view = "gmb";
     saveState();
+    render();
+    showToast("OAuth session expired. Please try connecting again.");
     return;
   }
 
@@ -5905,7 +5945,15 @@ async function initializeApp() {
     render();
   }
 
-  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+  supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    // Token refreshes (and duplicate SIGNED_IN events for the already-active user)
+    // must not re-run the full session pipeline — it wipes in-progress UI state
+    // (drafts, suggestions) and re-renders the DOM while the user is typing.
+    const sameUser = session?.user?.id && session.user.id === lastAppliedUserId && state.isLoggedIn;
+    if (sameUser && (event === "TOKEN_REFRESHED" || event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "USER_UPDATED")) {
+      currentSession = session;
+      return;
+    }
     try {
       await applySupabaseSession(session);
     } catch (error) {

@@ -1,13 +1,13 @@
-const CACHE_NAME = "revyne-ai-v20260518-3";
+const CACHE_NAME = "revyne-ai-v20260703-1";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/styles.css?v=20260518-3",
-  "/app.js?v=20260518-3",
-  "/supabase-config.js?v=20260518-3",
-  "/manifest.webmanifest?v=20260514-1",
-  "/assets/favicon.png?v=20260514-1",
-  "/assets/vendor/qrcode-generator.js?v=20260514-1",
+  "/styles.css?v=20260703-1",
+  "/app.js?v=20260703-1",
+  "/supabase-config.js?v=20260703-1",
+  "/manifest.webmanifest?v=20260703-1",
+  "/assets/favicon.png?v=20260703-1",
+  "/assets/vendor/qrcode-generator.js?v=20260703-1",
   "/robots.txt",
   "/sitemap.xml",
   "/assets/revyne-icon-192.png",

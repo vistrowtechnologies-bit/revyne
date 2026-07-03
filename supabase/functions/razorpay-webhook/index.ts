@@ -32,7 +32,13 @@ async function verifySignature(rawBody: string, signature: string, secret: strin
   const hex = Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
-  return hex === signature;
+  // Constant-time comparison — a plain === leaks timing information.
+  if (hex.length !== signature.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < hex.length; i++) {
+    mismatch |= hex.charCodeAt(i) ^ signature.charCodeAt(i);
+  }
+  return mismatch === 0;
 }
 
 function timestampToIso(value: unknown) {

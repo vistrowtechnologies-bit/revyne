@@ -108,60 +108,36 @@ async function saveReviewRequest(body: RequestBody): Promise<Response> {
     return jsonResponse({ error: "business_id and rating are required" }, 400);
   }
 
-  const headers = {
-    apikey: serviceRoleKey,
-    Authorization: `Bearer ${serviceRoleKey}`,
-    "Content-Type": "application/json",
-    Prefer: "return=representation"
-  };
+  // Go through the save_review_request RPC — it validates that the business
+  // exists with public reviews enabled AND enforces the 200/hour per-business
+  // spam guard. Direct table inserts here would bypass both.
+  const suggestions = Array.isArray(body.suggestions)
+    ? body.suggestions.filter((s) => typeof s === "string" && s.trim()).slice(0, 3).map((s) => s.trim())
+    : [];
 
-  // Insert into review_requests using service role (bypasses RLS for anonymous visitors)
-  const reqRes = await fetch(`${supabaseUrl}/rest/v1/review_requests`, {
+  const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/save_review_request`, {
     method: "POST",
-    headers,
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
-      business_id: businessId,
-      rating,
-      customer_experience: body.customer_experience || null,
-      customer_language: typeof body.customer_language === "string" ? body.customer_language.slice(0, 40) : "English",
-      source: "public_page"
+      p_business_id: businessId,
+      p_rating: rating,
+      p_experience: body.customer_experience || null,
+      p_language: typeof body.customer_language === "string" ? body.customer_language.slice(0, 40) : "English",
+      p_suggestions: suggestions
     })
   });
 
-  if (!reqRes.ok) {
-    const errText = await reqRes.text();
-    console.error("review_requests insert failed:", errText);
+  if (!rpcRes.ok) {
+    const errText = await rpcRes.text();
+    console.error("save_review_request RPC failed:", errText);
     return jsonResponse({ error: "Could not save review request" }, 500);
   }
 
-  const [reviewRequest] = await reqRes.json();
-  const requestId = reviewRequest?.id;
-
-  // Insert generated_reviews if suggestions are provided
-  if (requestId && Array.isArray(body.suggestions) && body.suggestions.length > 0) {
-    const rows = body.suggestions
-      .filter((s) => typeof s === "string" && s.trim())
-      .slice(0, 3)
-      .map((suggestion) => ({
-        review_request_id: requestId,
-        business_id: businessId,
-        suggestion: suggestion.trim()
-      }));
-
-    if (rows.length > 0) {
-      const genRes = await fetch(`${supabaseUrl}/rest/v1/generated_reviews`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(rows)
-      });
-      if (!genRes.ok) {
-        const errText = await genRes.text();
-        console.warn("generated_reviews insert failed:", errText);
-        // Non-fatal — review_request was saved, just log the warning
-      }
-    }
-  }
-
+  const requestId = await rpcRes.json().catch(() => null);
   return jsonResponse({ saved: true, request_id: requestId });
 }
 
@@ -229,12 +205,118 @@ function validateBody(body: RequestBody) {
   return null;
 }
 
-function getClientIdentifier(req: Request) {
+// Decode the JWT payload to get a stable user id. The gateway (verify_jwt)
+// validates the signature; we only read claims here. Returns null for the
+// anon key or malformed tokens.
+function getAuthenticatedUserId(req: Request): string | null {
   const authHeader = req.headers.get("authorization") || "";
-  if (authHeader.startsWith("Bearer ")) return `auth:${authHeader.slice(-32)}`;
-  const forwardedFor = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "";
-  const ip = forwardedFor.split(",")[0]?.trim();
+  if (!authHeader.startsWith("Bearer ")) return null;
+  const parts = authHeader.slice(7).split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    if (payload.role !== "authenticated") return null;
+    return typeof payload.sub === "string" ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+function getClientIdentifier(req: Request) {
+  // Stable per-user key — the raw token changes on every refresh, which reset
+  // the rate-limit window and made it useless for logged-in users.
+  const userId = getAuthenticatedUserId(req);
+  if (userId) return `user:${userId}`;
+  // cf-connecting-ip is set by the edge proxy and not client-forgeable.
+  // In x-forwarded-for, clients can PREPEND values — the last entry is the one
+  // appended by the trusted proxy, so use that, never the first.
+  const cfIp = req.headers.get("cf-connecting-ip") || "";
+  if (cfIp) return `ip:${cfIp.trim()}`;
+  const forwardedFor = (req.headers.get("x-forwarded-for") || "").split(",");
+  const ip = forwardedFor[forwardedFor.length - 1]?.trim();
   return `ip:${ip || "unknown"}`;
+}
+
+// ── Server-side monthly plan limits ──────────────────────────────────────────
+// These were previously enforced only in the browser, so any direct caller
+// could generate unlimited drafts on a free plan.
+const PLAN_MONTHLY_LIMITS: Record<string, number> = {
+  free: 20,
+  pro: 1000,
+  pro_max: 2500,
+  pro_yearly: 2500
+};
+
+function monthKey() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+async function serviceRoleFetch(path: string, init: RequestInit = {}) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  return await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+      ...(init.headers || {})
+    }
+  });
+}
+
+async function checkPlanUsage(userId: string, action: string): Promise<{ allowed: boolean; used?: number; limit?: number }> {
+  try {
+    const profileRes = await serviceRoleFetch(
+      `profiles?id=eq.${encodeURIComponent(userId)}&select=plan,plan_status,plan_current_end&limit=1`
+    );
+    if (!profileRes?.ok) return { allowed: true }; // fail open — availability over strictness
+    const [profile] = await profileRes.json().catch(() => [null]);
+
+    let plan = typeof profile?.plan === "string" ? profile.plan : "free";
+    const status = profile?.plan_status || "free";
+    const usableStatuses = ["active", "authenticated"];
+    const cancelStillValid = status === "cancel_requested" &&
+      (!profile?.plan_current_end || new Date(profile.plan_current_end).getTime() > Date.now());
+    if (plan !== "free" && !usableStatuses.includes(status) && !cancelStillValid) plan = "free";
+
+    const limit = PLAN_MONTHLY_LIMITS[plan] ?? PLAN_MONTHLY_LIMITS.free;
+    const usageRes = await serviceRoleFetch(
+      `usage_limits?user_id=eq.${encodeURIComponent(userId)}&month_key=eq.${monthKey()}&select=review_generations,reply_generations&limit=1`
+    );
+    if (!usageRes?.ok) return { allowed: true };
+    const [usage] = await usageRes.json().catch(() => [null]);
+    const used = action === "review_suggestions"
+      ? (usage?.review_generations ?? 0)
+      : (usage?.reply_generations ?? 0);
+
+    return { allowed: used < limit, used, limit };
+  } catch {
+    return { allowed: true };
+  }
+}
+
+async function incrementServerUsage(userId: string, action: string) {
+  try {
+    const usageRes = await serviceRoleFetch(
+      `usage_limits?user_id=eq.${encodeURIComponent(userId)}&month_key=eq.${monthKey()}&select=review_generations,reply_generations&limit=1`
+    );
+    const [usage] = usageRes?.ok ? await usageRes.json().catch(() => [null]) : [null];
+    await serviceRoleFetch(`usage_limits?on_conflict=user_id,month_key`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({
+        user_id: userId,
+        month_key: monthKey(),
+        review_generations: (usage?.review_generations ?? 0) + (action === "review_suggestions" ? 1 : 0),
+        reply_generations: (usage?.reply_generations ?? 0) + (action === "smart_replies" ? 1 : 0),
+        updated_at: new Date().toISOString()
+      })
+    });
+  } catch (err) {
+    console.warn("usage increment failed:", err);
+  }
 }
 
 async function checkRateLimit(req: Request, bucket: string, limit: number, windowSeconds: number) {
@@ -389,6 +471,17 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Too many AI requests. Please try again later." }, 429);
   }
 
+  // Enforce monthly plan limits server-side for logged-in users.
+  const authedUserId = getAuthenticatedUserId(req);
+  if (authedUserId) {
+    const planUsage = await checkPlanUsage(authedUserId, body.action);
+    if (!planUsage.allowed) {
+      return jsonResponse({
+        error: `Monthly limit reached (${planUsage.used}/${planUsage.limit}). Upgrade your plan for more generations.`
+      }, 429);
+    }
+  }
+
   const key = body.action === "review_suggestions" ? "suggestions" : "replies";
   const input = [
     { role: "system", content: systemPrompt() },
@@ -421,6 +514,9 @@ Deno.serve(async (req) => {
 
   try {
     const items = parseJsonArray(outputText, key);
+    if (authedUserId && items.length > 0) {
+      await incrementServerUsage(authedUserId, body.action);
+    }
     return jsonResponse({ [key]: items });
   } catch {
     return jsonResponse({ error: "Could not parse AI response", raw: outputText }, 502);
