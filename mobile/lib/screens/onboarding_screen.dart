@@ -123,7 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          value: _category.isEmpty ? null : _category,
+          initialValue: _category.isEmpty ? null : _category,
           decoration: const InputDecoration(labelText: 'Category *'),
           items: [
             for (final c in businessCategories) DropdownMenuItem(value: c, child: Text(c)),
