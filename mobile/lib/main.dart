@@ -8,6 +8,7 @@ import 'screens/auth_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/business_service.dart';
+import 'services/deep_link_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +16,7 @@ Future<void> main() async {
     url: AppConfig.supabaseUrl,
     publishableKey: AppConfig.supabaseAnonKey,
   );
+  await DeepLinkService.init();
   runApp(const RevyneApp());
 }
 
@@ -23,11 +25,14 @@ class RevyneApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'RevYne',
-      debugShowCheckedModeBanner: false,
-      theme: RevyneTheme.light(),
-      home: const AuthGate(),
+    return ValueListenableBuilder<String>(
+      valueListenable: AppTheme.selected,
+      builder: (context, themeId, _) => MaterialApp(
+        title: 'RevYne',
+        debugShowCheckedModeBanner: false,
+        theme: RevyneTheme.light(themeId),
+        home: const AuthGate(),
+      ),
     );
   }
 }
