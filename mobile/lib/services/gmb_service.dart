@@ -1,9 +1,7 @@
-import 'dart:convert';
-import 'dart:math';
-
-import 'package:crypto/crypto.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import '../config.dart';
 
 class GmbLocation {
   final String locationId;
@@ -29,7 +27,6 @@ class GmbStatus {
 /// the same backend the web app uses, so no server changes are needed here.
 class GmbService {
   static SupabaseClient get _db => Supabase.instance.client;
-  static String? _pendingCodeVerifier;
 
   static Future<Map<String, dynamic>?> _callConnect(Map<String, dynamic> body) async {
     final res = await _db.functions.invoke('gmb-connect', body: body);
@@ -55,44 +52,24 @@ class GmbService {
     return const GmbStatus(connected: false);
   }
 
-  static String _base64UrlNoPad(List<int> bytes) => base64Url.encode(bytes).replaceAll('=', '');
+  static const _businessManageScope = 'https://www.googleapis.com/auth/business.manage';
 
-  /// Starts the Google OAuth (PKCE) flow in the system browser. The redirect
-  /// lands on io.revyne.app://gmb-callback and is picked up by the app_links
-  /// listener wired in main.dart, which calls [handleOAuthCallback].
-  static Future<void> startConnect({required String googleClientId}) async {
-    final verifierBytes = List<int>.generate(32, (_) => Random.secure().nextInt(256));
-    final codeVerifier = _base64UrlNoPad(verifierBytes);
-    _pendingCodeVerifier = codeVerifier;
-    final codeChallenge = _base64UrlNoPad(sha256.convert(utf8.encode(codeVerifier)).bytes);
+  /// Requests the business.manage scope via GoogleSignIn's native incremental
+  /// authorization (Credential Manager) — no browser redirect involved, since
+  /// Google blocks custom-scheme redirects for Android-type OAuth clients.
+  /// The resulting access token is handed to gmb-connect's use_provider_token
+  /// action, which verifies the scope and lists the account's GMB locations.
+  static Future<List<GmbLocation>> startConnect() async {
+    final googleSignIn = GoogleSignIn.instance;
+    await googleSignIn.initialize(serverClientId: AppConfig.googleWebClientId);
 
-    final redirectUri = 'io.revyne.app://gmb-callback';
-    final params = {
-      'client_id': googleClientId,
-      'redirect_uri': redirectUri,
-      'response_type': 'code',
-      'scope': 'https://www.googleapis.com/auth/business.manage',
-      'code_challenge': codeChallenge,
-      'code_challenge_method': 'S256',
-      'state': 'gmb',
-      'access_type': 'offline',
-      'prompt': 'consent',
-    };
-    final uri = Uri.https('accounts.google.com', '/o/oauth2/v2/auth', params);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
+    final account = await googleSignIn.attemptLightweightAuthentication() ?? await googleSignIn.authenticate();
 
-  /// Returns the connected location(s). Empty list = no GMB account found.
-  static Future<List<GmbLocation>> handleOAuthCallback(String code) async {
-    final verifier = _pendingCodeVerifier;
-    _pendingCodeVerifier = null;
-    if (verifier == null) throw Exception('OAuth session expired. Please try connecting again.');
+    final authorization = await account.authorizationClient.authorizeScopes([_businessManageScope]);
 
     final result = await _callConnect({
-      'action': 'exchange_token',
-      'code': code,
-      'code_verifier': verifier,
-      'redirect_uri': 'io.revyne.app://gmb-callback',
+      'action': 'use_provider_token',
+      'provider_token': authorization.accessToken,
     });
     final locations = (result?['locations'] as List?) ?? [];
     return locations.map((l) => GmbLocation.fromJson(Map<String, dynamic>.from(l as Map))).toList();

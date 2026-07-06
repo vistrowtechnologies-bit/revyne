@@ -9,13 +9,21 @@ class AppConfig {
   /// Must be added to Supabase Auth → URL Configuration → Redirect URLs.
   static const authRedirect = 'io.revyne.app://login-callback';
 
+  /// Web OAuth Client ID for Supabase login — passed as GoogleSignIn's
+  /// serverClientId so the idToken audience matches what Supabase's Google
+  /// provider expects (Supabase Auth → Providers → Google → Client IDs).
+  static const googleWebClientId =
+      '390263564292-j1ihpm78dmkg75oag33p3smjv1jirllq.apps.googleusercontent.com';
+
   /// Public review page base (the web app hosts the customer-facing page).
   static const publicReviewBase = 'https://revyne-pied.vercel.app';
 
   /// Google OAuth Client ID for the Google Business Profile integration
-  /// (separate grant from Supabase login). Must be an Android OAuth client
-  /// in Google Cloud Console with io.revyne.app://gmb-callback registered.
-  static const googleGmbClientId = '';
+  /// (separate grant from Supabase login, requests business.manage scope).
+  /// This is the debug-signed Android OAuth client — swap to the release
+  /// client ID (390263564292-mso3...) when building a release APK.
+  static const googleGmbClientId =
+      '390263564292-dnekc3k6udpasgi73abaqr1qoo06icbv.apps.googleusercontent.com';
 }
 
 /// One entry per selectable theme swatch shown on the Profile screen.

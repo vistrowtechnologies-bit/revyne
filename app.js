@@ -5896,6 +5896,13 @@ async function callEdgeFunction(fnName, body) {
 }
 
 async function initializeApp() {
+  // ── Direct links for Google's OAuth consent screen (App domain fields) ────
+  // #terms / #privacy are also reachable via the in-app Terms/Privacy toggle
+  // (see legalShell), but need a real URL for external review purposes.
+  if (location.hash === "#terms" || location.hash === "#privacy") {
+    state.view = location.hash.slice(1);
+  }
+
   // ── Check for Google OAuth callback (state=gmb) ──────────────────────────
   const urlParams = new URLSearchParams(location.search);
   const oauthCode  = urlParams.get("code");

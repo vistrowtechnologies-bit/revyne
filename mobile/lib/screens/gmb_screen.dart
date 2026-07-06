@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../config.dart';
 import '../services/business_service.dart';
-import '../services/deep_link_service.dart';
 import '../services/gmb_service.dart';
 import '../widgets/ui.dart';
 
@@ -37,24 +37,13 @@ class _GmbScreenState extends State<GmbScreen> {
   void initState() {
     super.initState();
     _loadStatus();
-    DeepLinkService.gmbCallback.addListener(_onDeepLink);
   }
 
   @override
   void dispose() {
-    DeepLinkService.gmbCallback.removeListener(_onDeepLink);
     _postText.dispose();
     _replyText.dispose();
     super.dispose();
-  }
-
-  void _onDeepLink() {
-    final uri = DeepLinkService.gmbCallback.value;
-    if (uri == null) return;
-    DeepLinkService.consumeGmbCallback();
-    final code = uri.queryParameters['code'];
-    if (code == null) return;
-    _handleOAuthCode(code);
   }
 
   Future<void> _loadStatus() async {
@@ -67,27 +56,9 @@ class _GmbScreenState extends State<GmbScreen> {
   }
 
   Future<void> _connect() async {
-    if (AppConfig.googleGmbClientId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Google integration not configured — add googleGmbClientId in config.dart')),
-      );
-      return;
-    }
     setState(() => _connecting = true);
     try {
-      await GmbService.startConnect(googleClientId: AppConfig.googleGmbClientId);
-    } catch (_) {
-      if (mounted) {
-        setState(() => _connecting = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not start Google sign-in.')));
-      }
-    }
-  }
-
-  Future<void> _handleOAuthCode(String code) async {
-    setState(() => _connecting = true);
-    try {
-      final locations = await GmbService.handleOAuthCallback(code);
+      final locations = await GmbService.startConnect();
       if (locations.isEmpty) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No Google Business locations found on that account.')));
         setState(() => _connecting = false);
@@ -101,6 +72,11 @@ class _GmbScreenState extends State<GmbScreen> {
           _connecting = false;
         });
       }
+    } on GoogleSignInException catch (e) {
+      if (mounted && e.code != GoogleSignInExceptionCode.canceled) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not connect to Google. Please try again.')));
+      }
+      setState(() => _connecting = false);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
@@ -280,14 +256,6 @@ class _GmbScreenState extends State<GmbScreen> {
                   ],
                 ),
               ),
-            ),
-          if (AppConfig.googleGmbClientId.isEmpty)
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: AppColors.warningContainer, borderRadius: BorderRadius.circular(12)),
-              child: const Text('⚠ Setup required — add your Google OAuth Client ID in config.dart to enable this feature.',
-                  style: TextStyle(fontSize: 12)),
             ),
           FilledButton.icon(
             onPressed: _connecting ? null : _connect,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
@@ -17,15 +18,28 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _signInWithGoogle() async {
     setState(() => _busy = true);
     try {
-      await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: AppConfig.authRedirect,
-        authScreenLaunchMode: LaunchMode.externalApplication,
+      final googleSignIn = GoogleSignIn.instance;
+      await googleSignIn.initialize(serverClientId: AppConfig.googleWebClientId);
+      final account = await googleSignIn.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null) {
+        _showError('Google did not return an ID token. Please try again.');
+        return;
+      }
+      final authorization = await account.authorizationClient.authorizationForScopes(['email']);
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: authorization?.accessToken,
       );
+    } on GoogleSignInException catch (e) {
+      if (e.code != GoogleSignInExceptionCode.canceled) {
+        _showError('Could not sign in with Google. Please try again.');
+      }
     } on AuthException catch (e) {
       _showError(e.message);
     } catch (_) {
-      _showError('Could not start Google sign-in. Please try again.');
+      _showError('Could not sign in with Google. Please try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

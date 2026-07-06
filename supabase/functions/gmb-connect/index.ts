@@ -170,23 +170,28 @@ Deno.serve(async (req) => {
     }
 
     const clientId = Deno.env.get("GOOGLE_GMB_CLIENT_ID");
-    const clientSecret = Deno.env.get("GOOGLE_GMB_CLIENT_SECRET");
-    if (!clientId || !clientSecret) {
+    if (!clientId) {
       return jsonResponse({ error: "Google GMB credentials not configured on server" }, 500);
     }
+
+    // Android OAuth clients are public clients (no client_secret) — PKCE
+    // (code_verifier) proves possession instead. Only include client_secret
+    // if one is actually configured (e.g. if a Web-type client were used).
+    const clientSecret = Deno.env.get("GOOGLE_GMB_CLIENT_SECRET");
+    const tokenParams: Record<string, string> = {
+      code,
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
+      grant_type: "authorization_code"
+    };
+    if (clientSecret) tokenParams.client_secret = clientSecret;
 
     // Exchange authorization code for tokens (PKCE)
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-        code_verifier: codeVerifier,
-        grant_type: "authorization_code"
-      })
+      body: new URLSearchParams(tokenParams)
     });
 
     if (!tokenRes.ok) {
