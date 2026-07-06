@@ -18,12 +18,14 @@ class AppConfig {
   /// Public review page base (the web app hosts the customer-facing page).
   static const publicReviewBase = 'https://revyne-pied.vercel.app';
 
-  /// Google OAuth Client ID for the Google Business Profile integration
-  /// (separate grant from Supabase login, requests business.manage scope).
-  /// This is the debug-signed Android OAuth client — swap to the release
-  /// client ID (390263564292-mso3...) when building a release APK.
-  static const googleGmbClientId =
-      '390263564292-dnekc3k6udpasgi73abaqr1qoo06icbv.apps.googleusercontent.com';
+  // Note on Android OAuth clients: the native GoogleSignIn/Credential Manager
+  // flow (login + GMB's authorizeScopes) does not reference an Android client
+  // ID anywhere in this app's code — Google matches the calling app by its
+  // package name + signing certificate SHA-1 against whichever Android-type
+  // OAuth clients are registered in Google Cloud Console. Debug builds match
+  // the "RevYne Android Debug" client (debug.keystore SHA-1); release builds
+  // match "RevYne Android Release" (revyne-upload-keystore.jks SHA-1) —
+  // both must exist in Console, but neither needs to change here.
 }
 
 /// One entry per selectable theme swatch shown on the Profile screen.
