@@ -1,728 +1,130 @@
 # RevYne AI Project Handoff
 
-Last updated: 9 May 2026  
-Workspace: `E:\AI REVIEW`  
-Live app/testing URL: `https://revyne-pied.vercel.app/`  
-Planned brand domain: `revyneai.com`  
+Last updated: 7 July 2026
+Workspace: `/Users/mac15/BRANDS/Revyen` (macOS)
+Live web app: `https://revyne-pied.vercel.app/`
+Planned brand domain: `revyneai.com` (not wired up yet — see Blockers)
 Product name: **RevYne / RevYne AI**
+GitHub: `vistrowtechnologies-bit/revyne` (branch `main`)
+
+This doc is written for a cold handoff — assume the reader (human or AI) has never seen this project before.
+
+---
 
 ## 1. Product Summary
 
-RevYne is an AI-powered review assistant for businesses. The product helps real customers express genuine experiences clearly and helps businesses draft professional replies to customer reviews.
+RevYne is an AI-powered review assistant for small and medium businesses, focused on the Indian market. It has two audiences:
 
-Important positioning:
+1. **Business owners** — the primary app users. They get a QR/link customers scan to leave reviews, an AI Smart Reply tool for responding to reviews professionally, and (new) direct Google Business Profile management (health score, post updates, reply to Google reviews from inside the app).
+2. **Customers** — a lightweight public page (no login) where they rate their experience and get AI-drafted review text they can copy onto Google.
 
-- Do not present the product as generating fake reviews.
-- It should help customers write honest, real feedback.
-- It should stay aligned with Google review policies.
-- AI output should be framed as editable suggestions, not guaranteed or fabricated reviews.
+**Positioning, non-negotiable:** RevYne helps people write *honest* reviews faster. It must never be framed as generating fake reviews, gating negative feedback, or manipulating ratings. AI output is always an editable draft, never auto-posted without the human's explicit action.
 
-Target customers include local Indian businesses such as doctors, clinics, hotels, real estate, salons, restaurants, service providers, and similar SMBs.
+Target customers: local Indian SMBs — restaurants, salons, clinics, real estate agents, hotels, gyms, retail, etc. Free plan + three paid tiers (₹149/mo, ₹199/mo, ₹999/yr) via Razorpay.
 
-## 2. Current Technology Stack
+---
 
-Frontend:
+## 2. Two Codebases — Both Live, Both Maintained
 
-- Static HTML/CSS/JavaScript app.
-- Main files:
-  - `index.html`
-  - `styles.css`
-  - `app.js`
-  - `supabase-config.js`
-  - `manifest.webmanifest`
-  - `sw.js`
-- No React/Next.js yet.
+### 2a. Web app (repo root)
+Static HTML/CSS/JS, no build step, no framework.
+- `index.html`, `styles.css`, `app.js` (~5,900 lines — all app logic and rendering lives here), `supabase-config.js`, `manifest.webmanifest`, `sw.js` (service worker)
+- Hosted on **Vercel**, deploys automatically on push to `main`
+- `api/` folder: three Vercel serverless functions that proxy to Supabase edge functions (Razorpay create/cancel subscription, support email) — kept thin, just auth-header passthrough
+- This is a PWA (installable, has a service worker) but is **not** what people mean by "the app" going forward — the native Android app (below) is the primary mobile product now.
 
-Hosting:
+### 2b. Native Android app (`mobile/`)
+**Flutter** — compiles to real native ARM machine code, no webview, no PWA wrapper of any kind. This was a deliberate migration away from a PWA/TWA approach.
+- Package: `com.revyne.revyne_app`
+- Entry point: `mobile/lib/main.dart` → `AuthGate` routes between login → onboarding → `HomeShell` (5-tab bottom nav) based on Supabase session + whether a `businesses` row exists for the user (server-side truth, never a local flag — this was a deliberate fix for a recurring "onboarding wizard shows again" bug in the web app).
+- UI was redesigned end-to-end from a Google Stitch export to match an exact design system (colors, type scale, component library) — see `mobile/lib/config.dart` (`AppColors`, `AppRadius`, `AppSpacing`, `RevyneTheme`) and `mobile/lib/widgets/ui.dart` (shared components: `AppCard`, `MetricTile`, `ScoreRing`, `StepDots`, `SelectChip`, `StatusPill`, `EmptyState`).
+- Screens (`mobile/lib/screens/`): `auth_screen`, `onboarding_screen` (3-step wizard), `dashboard_screen`, `smart_reply_screen`, `business_screen`, `gmb_screen`, `pricing_screen`, `order_history_screen`, `support_screen`, `profile_screen`, `home_shell` (the 5-tab scaffold: Home / AI Reply / Business / Google / Profile).
+- Services (`mobile/lib/services/`): `business_service.dart` (Business/UserProfile/DashboardStats/SupportTicket/PaymentEvent models + all Supabase table CRUD), `gmb_service.dart` (Google Business Profile integration, see §4).
+- Talks to the **same Supabase backend** as the web app — no server-side duplication. Razorpay checkout on mobile opens the hosted Razorpay payment link in the system browser (via `create-razorpay-subscription`'s `shortUrl`) rather than embedding the native Razorpay SDK.
 
-- Vercel.
-- Production deploy is done through Vercel CLI.
-- `vercel.json` contains basic security headers.
+---
 
-Backend:
+## 3. Backend (shared by both apps)
 
-- Supabase Auth.
-- Supabase Postgres.
-- Supabase Edge Functions.
-- Vercel serverless API routes in `/api`.
+- **Supabase** (project ref `dbqizpephewiefvghenr`, project name `revyne-prod`): Postgres, Auth (Google OAuth provider), Edge Functions, Storage.
+  - Migrations: `supabase/migrations/*.sql` — 17 migrations, latest is `20260703000000_protect_billing_columns.sql` (see §5, Security).
+  - Edge functions (`supabase/functions/`): `generate-ai` (OpenAI calls for review suggestions + smart replies, server-side plan-limit enforcement, rate limiting), `gmb-connect` (Google Business Profile OAuth/session management), `gmb-api` (reviews, health score, posts, replies, SEO description), `create-razorpay-subscription`, `cancel-razorpay-subscription`, `razorpay-webhook` (signature-verified, idempotent), `send-support-email`.
+  - Key tables: `profiles`, `businesses`, `review_requests`, `generated_reviews`, `smart_replies`, `support_tickets`, `payment_events`, `usage_limits`, `analytics_events`, `gmb_tokens` (service-role only), `gmb_reviews`.
+- **OpenAI** (`gpt-5-nano` via `generate-ai`) for review suggestions and smart replies.
+- **Razorpay** — subscriptions, currently believed to be in test mode; full payment lifecycle (failed/abandoned/refund) is **not yet tested**, only the happy path.
+- **Google Cloud project**: `revyne-494711` (owned by `revyneai@gmail.com`), project number `390263564292`. Has two Android OAuth clients registered ("RevYne Android Debug" — SHA-1 of `~/.android/debug.keystore`; "RevYne Android Release" — SHA-1 of `~/.android-keys/revyne-upload-keystore.jks`) plus a Web OAuth client used as `serverClientId`. OAuth consent screen is in **Testing** status with test users added (see §6).
 
-Payments:
+---
 
-- Razorpay test mode integration.
-- Subscription creation and webhook handling have been implemented.
+## 4. Google Sign-In & GMB Architecture (native app) — read this before touching auth code
 
-AI:
+Both the app's login and its Google Business Profile connect flow use **`google_sign_in` v7's native Credential Manager API** — `GoogleSignIn.instance.authenticate()` for login, `account.authorizationClient.authorizeScopes([...])` for incremental GMB authorization. **This is not a browser redirect flow.**
 
-- OpenAI API is called from Supabase Edge Function `generate-ai`.
-- Model secret was set to a low-cost model, currently intended as `gpt-5-nano`.
+This was a deliberate architecture correction (was originally built as browser-based OAuth with a custom URL scheme redirect, then rebuilt): **Google blocks custom-scheme redirects (`io.revyne.app://...`) for "Android"-type OAuth clients** on the classic browser/PKCE flow — it throws `Error 400: invalid_request... doesn't comply with Google's OAuth 2.0 policy`. Native Credential Manager sidesteps this entirely and is also the modern recommended approach (one-tap sign-in, no browser bounce).
 
-PWA/App:
+Practical implications:
+- `mobile/lib/config.dart` has `googleWebClientId` (a Web-type OAuth client ID, used as `serverClientId` so the ID token audience matches what Supabase's Google provider expects) — this is the **only** client ID referenced anywhere in the Dart code.
+- There is **no Android client ID anywhere in the code**, and there doesn't need to be — Google's Credential Manager matches the calling app by package name + signing certificate SHA-1 against whichever Android-type OAuth clients are registered in Cloud Console. Debug builds match the Debug client, release builds match the Release client, automatically, with zero code difference. (An earlier note in this doc/memory claiming "swap `googleGmbClientId` to release before shipping" was based on a misunderstanding — that field was dead code and has been removed. Nothing needs to change in code for release builds.)
+- `mobile/lib/services/gmb_service.dart`'s `startConnect()` requests the `business.manage` scope via `authorizeScopes()`, gets an access token, and hands it to the `gmb-connect` edge function's `use_provider_token` action (which verifies the scope server-side and lists the account's GMB locations). The `exchange_token` action in `gmb-connect` still exists in the edge function but is now **dead code** — it was for the old browser-PKCE flow and nothing calls it anymore.
+- The `io.revyne.app://login-callback` deep link intent-filter is still declared in `AndroidManifest.xml` but its browser-redirect purpose no longer applies now that login is native Credential Manager — it may be vestigial (not yet cleaned up, not causing harm).
 
-- PWA manifest and service worker exist.
-- PWABuilder package was generated for Android testing.
-- App icon assets exist in `assets/`.
+---
 
-## 3. Key Project Files
+## 5. Native App Build & Signing
 
-Core app:
+Toolchain lives entirely outside package managers (no Homebrew on this Mac):
+- Flutter SDK: `~/development/flutter` (3.44.4 stable)
+- JDK 17: `~/development/jdk17/Contents/Home`
+- Android SDK: `~/development/android-sdk`
+- Supabase CLI: `~/development/supabase-cli/supabase` (manually downloaded — the official tarball's default `supabase` binary is broken/Bun-based; the `supabase-go` binary from the same tarball, renamed, works)
 
-- `index.html`: App shell, meta tags, scripts, manifest, favicon links.
-- `styles.css`: All UI styling, responsive desktop/mobile behavior, bottom nav, cards, pricing, profile, business forms.
-- `app.js`: Main application logic, state, routing, Supabase auth/data, AI calls, Razorpay flows, support tickets, rendering.
-- `supabase-config.js`: Public Supabase URL and publishable key.
-
-PWA/assets:
-
-- `manifest.webmanifest`: PWA metadata, icons, screenshots, shortcuts, share target, launch handler.
-- `sw.js`: Service worker cache strategy.
-- `assets/favicon.png`
-- `assets/apple-touch-icon.png`
-- `assets/revyne-icon-192.png`
-- `assets/revyne-icon-512.png`
-- `assets/screenshot-mobile.png`
-- `assets/screenshot-wide.png`
-
-Vercel API routes:
-
-- `api/create-razorpay-subscription.js`
-- `api/cancel-razorpay-subscription.js`
-- `api/send-support-email.js`
-
-Supabase Edge Functions:
-
-- `supabase/functions/generate-ai/index.ts`
-- `supabase/functions/create-razorpay-subscription/index.ts`
-- `supabase/functions/cancel-razorpay-subscription/index.ts`
-- `supabase/functions/razorpay-webhook/index.ts`
-- `supabase/functions/send-support-email/index.ts`
-
-Supabase migrations:
-
-- `supabase/migrations/20260430000000_support_tickets.sql`
-- `supabase/migrations/20260430001000_admin_support_queue.sql`
-- `supabase/migrations/20260430002000_security_advisor_cleanup.sql`
-- `supabase/migrations/20260502000000_analytics_events.sql`
-- `supabase/migrations/20260502001000_rate_limits_and_bug_reports.sql`
-- `supabase/migrations/20260505000000_payments_schema.sql`
-- `supabase/migrations/20260505001000_service_role_payment_grants.sql`
-- `supabase/migrations/20260508000000_payment_lifecycle_hardening.sql`
-- `supabase/migrations/20260508001000_security_warning_followup.sql`
-- `supabase/migrations/20260508002000_business_persistence_fix.sql`
-
-Reference/security:
-
-- `SECURITY_LAUNCH_RUNBOOK.md`
-- `robots.txt`
-- `sitemap.xml`
-
-## 4. Supabase Project
-
-Project ref:
-
-```text
-dbqizpephewiefvghenr
+Build command pattern:
+```
+cd mobile
+JAVA_HOME=~/development/jdk17/Contents/Home ~/development/flutter/bin/flutter build apk --release
+JAVA_HOME=~/development/jdk17/Contents/Home ~/development/flutter/bin/flutter build appbundle --release
 ```
 
-Project URL:
+**Release signing is fully configured and working.** A real upload keystore was generated at `~/.android-keys/revyne-upload-keystore.jks` (password in `~/.android-keys/revyne-keystore-credentials.txt`, both outside the repo, both `chmod 600`, both git-ignored by Flutter's default `.gitignore` rules). `mobile/android/app/build.gradle.kts` reads `android/key.properties` (also git-ignored) for the release `signingConfig`, falling back to the debug key if that file is absent. Both `app-release.apk` and `app-release.aab` build and verify correctly (`apksigner verify` confirms v2 scheme signing).
 
-```text
-https://dbqizpephewiefvghenr.supabase.co
-```
+**Do not lose the keystore file or its password** — Google Play will not allow app updates to the same listing without it; there is no recovery path.
 
-Public publishable key is stored in `supabase-config.js`.
+Tested end-to-end on a real device (Android 15) and an emulator: app renders correctly, Google Sign-In button correctly opens the native account picker and reaches Google's real consent screen for this Supabase project.
 
-Do not commit or expose these secrets:
+---
 
-- Supabase service role key
-- OpenAI API key
-- Razorpay key secret
-- Razorpay webhook secret
-- Email provider secret/API key
+## 6. Current Blockers (ranked by what's actually stopping progress)
 
-## 5. Database Tables Currently Used
+1. **GBP API access request was rejected** (submitted 2026-07-06 via the official request form using Marketix Studio's verified 60+ day GBP as the qualifying business; rejected ~15 hours later with a generic "did not pass internal quality checks" message, case ID `2-3234000040978`). Best-guess cause: the company website field was filled with the bare Vercel URL (`revyne-pied.vercel.app`) rather than a real custom domain, which likely reads as untrustworthy to Google's automated quality check. **Until this is approved, every GMB connect attempt in the app will succeed at auth but return "no business found" for anyone** — `mybusinessaccountmanagement.googleapis.com` / `mybusinessbusinessinformation.googleapis.com` quota is hard-capped at 0 until Google approves. Do not resubmit immediately (looks worse to automated review); fix the underlying issue first.
+2. **Custom domain `revyneai.com` is not live.** This is the fix for #1, and also needed generally for a credible production launch (OAuth consent screen branding, Play Store listing, etc. all reference this domain eventually). Currently everything points at the Vercel-assigned subdomain.
+3. **Razorpay payment lifecycle is only happy-path tested.** Failed payments, abandoned checkouts, refunds, upgrade/downgrade transitions are unverified.
+4. **OAuth consent screen cosmetic bug**: "Authorized domain 1" has a typo (`dbqizpepheview fvghenr.supabase.co` vs. the real `dbqizpephewiefvghenr.supabase.co`, which is correctly listed as domain 2). Harmless, not yet fixed.
+5. Consent screen is still in **Testing** status (not published) — test users added: `prophuntllp@gmail.com`, `7777abhighadge@gmail.com`, `marketixstudio@gmail.com`, `abhighadge1509@gmail.com`. Needs to move to production/verified once ready to launch publicly.
 
-Main tables:
+---
 
-- `profiles`
-- `businesses`
-- `review_requests`
-- `generated_reviews`
-- `smart_replies`
-- `usage_limits`
-- `support_tickets`
-- `analytics_events`
-- `payment_events`
+## 7. Security Work Already Done (as of this handoff)
 
-Important behavior:
+These were real vulnerabilities found and fixed, not hypothetical:
+- **Client-side plan self-upgrade**: users could previously run `supabase.from('profiles').update({plan:'pro_max'})` from the browser console to get a paid plan for free. Fixed via `20260703000000_protect_billing_columns.sql` — a Postgres trigger locks `plan`/`plan_status`/`is_admin`/Razorpay ID columns (and `businesses.owner_plan*`) to service-role-only writes. Deployed to production.
+- **Monthly AI generation limits were browser-only** (bypassable by calling the edge function directly). Now enforced server-side in `generate-ai` with a stable per-user rate-limit key (JWT `sub`, not a token fragment that resets on refresh).
+- **Exposed credentials rotated**: a Supabase personal access token and the database password that had been pasted into a terminal session were both revoked/reset and replaced. New values are stored in `~/.supabase-keys/` (chmod 600, outside the repo) — never re-paste these into any chat, doc, or commit.
+- Razorpay webhook signature check upgraded to constant-time comparison.
+- Public review page now looks up the business strictly by public token (was previously look-up-by-name, which could misattribute reviews to a same-named business).
 
-- `profiles` stores auth/profile/payment plan data.
-- `businesses` stores each user business profile and public review page data.
-- `review_requests` stores customer public review attempts.
-- `generated_reviews` stores AI review suggestions generated for public review flow.
-- `smart_replies` stores AI business reply drafts.
-- `usage_limits` tracks usage/rate limiting.
-- `support_tickets` stores customer support tickets and admin replies.
-- `analytics_events` stores page/event tracking.
-- `payment_events` stores Razorpay webhook/payment/subscription events.
+Still on the list, not yet done: full Supabase Security Advisor pass, RLS policy audit beyond what's covered above.
 
-## 6. Auth Flow
+---
 
-Current auth:
+## 8. What's Fully Working Right Now
 
-- Google login through Supabase Auth.
-- Guest/demo login still exists for testing.
-- On Google login, the app fetches the user profile and business profile from Supabase.
-- A `profiles` row is created/updated for the user.
+- Web app: full onboarding, business profile CRUD, public QR review page, AI review suggestions, Smart Reply, Razorpay checkout (happy path), support tickets, admin ticket queue, GMB integration (browser-based on web, unaffected by the native app's architecture change), analytics events.
+- Native Android app: Google Sign-In (native, verified working on real hardware), server-truth onboarding, dashboard with live stats/QR/WhatsApp share, Smart Reply, Business Profile editor, Pricing/Order History/Support screens, Profile with a genuinely functional 5-theme switcher. GMB screen UI and API plumbing are complete and correct — only blocked by Google's pending API approval (§6.1), not by anything in this codebase.
+- Signed release APK/AAB, ready to sideload or eventually submit to Play Store once the domain and GBP approval land.
 
-Known recent fix:
+## 9. What Codex (or anyone else picking this up) Should NOT Assume
 
-- Business details were vanishing after login/refresh because the app reset `state.business` before Supabase business data loaded.
-- This was fixed by not clearing business state during session restore and by loading the latest business by `owner_id`.
-- Migration `20260508002000_business_persistence_fix.sql` added persistence support for:
-  - `service_types`
-  - `business_logo`
-  - owner select/insert/update policies on `businesses`
-
-Important follow-up:
-
-- If a user's old business existed only in localStorage and was never saved to Supabase, that user must save it once again.
-- After saving, the same Google account should retain business details.
-
-## 7. App Routing and Views
-
-The app uses client-side state and hash-based public routing.
-
-Main authenticated views:
-
-- Dashboard
-- Smart Reply
-- Pricing
-- My Business
-- Profile
-- About RevYne
-- Order History
-- Help & Support
-- Terms & Privacy
-- Admin Support for admin user
-
-Public route:
-
-- `/#review` opens the public customer review page.
-
-Navigation:
-
-- Desktop uses top header navigation.
-- Mobile uses sticky header and bottom tab navigation.
-- The header should stay sticky on mobile.
-- Avoid adding large desktop sidebars or huge hero blocks; the user wants a clean dashboard.
-
-## 8. Business Profile Logic
-
-The business profile supports:
-
-- Profile picture/logo upload
-- Business name
-- Category dropdown
-- City
-- Google Review URL
-- Keywords
-- Services
-- Service/type personalization for Pro Max
-- Language
-- Tone
-- Mobile number
-
-Categories include Indian SMB categories such as:
-
-- Real Estate
-- Restaurant
-- Salon & Beauty
-- Healthcare Clinic
-- Education & Coaching
-- Car & Bike Service
-- Electronics & Appliances
-- Home Services
-- Travel & Transport
-- Hotel & Stay
-- Fitness & Gym
-- Retail Store
-- Jewellery
-- Event & Wedding Services
-- Legal & Finance
-- IT & Digital Services
-- Driver Service
-- Other
-
-Pro Max personalization:
-
-- Pro Max users can define up to 5 main services.
-- The second field changes based on category. Example:
-  - Real Estate -> property type
-  - Restaurant -> cuisine/order type
-  - Healthcare -> consultation/treatment type
-  - Other -> type or requirement
-- These fields should only appear on the public customer page when the business owner has an active Pro Max or Pro Yearly plan.
-- Free/Pro customers should not show locked Pro Max fields to end customers.
-
-Google Review URL info button:
-
-- An info button was added near the Google Review URL field.
-- It should explain how the business owner can get their Google review link.
-
-## 9. Public Review Page
-
-Purpose:
-
-- A customer scans a QR/link and opens the business public review page.
-- They choose a star rating and write their real experience.
-- RevYne generates honest review suggestions.
-- Customer can copy and post to Google.
-
-Behavior:
-
-- Uses business data loaded by public token.
-- Customer review requests are saved to Supabase.
-- Generated reviews are saved to Supabase.
-- Google review button opens the owner's saved Google Review URL.
-
-Important policy:
-
-- Never imply fake reviews.
-- Keep wording like "AI-generated suggestion, feel free to edit before posting."
-
-## 10. Smart Reply Page
-
-Purpose:
-
-- Business owner pastes a real customer review.
-- App generates professional business replies.
-
-Current behavior:
-
-- Uses OpenAI through `generate-ai`.
-- Saves generated replies to `smart_replies`.
-- Uses usage limits.
-- Earlier bug where customer name vanished when star rating changed was fixed.
-
-Remaining improvement:
-
-- Continue optimizing AI speed and token cost.
-- Add clearer loading state if generation takes 5-6 seconds.
-
-## 11. Pricing and Plans
-
-Current plan structure:
-
-Free:
-
-- Rs 0/month.
-- Basic testing/review collection.
-- Limited AI suggestions.
-
-Pro Monthly:
-
-- Rs 149/month.
-- Active local businesses.
-- More AI reviews/replies.
-- Editable services and keywords.
-- Multi-language support including Marathi.
-- Tone customization.
-
-Pro Max Monthly:
-
-- Rs 199/month.
-- Adds service/type selection on public review page.
-- Adds deeper SEO-friendly review drafts.
-- Intended for businesses wanting hyper-personalized review output.
-
-Pro Yearly:
-
-- Rs 999/year.
-- Lower annual price for long-term use.
-- Similar high-tier access.
-
-Important:
-
-- "Free Website" was removed from all feature lists.
-- Pricing page has had UI work but still needs a final responsive QA pass.
-- User reported bottom nav animation glitches in pricing earlier; some fixes were applied, but re-test on real mobile.
-
-## 12. Razorpay Integration
-
-Razorpay is currently in test mode.
-
-Implemented:
-
-- Create subscription checkout/payment link flow.
-- Razorpay payment page opens.
-- Test payment succeeded.
-- Webhook updates the user's `profiles.plan`.
-- Plan changed to Pro Monthly after payment.
-- Payment events show in database/order history.
-- Cancel subscription endpoint exists.
-
-Relevant files:
-
-- `api/create-razorpay-subscription.js`
-- `api/cancel-razorpay-subscription.js`
-- `supabase/functions/razorpay-webhook/index.ts`
-- `supabase/functions/create-razorpay-subscription/index.ts`
-- `supabase/functions/cancel-razorpay-subscription/index.ts`
-
-Important known issue:
-
-- Razorpay test mode can show payment success behavior unexpectedly during testing.
-- Need a full test matrix:
-  - successful payment
-  - abandoned checkout
-  - failed payment
-  - webhook not received
-  - duplicate webhook
-  - cancel subscription
-  - downgrade
-  - upgrade Pro to Pro Max
-
-Razorpay dashboard details:
-
-- Website/app was approved for `https://revyne-pied.vercel.app`.
-- API keys were saved by the user.
-- Plan IDs were created and saved as Supabase/Vercel secrets.
-- Webhook secret was created and saved.
-
-Do not expose keys in code.
-
-## 13. Support System
-
-Implemented:
-
-- Normal user Help & Support page.
-- User can raise support tickets from profile.
-- Support categories include:
-  - general
-  - bug report
-  - login/account access
-  - payment/subscription
-  - AI generation
-  - review page/QR
-  - business profile
-- Admin Support page exists for admin users.
-- Admin can view tickets, change status, assign owner, add reply, and close tickets.
-- `revyneai@gmail.com` was approved as admin.
-
-Remaining:
-
-- Add email notification when:
-  - customer creates ticket
-  - admin replies
-  - ticket status changes
-- Improve support ticket conversation thread model. Current implementation is more single-ticket plus admin response.
-
-## 14. Analytics
-
-Implemented:
-
-- `analytics_events` table.
-- Page tracking.
-- User event tracking.
-- Client error tracking.
-
-Remaining:
-
-- Build an admin analytics view.
-- Track funnel metrics:
-  - login started/completed
-  - business profile saved
-  - QR opened
-  - review generated
-  - copy clicked
-  - Google button clicked
-  - pricing viewed
-  - checkout started/completed/failed
-
-## 15. SEO and Legal
-
-Implemented:
-
-- Meta description and OG tags were added.
-- `robots.txt`
-- `sitemap.xml`
-- Terms & Conditions page.
-- Privacy Policy page.
-
-Remaining:
-
-- Update sitemap/domain once final domain `revyneai.com` is live and stable.
-- Submit to Google Search Console after DNS is ready.
-- Add cookie consent if targeting EU/GDPR users.
-- Review legal pages with a legal professional before launch.
-
-## 16. PWA and Android APK
-
-Implemented:
-
-- `manifest.webmanifest`
-- `sw.js`
-- App icon files
-- Screenshots
-- PWA shortcuts
-- Share target
-- Launch handler
-- Protocol handler
-- PWABuilder package was created successfully.
-
-Remaining before Play Store:
-
-- Buy/finalize domain.
-- Configure production OAuth redirects.
-- Verify Digital Asset Links for TWA if using PWABuilder/Trusted Web Activity.
-- Create final package name, likely `com.revyneai.app`.
-- Add Play Store listing assets:
-  - short description
-  - full description
-  - screenshots
-  - feature graphic
-  - privacy policy URL
-  - support email
-- Ensure app opens in polished mobile layout and not raw unstyled HTML.
-
-## 17. Deployment Workflow
-
-Local workspace:
-
-```powershell
-cd "E:\AI REVIEW"
-```
-
-Deploy frontend to production:
-
-```powershell
-$env:NODE_OPTIONS='--use-system-ca'
-npx vercel deploy --prod
-```
-
-Apply Supabase migrations:
-
-```powershell
-npx supabase db push --yes
-```
-
-Deploy Supabase function example:
-
-```powershell
-npx supabase functions deploy generate-ai --project-ref dbqizpephewiefvghenr
-```
-
-Some functions were deployed with JWT verification disabled because they are called by external services or need public callback access:
-
-```powershell
-npx supabase functions deploy razorpay-webhook --project-ref dbqizpephewiefvghenr --no-verify-jwt
-```
-
-Use care before disabling JWT verification. Only do it for endpoints that verify their own secret/signature, such as Razorpay webhooks.
-
-## 18. Current UI Direction
-
-The user prefers:
-
-- Clean dashboard.
-- No huge desktop left sidebar.
-- Header with small favicon/logo before RevYne brand.
-- Desktop top nav.
-- Mobile sticky header and fixed bottom navigation.
-- No skeleton screens in this app.
-- No unnecessary page headings repeated for every menu.
-- Rename desktop header "Edit Business" to "My Business".
-- Remove "Order History" from desktop header menu but keep it accessible inside Profile.
-- Fix desktop padding so content does not feel too narrow or floating with too much unused space.
-
-Recent UI issues to re-check:
-
-- Mobile scrolling got stuck after desktop UI edits.
-- Header should be sticky on mobile.
-- All pages should scroll normally.
-- Desktop pricing page still looked too padded and had redundant page label.
-- Profile desktop layout may need polish.
-
-## 19. Security Notes
-
-Already added:
-
-- Vercel security headers:
-  - `X-Content-Type-Options: nosniff`
-  - `Referrer-Policy: strict-origin-when-cross-origin`
-  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
-- Supabase RLS policies for main user-owned data.
-- Security cleanup migrations.
-- Rate limit related migration.
-
-Still needs final review:
-
-- Supabase Security Advisor warnings.
-- RLS policy expressions that may be overly permissive.
-- Security definer functions.
-- Leaked password protection setting.
-- Public read policy for business public review links.
-- All no-JWT functions must verify a trusted secret/signature.
-- Ensure service role key is never used in frontend.
-
-## 20. Environment Variables and Secrets
-
-Secrets exist in Supabase/Vercel but should be checked before production:
-
-OpenAI:
-
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
-
-Razorpay:
-
-- `RAZORPAY_KEY_ID`
-- `RAZORPAY_KEY_SECRET`
-- `RAZORPAY_WEBHOOK_SECRET`
-- Razorpay plan IDs for Pro Monthly, Pro Max Monthly, Pro Yearly
-
-Supabase:
-
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- public anon/publishable key
-
-Email:
-
-- Email API/provider key if using notification emails.
-
-Never put private secrets in:
-
-- `index.html`
-- `app.js`
-- `styles.css`
-- `supabase-config.js`
-- `manifest.webmanifest`
-
-## 21. What Has Been Made So Far
-
-Completed or mostly completed:
-
-- Brand renamed from ReviewPilot AI to RevYne.
-- Static MVP turned into a real connected app using Supabase.
-- Google auth through Supabase.
-- User profile creation and restoration.
-- Business profile save/load.
-- Public review page.
-- QR/review link flow.
-- AI review suggestion generation.
-- Smart reply generation.
-- AI outputs saved to Supabase.
-- Pricing plans and Pro Max plan.
-- Pro Max personalized service/type fields.
-- Razorpay subscription creation and webhook plan update.
-- Order/payment event storage.
-- Basic order history.
-- Help & Support ticket system.
-- Admin support dashboard.
-- Analytics events/page tracking.
-- Legal pages.
-- SEO basics.
-- PWA manifest/service worker/icons/screenshots.
-- APK/PWABuilder test package generation.
-- Logo/favicon assets added.
-- Mobile and desktop responsive work done in multiple rounds.
-
-## 22. What Is Left Before Production
-
-Highest priority:
-
-1. Final UI QA on mobile and desktop.
-   - Fix mobile scroll stuck issue.
-   - Keep mobile header sticky.
-   - Fix desktop padding.
-   - Remove redundant menu headings.
-   - Remove Order History from header.
-   - Keep Order History inside Profile.
-
-2. Payment lifecycle hardening.
-   - Confirm checkout success/failure/abandoned cases.
-   - Confirm webhook idempotency.
-   - Confirm plan update after payment.
-   - Confirm cancel/downgrade/upgrade flows.
-   - Improve user-facing messages after returning from Razorpay.
-
-3. Production domain setup.
-   - Buy/configure `revyneai.com`.
-   - Add Vercel DNS/domain.
-   - Update Supabase site URL.
-   - Update Supabase OAuth redirect URLs.
-   - Update Google Cloud OAuth redirect URIs.
-   - Update Razorpay approved website/app URL if needed.
-   - Update sitemap and robots.
-
-4. Play Store readiness.
-   - Final APK/AAB.
-   - Digital Asset Links.
-   - Privacy policy URL.
-   - Store listing assets.
-   - Test on multiple Android phones.
-
-5. Security final pass.
-   - Resolve or document Supabase Security Advisor warnings.
-   - Review every RLS policy.
-   - Ensure no secrets in frontend.
-   - Add stronger rate limits to AI/payment/support endpoints.
-
-6. Support polish.
-   - Email notifications for tickets and admin replies.
-   - Better ticket conversation history.
-
-7. Analytics/admin views.
-   - Add admin dashboard for active users, events, payments, failed webhooks, support tickets.
-
-8. Legal and compliance.
-   - Legal review of Terms and Privacy.
-   - Cookie consent if needed.
-   - Business policy language for review generation.
-
-## 23. Known Bugs / Risks
-
-Recent reported or likely issues:
-
-- Mobile view scroll can get stuck after desktop layout edits.
-- Desktop pages have too much padding or narrow centered content in some views.
-- Business details used to vanish; fix was deployed, but should be tested with same Google account after fresh login/refresh.
-- `revyneai.com` DNS may not be fully stable yet.
-- Vercel deployment URL may be protected while `revyne-pied.vercel.app` is the practical test URL.
-- Razorpay test mode behavior can be confusing and must be tested carefully.
-- If a user had old business data only in localStorage, they need to save it once to Supabase.
-
-## 24. Suggested Next Steps for Claude
-
-Start with these:
-
-1. Open and understand `app.js`, `styles.css`, `index.html`.
-2. Fix the current mobile scroll/header bug.
-3. Polish desktop layout:
-   - keep clean header
-   - remove Order History from header
-   - rename My Business
-   - reduce padding/unused space
-   - avoid redundant page labels
-4. Test Google login refresh:
-   - save business profile
-   - refresh
-   - logout/login same Gmail
-   - verify data persists
-5. Test public review route `/#review`.
-6. Test Smart Reply generation and persistence.
-7. Test Razorpay subscription in test mode.
-8. Review Supabase Security Advisor and RLS policies.
-9. Prepare final domain OAuth changes after domain purchase/DNS completion.
-
-## 25. Important Product Rules
-
-- Reviews must be honest and customer-led.
-- AI suggestions should help clarity, not deception.
-- Do not invent customer experiences.
-- Always let users edit before posting.
-- Do not hide that suggestions are AI-generated where relevant.
-- Public review page should be simple for end customers.
-- Business admin pages can be more detailed.
-
+- Don't assume the web app and native app share UI code — they don't; they're two independent frontends against one Supabase backend, kept in sync by convention, not by shared code.
+- Don't re-add a browser-based OAuth flow for GMB or login on the native app — read §4 first, it explains exactly why that was replaced.
+- Don't treat `googleGmbClientId` or any Android client ID as something to configure in Dart — there isn't one, by design.
+- Don't assume secrets are recoverable from this doc or from chat history — the actual values live only in `~/.android-keys/` and `~/.supabase-keys/` on this Mac, both outside the repo.
