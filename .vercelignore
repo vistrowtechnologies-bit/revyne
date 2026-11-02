@@ -12,3 +12,5 @@ package-lock.json
 .env
 .env.*
 *.log
+
+IMPLEMENTATION_PLAN.md
