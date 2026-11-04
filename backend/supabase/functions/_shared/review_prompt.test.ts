@@ -19,6 +19,17 @@ test("forbids invented details and keyword stuffing", () => {
   assert.match(instructions, /hashtags, emojis, keywords/);
 });
 
+test("every sentence must trace back to the customer's input — no added intentions or remarks", () => {
+  const { instructions } = buildReviewPrompt(base);
+  assert.match(instructions, /Every sentence must be directly supported/);
+  assert.match(instructions, /no plans to return/);
+  assert.match(instructions, /Short and true is better than long/);
+});
+
+test("avoids assuming the customer's gender in gendered languages", () => {
+  assert.match(buildReviewPrompt({ ...base, language: "hinglish" }).instructions, /gender is unknown/);
+});
+
 test("low ratings get an honest, constructive tone — never turned positive", () => {
   const { instructions } = buildReviewPrompt({ ...base, rating: 2 });
   assert.match(instructions, /honest and constructive/);
