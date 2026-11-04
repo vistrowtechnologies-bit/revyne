@@ -10,6 +10,11 @@ class Env {
   /// matched by package name + signing SHA-1 and never appear in code.
   static const googleWebClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
 
+  /// Base URL of the customer review page; the link is `<base>/r/<public_slug>`.
+  static const reviewBaseUrl = String.fromEnvironment('REVIEW_BASE_URL', defaultValue: 'https://revyneai.com');
+
+  static String reviewLink(String slug) => '$reviewBaseUrl/r/$slug';
+
   static List<String> get missingKeys => [
         if (supabaseUrl.isEmpty) 'SUPABASE_URL',
         if (supabasePublishableKey.isEmpty) 'SUPABASE_PUBLISHABLE_KEY',

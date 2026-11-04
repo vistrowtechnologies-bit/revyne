@@ -24,6 +24,18 @@ class BusinessRepository {
         .maybeSingle();
     return row == null ? null : Business.fromJson(row);
   }
+
+  /// Updates the RevYne-only preferences — the only columns owners may edit
+  /// directly (businesses are created by gbp-connect).
+  Future<Business> updatePreferences(String id, {required List<String> products, required List<String> reviewLanguages, required String replyTone}) async {
+    final row = await _client
+        .from('businesses')
+        .update({'products': products, 'review_languages': reviewLanguages, 'reply_tone': replyTone})
+        .eq('id', id)
+        .select()
+        .single();
+    return Business.fromJson(row);
+  }
 }
 
 final businessRepositoryProvider = Provider<BusinessRepository>((ref) => BusinessRepository(ref.watch(supabaseProvider)));

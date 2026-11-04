@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/google/google_sign_in_service.dart';
 import '../../core/theme/tokens.dart';
 import 'auth_repository.dart';
 
@@ -20,7 +21,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     try {
       await ref.read(authRepositoryProvider).signInWithGoogle();
       // The router redirects once the session arrives.
-    } on SignInCancelled {
+    } on GoogleCancelled {
       // User closed the picker.
     } on AuthException catch (e) {
       _showError(e.message);

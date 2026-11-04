@@ -97,7 +97,9 @@ Scaling limits to design for (not the database):
 - [ ] Domain `revyneai.com` live with homepage, privacy policy, terms, account-deletion page
 - [ ] Domain verified in Google Search Console (needed for OAuth verification)
 - [ ] Vistrow Business Profile checked: verified & active 60+ days, website = `https://revyneai.com`
-- [ ] GBP API access form submitted from an owner/manager email of that profile with project number (record case ID + date here)
+- [x] Vistrow Business Profile checked (4 Nov): verified, "Marketing agency", Pune service area, website `https://vistrow.com` (live, has privacy policy; RevYne not mentioned yet). Owner confirmed 60+ days verified
+- [x] GBP API access applied 4 Nov from vistrowtechnologies@gmail.com — **case ID 0-6496000041329**, Google estimate 7–10 business days. Submit only one request per project. On approval: enable "Google My Business API" (v4), check quotas show 300 QPM
+- [x] Billing account linked (4 Nov, UPI prepayment). Places API **not** enabled — not needed after connect-only decision; set a budget alert
 - [ ] Play Console organisation account for Vistrow Technologies (D-U-N-S number)
 - [x] Supabase org "Vistrow Technologies" (Free) created; project `revyne-dev` (ref `qokgcupkabyzdqmgtgdp`) in South Asia (Mumbai) `ap-south-1` — Data API on, auto-expose new tables **off**, automatic RLS **on**; DB password held by owner only
 - [x] Redirect URI `https://qokgcupkabyzdqmgtgdp.supabase.co/auth/v1/callback` added to Google Web OAuth client (2 Nov)
@@ -112,7 +114,11 @@ Scaling limits to design for (not the database):
 - [x] New Flutter project `apps/mobile` (package `com.revyne.revyne_app`, branch `rebuild`): design tokens + shared widgets, env config via `--dart-define-from-file`, Riverpod + go_router, auth → onboarding → 5-tab shell gate (load errors never fall through to onboarding), analyzer clean, tests passing, debug APK builds (needs `kotlin.incremental=false` on this PC)
 - [ ] Supabase schema + RLS — **foundation migration written** (`backend/supabase/migrations/20261102000000_foundation.sql`: profiles, subscriptions (client read-only), businesses (column-level grants), `get_review_page(slug)`); **pushed to revyne-dev 2 Nov** (+ `20261102000100_lock_rls_auto_enable.sql`). Verified from outside with the publishable key: anon cannot read/insert any table, `get_review_page` works, internal functions not callable; Security Advisor 0 errors, only the 2 intentional `get_review_page` warnings. Still to add: review_sessions, private_feedback, reply_drafts, whatsapp_requests, usage, support_tickets. Two-account RLS test pending
 - [x] Google sign-in (native Credential Manager → Supabase `signInWithIdToken`) — verified 2 Nov on Realme RMX2156 (Android 12) with pranav28.nair@gmail.com: Supabase user created, `profiles` + `subscriptions` (free/active) rows auto-created by trigger, app routed to onboarding
-- [ ] Onboarding: language → find business via Places → confirm → products & tone → QR ready
+- [ ] **Decision 3 Nov: connect-only onboarding (option C).** A business exists only after Google Business Profile connect proves the owner manages it; no search/manual fallback. Migration `20261103000000_gbp_connect_only.sql` pushed: `gbp_connections` (service-role only, tokens to be AES-GCM encrypted), `businesses.gbp_account/gbp_location/verified_at`, one RevYne business per Google location, clients can no longer INSERT businesses and may only edit products/review_languages/reply_tone (verified via privilege checks). **Built 4 Nov:** `gbp-connect` edge function deployed (server auth code → encrypted refresh token, list locations, ownership-checked claim; anon calls rejected; secrets `GBP_TOKEN_KEY` + `GOOGLE_OAUTH_CLIENT_ID` set) and onboarding rebuilt as connect → choose location → preferences → done with an honest "Google is still reviewing RevYne" state (10 controller tests). `GOOGLE_OAUTH_CLIENT_SECRET` set by owner 4 Nov (verified it is not a placeholder; correctness proven on first real connect). End-to-end connect test waits on GBP API approval. Places code and function removed; Google Score formula kept in `functions/_shared/google_score.ts` for Phase 3
+- [x] Get Reviews tab: QR + review link (copy, WhatsApp share) and a single-customer WhatsApp request form (4 Nov)
+- [x] Dev test business seeded for pranav28.nair@gmail.com ("RevYne Test Store", unverified) via `backend/supabase/dev-seed/test_business.sql` — dev only, lets the app be built before GBP approval
+- [ ] ~~Onboarding via Places search~~ — superseded by connect-only. Built 2 Nov (4 steps, manual-entry fallback, 7 controller tests). `places` edge function deployed to revyne-dev with its own signed-in check (gateway let a bare publishable key through). Google search waits on: billing linked → Places API (New) enabled → restricted API key → `GOOGLE_PLACES_API_KEY` secret. App-language picker deferred until the UI is translated
+- [ ] Customer review page live at `REVIEW_BASE_URL/r/<slug>` (QR on the done screen points there; page not built yet)
 - [ ] Google Score (Places: rating, review count, profile completeness, nearby competitors)
 - [ ] Dashboard + notifications
 - [ ] Reviews inbox (Places latest reviews + paste a review) + AI reply drafts (copy & open Google)
@@ -172,5 +178,8 @@ Scaling limits to design for (not the database):
 | 2026-11-02 | Supabase org "Vistrow Technologies" + `revyne-dev` created | Mumbai region, secure defaults (no auto-expose, auto RLS) |
 | 2026-11-02 | Google sign-in connected to `revyne-dev` | Callback URL on Web client; Google provider enabled in Supabase |
 | 2026-11-02 | Foundation migrations pushed to `revyne-dev` | Supabase CLI logged in + linked on this PC (owner ran login/link) |
+| 2026-11-04 | Connect-only onboarding + gbp-connect + Get Reviews tab | Verified on phone: test account opens Home ("RevYne Test Store"), Get Reviews shows QR/link/WhatsApp form |
+| 2026-11-04 | GBP API access requested | Case 0-6496000041329; build continues on the seeded test business meanwhile |
+| 2026-11-03 | Connect-only onboarding decided | Migration pushed; test business seeded for pranav28.nair@gmail.com |
 | 2026-11-02 | First real sign-in on phone | Debug APK on Realme RMX2156; user + profile + free subscription created |
 | 2026-11-02 | Phase 1 started on branch `rebuild` | `apps/mobile` (Flutter) + `backend/` (Supabase) scaffolded; old code left untouched at repo root; half-merged old edits reset (still in `stash@{0}`) |
