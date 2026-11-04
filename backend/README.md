@@ -17,6 +17,7 @@ npx supabase db push
 ## Security rules for every migration
 
 - Enable RLS on every table and write explicit policies using `(select auth.uid())`.
-- The project does not auto-expose tables: grant only the columns clients need.
+- The project does not auto-expose tables: grant only the columns clients need, and always
+  `grant select, insert, update, delete on <table> to service_role` (edge functions need it).
 - Billing/plan data is client read-only; only the service role writes it.
 - Anonymous access goes through `security definer` functions that return public fields only.
