@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/router.dart';
 import '../../core/google/google_sign_in_service.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
 import '../business/business_repository.dart';
 import '../gbp/gbp_repository.dart';
+import '../google_reviews/google_reviews_repository.dart';
+import 'profile_panel.dart';
+import 'profile_repository.dart';
 
 /// Google tab. Until Google approves RevYne's Business Profile API access this
 /// shows what connecting unlocks; afterwards it becomes reviews, posts and insights.
@@ -29,9 +34,11 @@ class _GoogleProfileScreenState extends ConsumerState<GoogleProfileScreen> {
       var result = await repo.locations();
       if (result.status != ConnectStatus.ok || result.locations.isEmpty) result = await repo.connect();
       message = switch (result.status) {
-        ConnectStatus.apiNotApproved => 'Your Google account is linked. Google is still reviewing RevYne — we\'ll finish setup once approved.',
+        ConnectStatus.apiNotApproved =>
+          'Your Google account is linked. Google is still reviewing RevYne — we\'ll finish setup once approved.',
         ConnectStatus.missingScope => 'Please allow RevYne to manage your Business Profile and try again.',
-        ConnectStatus.ok when result.locations.isEmpty => 'This Google account doesn\'t manage a Business Profile. Try the account that does.',
+        ConnectStatus.ok when result.locations.isEmpty =>
+          'This Google account doesn\'t manage a Business Profile. Try the account that does.',
         ConnectStatus.ok => await _pickAndLink(result.locations),
         _ => 'Could not connect right now. Please try again.',
       };
@@ -82,97 +89,179 @@ class _GoogleProfileScreenState extends ConsumerState<GoogleProfileScreen> {
     final verified = business?.isVerified ?? false;
 
     const unlocks = [
-      (Icons.reviews_outlined, 'Google reviews & AI replies', 'Every review in one inbox. AI drafts a warm reply in your tone — it is posted only after you approve it.'),
-      (Icons.add_photo_alternate_outlined, 'Posts & photos', 'Share offers, festival updates and fresh photos to your Google profile from your phone.'),
-      (Icons.insights_outlined, 'Calls, directions & searches', 'See how many people called you, asked for directions or found you on Google each week.'),
+      (
+        Icons.reviews_outlined,
+        'Google reviews & AI replies',
+        'Every review in one inbox. AI drafts a warm reply in your tone — it is posted only after you approve it.',
+      ),
+      (
+        Icons.add_photo_alternate_outlined,
+        'Posts & photos',
+        'Share offers, festival updates and fresh photos to your Google profile from your phone.',
+      ),
+      (
+        Icons.insights_outlined,
+        'Calls, directions & searches',
+        'See how many people called you, asked for directions or found you on Google each week.',
+      ),
     ];
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 120),
-          children: [
-            Text('Google Profile', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: AppSpacing.lg),
-            GradientCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(14)),
-                        child: const Icon(Icons.storefront_rounded, color: Colors.white),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(AppRadius.chip)),
-                        child: Text(verified ? 'Connected' : 'Not connected', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    verified ? business!.name : 'Connect your Google Business Profile',
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.25),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    verified
-                        ? [if (business!.city != null) business.city!, 'Linked to your Google Business Profile'].join(' · ')
-                        : 'Use the Google account that manages your business on Google Maps.',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 15),
-                  ),
-                  if (!verified) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.violet),
-                        onPressed: _busy ? null : _connect,
-                        icon: _busy
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.link_rounded),
-                        label: const Text('Connect Google Profile'),
-                      ),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(gbpProfileProvider);
+            ref.invalidate(googleReviewsProvider);
+            try {
+              await ref.read(gbpProfileProvider.future);
+            } catch (_) {
+              // The panel shows the error itself.
+            }
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 120),
+            children: [
+              Text('Google Profile', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: AppSpacing.lg),
+              GradientCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(14)),
+                          child: const Icon(Icons.storefront_rounded, color: Colors.white),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(AppRadius.chip),
+                          ),
+                          child: Text(
+                            verified ? 'Connected' : 'Not connected',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            SectionHeader(title: verified ? 'Coming to this tab' : 'What you unlock'),
-            const SizedBox(height: AppSpacing.sm),
-            for (final (icon, title, body) in unlocks)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.gutter),
-                child: AppCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      IconTile(icon),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                            const SizedBox(height: 4),
-                            Text(body, style: const TextStyle(color: AppColors.muted, fontSize: 14.5)),
-                          ],
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      verified ? business!.name : 'Connect your Google Business Profile',
+                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.25),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      verified
+                          ? [if (business!.city != null) business.city!, 'Linked to your Google Business Profile'].join(' · ')
+                          : 'Use the Google account that manages your business on Google Maps.',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 15),
+                    ),
+                    if (!verified) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.violet),
+                          onPressed: _busy ? null : _connect,
+                          icon: _busy
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.link_rounded),
+                          label: const Text('Connect Google Profile'),
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
               ),
-          ],
+              if (verified) ...[
+                const SizedBox(height: AppSpacing.lg),
+                const GoogleProfilePanel(),
+                const SizedBox(height: AppSpacing.lg),
+                const SectionHeader(title: 'Google reviews'),
+                const SizedBox(height: AppSpacing.sm),
+                const _ReviewsShortcut(),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              SectionHeader(title: verified ? 'Coming next' : 'What you unlock'),
+              const SizedBox(height: AppSpacing.sm),
+              for (final (icon, title, body) in verified ? unlocks.skip(1) : unlocks)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.gutter),
+                  child: AppCard(
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        IconTile(icon),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                              const SizedBox(height: 4),
+                              Text(body, style: const TextStyle(color: AppColors.muted, fontSize: 14.5)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// Rating, review count and replies waiting, with a way into the inbox.
+class _ReviewsShortcut extends ConsumerWidget {
+  const _ReviewsShortcut();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final page = ref.watch(googleReviewsProvider);
+    final value = page.value;
+    final waiting = value?.reviews.where((r) => r.needsReply).length ?? 0;
+    return AppCard(
+      padding: const EdgeInsets.all(18),
+      onTap: () => context.go(Routes.reviews),
+      child: Row(
+        children: [
+          const IconTile(Icons.star_rounded),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value == null
+                      ? (page.hasError ? 'Open your reviews inbox' : 'Loading reviews…')
+                      : value.totalCount == 0
+                      ? 'No Google reviews yet'
+                      : '${value.averageRating?.toStringAsFixed(1) ?? '–'} ★ · ${value.totalCount} review${value.totalCount == 1 ? '' : 's'}',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value == null || value.totalCount == 0
+                      ? 'Read and reply to Google reviews'
+                      : (waiting > 0 ? '$waiting waiting for your reply' : 'All replied — nice work'),
+                  style: const TextStyle(color: AppColors.muted, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ],
       ),
     );
   }
@@ -207,8 +296,10 @@ class LocationPickerSheet extends StatelessWidget {
             ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: Text('Google profiles this account manages. RevYne links one business per account.',
-                  style: TextStyle(color: AppColors.muted, fontSize: 14.5)),
+              child: Text(
+                'Google profiles this account manages. RevYne links one business per account.',
+                style: TextStyle(color: AppColors.muted, fontSize: 14.5),
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Flexible(
@@ -234,8 +325,10 @@ class LocationPickerSheet extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(l.title.isEmpty ? 'Unnamed business' : l.title,
-                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                                  Text(
+                                    l.title.isEmpty ? 'Unnamed business' : l.title,
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                                  ),
                                   if (l.city != null || l.takenByOther) ...[
                                     const SizedBox(height: 2),
                                     Text(

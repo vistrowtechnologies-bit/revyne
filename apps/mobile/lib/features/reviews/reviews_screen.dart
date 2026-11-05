@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../app/router.dart';
 import '../../core/format.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
 import '../business/business_repository.dart';
 import '../get_reviews/review_link_card.dart';
+import '../google_reviews/google_reviews_inbox.dart';
+import '../google_reviews/google_reviews_repository.dart';
 import '../home/dashboard.dart';
 import 'reviews_repository.dart';
 
@@ -23,17 +23,20 @@ class ReviewsScreen extends ConsumerStatefulWidget {
 }
 
 class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
-  _Tab _tab = _Tab.private;
+  _Tab? _picked; // null → Google when linked, otherwise Private
 
   @override
   Widget build(BuildContext context) {
     final unread = ref.watch(privateFeedbackProvider).value?.where((f) => f.isUnread).length ?? 0;
+    final linked = ref.watch(myBusinessProvider).value?.isVerified ?? false;
+    final waiting = linked ? ref.watch(googleReviewsProvider).value?.reviews.where((r) => r.needsReply).length : null;
+    final tab = _picked ?? (linked ? _Tab.google : _Tab.private);
 
-    Widget segment(_Tab tab, IconData icon, String label, {int? badge}) {
-      final selected = _tab == tab;
+    Widget segment(_Tab t, IconData icon, String label, {int? badge}) {
+      final selected = t == tab;
       return Expanded(
         child: GestureDetector(
-          onTap: () => setState(() => _tab = tab),
+          onTap: () => setState(() => _picked = t),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(vertical: 11),
@@ -80,7 +83,7 @@ class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
                 decoration: BoxDecoration(color: AppColors.violet100, borderRadius: BorderRadius.circular(AppRadius.chip)),
                 child: Row(
                   children: [
-                    segment(_Tab.google, Icons.lock_outline_rounded, 'Google'),
+                    segment(_Tab.google, linked ? Icons.star_rounded : Icons.lock_outline_rounded, 'Google', badge: waiting),
                     segment(_Tab.private, Icons.forum_outlined, 'Private', badge: unread),
                     segment(_Tab.visits, Icons.visibility_outlined, 'Visits'),
                   ],
@@ -89,8 +92,8 @@ class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
             ),
             const SizedBox(height: AppSpacing.sm),
             Expanded(
-              child: switch (_tab) {
-                _Tab.google => const _GoogleLocked(),
+              child: switch (tab) {
+                _Tab.google => const GoogleReviewsInbox(),
                 _Tab.private => const _FeedbackList(),
                 _Tab.visits => const _VisitList(),
               },
@@ -98,31 +101,6 @@ class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _GoogleLocked extends ConsumerWidget {
-  const _GoogleLocked();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final verified = ref.watch(myBusinessProvider).value?.isVerified ?? false;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 120),
-      children: [
-        EmptyState(
-          icon: verified ? Icons.hourglass_top_rounded : Icons.lock_outline_rounded,
-          title: verified ? 'Google reviews are on the way' : 'Connect Google to see your reviews',
-          body: verified
-              ? 'Your profile is connected. Reviews appear here once Google finishes approving RevYne.'
-              : 'Read every Google review here and reply with AI drafts — nothing is posted until you approve it.',
-        ),
-        if (!verified) ...[
-          const SizedBox(height: AppSpacing.md),
-          GradientButton(label: 'Connect Google Profile', icon: Icons.link_rounded, onPressed: () => context.go(Routes.google)),
-        ],
-      ],
     );
   }
 }
