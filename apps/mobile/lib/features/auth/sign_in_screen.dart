@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/google/google_sign_in_service.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/ui.dart';
 import 'auth_repository.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
@@ -40,62 +41,89 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     const points = [
-      (Icons.qr_code_2_rounded, 'Get more genuine Google reviews with a QR code and WhatsApp'),
-      (Icons.auto_awesome_rounded, 'Reply to every review in seconds with AI'),
-      (Icons.verified_user_rounded, 'Nothing is posted to Google without your approval'),
+      (Icons.qr_code_2_rounded, 'More genuine Google reviews from a QR code and WhatsApp'),
+      (Icons.auto_awesome_rounded, 'AI reply drafts in Hindi, Hinglish or English'),
+      (Icons.verified_user_outlined, 'Nothing is posted to Google without your approval'),
     ];
 
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(),
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(16)),
-                alignment: Alignment.center,
-                child: const Text('R', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text('Grow your business on Google', style: Theme.of(context).textTheme.displayMedium),
-              const SizedBox(height: AppSpacing.sm),
-              const Text(
-                'More reviews, faster replies, a stronger Google profile.',
-                style: TextStyle(fontSize: 16, color: AppColors.onSurfaceVariant),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              for (final (icon, text) in points)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: Row(
+      backgroundColor: Colors.white,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            flex: 11,
+            child: Container(
+              decoration: const BoxDecoration(gradient: AppColors.brandGradient),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Icon(icon, color: AppColors.primary),
-                      const SizedBox(width: AppSpacing.gutter),
-                      Expanded(child: Text(text, style: const TextStyle(fontSize: 15))),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(26),
+                          boxShadow: const [BoxShadow(color: Color(0x55120731), blurRadius: 30, offset: Offset(0, 14))],
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Image.asset('assets/brand/logo.png', width: 84, height: 84),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      const Text(
+                        'Grow your business\non Google',
+                        style: TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800, height: 1.12, letterSpacing: -0.6),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'More reviews, faster replies, a stronger profile.',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16.5),
+                      ),
                     ],
                   ),
                 ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: _busy ? null : _signIn,
-                icon: _busy
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.login_rounded),
-                label: const Text('Continue with Google'),
               ),
-              const SizedBox(height: AppSpacing.gutter),
-              const Text(
-                'Free to start. No sales calls, ever.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
-              ),
-            ],
+            ),
           ),
-        ),
+          Expanded(
+            flex: 10,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final (icon, text) in points)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: Row(
+                          children: [
+                            IconTile(icon, size: 40),
+                            const SizedBox(width: AppSpacing.gutter),
+                            Expanded(child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+                          ],
+                        ),
+                      ),
+                    const Spacer(),
+                    GradientButton(label: 'Continue with Google', icon: Icons.login_rounded, busy: _busy, onPressed: _signIn),
+                    const SizedBox(height: AppSpacing.gutter),
+                    const Text(
+                      'Free to start. No sales calls, ever.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: AppColors.muted, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

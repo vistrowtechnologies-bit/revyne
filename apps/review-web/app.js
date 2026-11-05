@@ -73,6 +73,7 @@
     const chips = [...(p.products || []), ...ASPECTS];
     const languages = (p.review_languages || ["en"]).filter((c) => LANGUAGE_LABELS[c]);
     app.innerHTML = `
+      <div class="brand"><img src="/logo.png" alt=""> RevYne</div>
       <h1>How was your visit to ${esc(p.name)}?</h1>
       <p class="muted">${esc([p.category, p.city].filter(Boolean).join(" · "))}</p>
       <div class="card">

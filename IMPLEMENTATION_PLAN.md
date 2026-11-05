@@ -122,12 +122,13 @@ Scaling limits to design for (not the database):
 - [x] Found + fixed: service_role had no table privileges (auto-expose off) — `20261104000100_service_role_grants.sql`; rule added to backend README
 - [x] Reviews tab: private feedback (unread, mark read, call/WhatsApp back) + review-page visits (4 Nov). Verified on phone: 2 private feedback with unread count, tap marks read (DB confirms), page visits show rating/highlights/text/"Went to Google"
 - [ ] Google Score (Places: rating, review count, profile completeness, nearby competitors)
-- [ ] Dashboard + notifications
+- [x] Home dashboard (4 Nov): `get_dashboard_stats` (security invoker — verified a stranger's session gets zeros, owner gets real numbers), this-week tiles with week-over-week change, reached-Google %, 30-day average rating, unread-feedback card, up to 3 next steps from real activity, On Google / Not connected badge. Verified on phone
+- [ ] Notifications (push) — later, with FCM
 - [ ] Reviews inbox (Places latest reviews + paste a review) + AI reply drafts (copy & open Google)
 - [ ] Customer review web page (5 states, 10+ languages, no gating)
-- [ ] Private feedback inbox
-- [ ] QR & poster, WhatsApp single request, review page settings
-- [ ] Help & support, settings, legal, in-app account deletion
+- [x] Private feedback inbox (Reviews tab: Private + Visits, Reply on WhatsApp / Call) (5 Nov)
+- [x] QR & poster (A5/A4 PDF download), WhatsApp single request, review page settings (products, tone, languages) (5 Nov)
+- [x] Help & support, settings, legal links, in-app account deletion (`account-delete` revokes the Google token, then deletes the user) (5 Nov)
 - [ ] AI edge functions with server-side limits + rate limits
 - [ ] Create upload keystore (back up key + password in 2 safe places) — only now, right before the first Play upload
 - [ ] Internal testing release, then closed testing
@@ -143,8 +144,8 @@ Scaling limits to design for (not the database):
 
 ## Phase 3 — Google Business Profile integration (starts when Google approves API access)
 
-- [ ] Connect flow: incremental `business.manage` + server auth code → refresh token stored server-side
-- [ ] Location picker; location stored as `accounts/{a}/locations/{l}`
+- [x] Connect flow: incremental `business.manage` + server auth code → refresh token stored server-side (5 Nov, verified with a real profile)
+- [x] Location picker; location stored as `accounts/{a}/locations/{l}`; an existing unlinked business is linked in place (keeps its review link) (5 Nov)
 - [ ] Reviews sync + reply posting (owner approval) + Pub/Sub new-review push notifications
 - [ ] Profile editor (description with AI, hours, phone, website) with before/after + approval
 - [ ] Posts (update/offer/event, AI text + image, scheduling) and photos
@@ -181,6 +182,8 @@ Scaling limits to design for (not the database):
 | 2026-11-02 | Google sign-in connected to `revyne-dev` | Callback URL on Web client; Google provider enabled in Supabase |
 | 2026-11-02 | Foundation migrations pushed to `revyne-dev` | Supabase CLI logged in + linked on this PC (owner ran login/link) |
 | 2026-11-04 | Connect-only onboarding + gbp-connect + Get Reviews tab | Verified on phone: test account opens Home ("RevYne Test Store"), Get Reviews shows QR/link/WhatsApp form |
+| 2026-11-05 | Logo-palette redesign of every screen | Palette in `design/brand/PALETTE.md`; Plus Jakarta Sans bundled (500-800); gradient hero per screen, raised Get Reviews tab, 7-day chart (`dashboard_daily` migration). Verified all 5 tabs on the Realme (arm64 release build, 21 MB - phone too full for the 192 MB debug APK) |
+| 2026-11-05 | First real Business Profile linked | Google's Business Profile APIs answered for pranav28.nair@gmail.com (access appears approved). Test store linked to a real Pune profile: name, category, address, phone, place ID, review URL from Google; review page shows it |
 | 2026-11-04 | GBP API access requested | Case 0-6496000041329; build continues on the seeded test business meanwhile |
 | 2026-11-03 | Connect-only onboarding decided | Migration pushed; test business seeded for pranav28.nair@gmail.com |
 | 2026-11-02 | First real sign-in on phone | Debug APK on Realme RMX2156; user + profile + free subscription created |

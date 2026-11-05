@@ -10,5 +10,19 @@ String timeAgo(DateTime time, {DateTime? now}) {
   return '${local.day} ${months[local.month - 1]}';
 }
 
+/// "Good morning" / "Good afternoon" / "Good evening" for the local hour.
+String greeting(DateTime now) {
+  final h = now.hour;
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/// First word of a full name, or null.
+String? firstName(String? fullName) {
+  final parts = (fullName ?? '').trim().split(RegExp(r'\s+'));
+  return parts.first.isEmpty ? null : parts.first;
+}
+
 /// "★★★★☆" for a 1–5 rating.
 String stars(int rating) => '★' * rating + '☆' * (5 - rating);

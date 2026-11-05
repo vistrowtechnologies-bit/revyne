@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+
+<html class="h-full dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<meta content="mobile_tab" name="shell-type"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            surface: "#0E0D1A",
+            background: "#0E0D1A",
+            "surface-container-low": "#151329",
+            "surface-container": "#1B1A2E",
+            "surface-container-high": "#24223C",
+            "surface-container-highest": "#2E2B4A",
+            "primary": "#F5B544",
+            "primary-container": "#F5B544",
+            "on-primary": "#281900",
+            "on-surface": "#FAF9F6",
+            "on-surface-variant": "#A09DB0",
+            "gold-border": "rgba(245, 181, 68, 0.15)",
+            "glass-bg": "rgba(255, 255, 255, 0.035)",
+            "glass-card": "rgba(27, 26, 46, 0.7)"
+          },
+          borderRadius: {
+            DEFAULT: "1rem",
+            "2xl": "1.5rem",
+            "3xl": "2rem",
+            full: "9999px"
+          },
+          fontFamily: {
+            "headline-lg": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-md": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-sm": ["Plus Jakarta Sans", "sans-serif"],
+            "label-lg": ["Plus Jakarta Sans", "sans-serif"],
+            "label-md": ["Plus Jakarta Sans", "sans-serif"],
+            "label-sm": ["Plus Jakarta Sans", "sans-serif"],
+            "body-lg": ["Noto Sans", "sans-serif"],
+            "body-md": ["Noto Sans", "sans-serif"],
+            "body-sm": ["Noto Sans", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    @layer base {
+      html, body {
+        width: 100vw;
+        min-height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #0E0D1A;
+        color: #FAF9F6;
+      }
+      body {
+        overscroll-behavior: none;
+      }
+      .pb-safe {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .material-symbols-filled {
+      font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+    }
+    .gold-glow {
+      background: radial-gradient(circle, rgba(245, 181, 68, 0.18) 0%, rgba(245, 181, 68, 0) 70%);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface flex flex-col min-h-screen selection:bg-[#F5B544]/20 selection:text-[#F5B544]">
+<!-- Top App Bar / Header -->
+<header class="fixed top-0 w-full z-50 pt-safe bg-[#0E0D1A]/85 backdrop-blur-xl border-b border-[rgba(245,181,68,0.1)]">
+<div class="h-16 px-4 flex items-center justify-between gap-3">
+<!-- Left: Logo & Branch Pill -->
+<div class="flex items-center gap-2.5 min-w-0 flex-1">
+<div class="flex items-center gap-1 text-[#FAF9F6] text-xl font-extrabold tracking-tight font-headline-md flex-shrink-0">
+<span>RevYne</span>
+<span class="text-[#F5B544] text-lg font-normal">✦</span>
+</div>
+<button class="h-9 px-2.5 flex items-center gap-1.5 bg-[#151329] border border-[rgba(245,181,68,0.15)] rounded-full text-left max-w-[190px] active:scale-95 transition-transform" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-[#4fe088] flex-shrink-0 animate-pulse"></span>
+<span class="font-label-md text-xs text-[#FAF9F6] truncate font-medium">Sharma Sweets &amp; Chaat</span>
+<span class="material-symbols-outlined material-symbols-filled text-[15px] text-[#F5B544] flex-shrink-0">verified</span>
+<span class="material-symbols-outlined text-[15px] text-[#A09DB0] flex-shrink-0">expand_more</span>
+</button>
+</div>
+<!-- Right: Action Icons -->
+<div class="flex items-center gap-2 flex-shrink-0">
+<button aria-label="Notifications" class="w-10 h-10 rounded-full flex items-center justify-center text-[#A09DB0] hover:text-[#FAF9F6] active:bg-[#1B1A2E] bg-[#151329] border border-[rgba(245,181,68,0.12)] relative transition-all" onclick="triggerToast('Notifications up to date')" type="button">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#F5B544] shadow-[0_0_8px_#F5B544]"></span>
+</button>
+<div class="w-9 h-9 rounded-full bg-gradient-to-br from-[#F5B544]/25 to-[#F5B544]/10 border border-[#F5B544]/40 flex items-center justify-center text-[#F5B544] font-bold font-label-md text-xs shadow-[0_0_12px_rgba(245,181,68,0.15)]">
+          RS
+        </div>
+</div>
+</div>
+</header>
+<!-- Main Scrollable Canvas -->
+<main class="flex flex-col relative w-full pt-16 pb-safe bg-[#0E0D1A] min-h-screen">
+<!-- Action Toast Notification -->
+<div class="fixed top-20 left-4 right-4 z-50 transform -translate-y-28 opacity-0 transition-all duration-300 pointer-events-none" id="actionToast">
+<div class="bg-[#1B1A2E] text-[#FAF9F6] border border-[#F5B544]/30 rounded-2xl px-4 py-3 shadow-[0_16px_36px_rgba(0,0,0,0.6)] backdrop-blur-xl flex items-center justify-between gap-3">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined material-symbols-filled text-[#F5B544] text-[20px]">check_circle</span>
+<span class="font-label-md text-sm text-[#FAF9F6]" id="toastMessage">Action completed</span>
+</div>
+<span class="font-label-sm text-xs text-[#F5B544] uppercase tracking-wider font-bold">Done</span>
+</div>
+</div>
+<div class="px-4 space-y-4 pt-3 pb-6">
+<!-- 1. Welcome Greeting Header -->
+<div class="flex items-center justify-between pt-1">
+<div>
+<div class="flex items-center gap-2">
+<h1 class="font-headline-md text-xl md:text-2xl text-[#FAF9F6] font-bold tracking-tight">Namaste, Ramesh ji!</h1>
+<span class="text-xl">🙏</span>
+</div>
+<p class="font-body-sm text-xs text-[#A09DB0] flex items-center gap-1.5 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-[#4fe088] inline-block shadow-[0_0_6px_#4fe088]"></span>
+            Sharma Sweets &amp; Chaat • Old Delhi Listing
+          </p>
+</div>
+<div class="w-10 h-10 rounded-2xl bg-[#151329] border border-[rgba(245,181,68,0.2)] flex items-center justify-center flex-shrink-0 text-[#F5B544] shadow-[0_0_16px_rgba(245,181,68,0.1)]">
+<span class="material-symbols-outlined text-[20px]">storefront</span>
+</div>
+</div>
+<!-- 2. Hero Analytics Card: RevYne Weekly Activity & 7-Day Chart -->
+<div class="w-full bg-[#151329]/90 border border-[rgba(245,181,68,0.22)] rounded-[24px] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl relative overflow-hidden">
+<!-- Soft golden radiant glow halo -->
+<div class="absolute -top-12 -right-8 w-56 h-56 rounded-full gold-glow pointer-events-none"></div>
+<div class="absolute -bottom-16 -left-10 w-48 h-48 rounded-full gold-glow pointer-events-none opacity-60"></div>
+<div class="relative z-10 flex items-center justify-between pb-3 border-b border-[rgba(245,181,68,0.1)]">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#F5B544] text-[20px]">insights</span>
+<span class="font-label-md text-xs uppercase tracking-wider text-[#FAF9F6] font-bold">RevYne Activity This Week</span>
+</div>
+<span class="inline-flex items-center gap-1 bg-[#F5B544]/15 border border-[#F5B544]/30 text-[#F5B544] px-2.5 py-0.5 rounded-full font-label-sm text-[11px] font-semibold">
+<span class="material-symbols-outlined text-[13px]">trending_up</span>
+            +40% vs last week
+          </span>
+</div>
+<!-- Key Metrics Row -->
+<div class="relative z-10 grid grid-cols-2 gap-4 pt-4 pb-4">
+<div class="relative">
+<div class="absolute -inset-2 rounded-full gold-glow -z-10 scale-75 opacity-70"></div>
+<span class="font-headline-lg text-3xl font-extrabold text-[#FAF9F6] tracking-tight block">31</span>
+<span class="font-body-sm text-xs text-[#A09DB0] mt-0.5 block">Review page visits</span>
+</div>
+<div>
+<div class="flex items-baseline gap-1.5">
+<span class="font-headline-lg text-3xl font-extrabold text-[#F5B544] tracking-tight">12</span>
+<span class="font-label-sm text-xs text-[#A09DB0] font-medium">(39%)</span>
+</div>
+<span class="font-body-sm text-xs text-[#A09DB0] mt-0.5 block">Went to Google</span>
+</div>
+</div>
+<!-- 7-Day Dark-Gold Styled Bar Chart -->
+<div class="relative z-10 pt-3 border-t border-[rgba(245,181,68,0.08)]">
+<div class="flex items-center justify-between text-xs font-label-sm mb-3">
+<span class="text-[#A09DB0]">Customer visits past 7 days</span>
+<span class="text-[#F5B544] font-semibold">Avg 4.4 / day</span>
+</div>
+<div class="grid grid-cols-7 gap-2 items-end h-20 pt-1">
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<div class="w-full bg-[#F5B544]/20 rounded-t-md h-[40%] border-t border-[#F5B544]/40"></div>
+<span class="text-[10px] text-[#A09DB0] font-label-sm">M</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<div class="w-full bg-[#F5B544]/20 rounded-t-md h-[55%] border-t border-[#F5B544]/40"></div>
+<span class="text-[10px] text-[#A09DB0] font-label-sm">T</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<div class="w-full bg-[#F5B544]/20 rounded-t-md h-[35%] border-t border-[#F5B544]/40"></div>
+<span class="text-[10px] text-[#A09DB0] font-label-sm">W</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<div class="w-full bg-[#F5B544]/25 rounded-t-md h-[60%] border-t border-[#F5B544]/50"></div>
+<span class="text-[10px] text-[#A09DB0] font-label-sm">T</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<div class="w-full bg-[#F5B544]/40 rounded-t-md h-[75%] border-t border-[#F5B544]/70"></div>
+<span class="text-[10px] text-[#A09DB0] font-label-sm">F</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<div class="w-full bg-gradient-to-t from-[#F5B544]/70 to-[#F5B544] rounded-t-md h-[100%] shadow-[0_0_12px_rgba(245,181,68,0.45)]"></div>
+<span class="text-[10px] text-[#F5B544] font-bold font-label-sm">S</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<div class="w-full bg-[#F5B544]/80 rounded-t-md h-[85%] shadow-[0_0_10px_rgba(245,181,68,0.3)]"></div>
+<span class="text-[10px] text-[#F5B544] font-bold font-label-sm">S</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. Private Feedback Attention Card -->
+<div class="w-full bg-[#1B1A2E]/80 border border-[rgba(245,181,68,0.18)] rounded-[24px] p-4 shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl relative overflow-hidden">
+<div class="flex items-start gap-3.5">
+<div class="w-11 h-11 rounded-2xl bg-[#F5B544]/15 border border-[#F5B544]/30 flex items-center justify-center flex-shrink-0 text-[#F5B544] shadow-[0_0_16px_rgba(245,181,68,0.15)] mt-0.5">
+<span class="material-symbols-outlined text-[22px]">mark_email_unread</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between gap-1">
+<span class="font-headline-sm text-sm text-[#FAF9F6] font-bold">2 private messages waiting</span>
+<span class="font-label-sm text-[10px] bg-[#F5B544]/20 border border-[#F5B544]/40 text-[#F5B544] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Needs attention</span>
+</div>
+<p class="font-body-sm text-xs text-[#A09DB0] mt-1 leading-relaxed">
+              Customers who gave private feedback on your review link. Read privately without public posting.
+            </p>
+<div class="pt-3">
+<button class="bg-[#F5B544] text-[#281900] font-label-sm text-xs px-4 py-2 rounded-full font-bold inline-flex items-center gap-1.5 shadow-[0_4px_16px_rgba(245,181,68,0.35)] active:scale-95 transition-all" onclick="triggerToast('Opening private customer feedback...')" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+<span>Read Feedback</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- 4. Locked Google Business Analytics Card -->
+<div class="bg-[#151329]/75 rounded-[24px] p-4 border border-[rgba(245,181,68,0.12)] shadow-[0_10px_30px_rgba(0,0,0,0.3)] backdrop-blur-xl relative overflow-hidden">
+<div class="flex items-start gap-3.5">
+<div class="w-11 h-11 rounded-2xl bg-[#1B1A2E] border border-[rgba(255,255,255,0.08)] flex items-center justify-center text-[#A09DB0] flex-shrink-0">
+<span class="material-symbols-outlined text-[22px]">lock</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-sm font-bold text-[#FAF9F6]">Google Business Analytics</span>
+</div>
+<p class="font-body-sm text-xs text-[#A09DB0] mt-1 leading-relaxed">
+              Unlocks when your Google Business Profile is connected. Sync live views, customer searches, directions, and phone call analytics.
+            </p>
+<div class="pt-3 flex items-center gap-3">
+<button class="bg-[#FAF9F6] text-[#0E0D1A] font-label-sm text-xs px-4 py-2 rounded-full font-bold flex items-center gap-1.5 shadow-[0_4px_12px_rgba(255,255,255,0.15)] active:scale-95 transition-all" onclick="triggerToast('Connecting Google Business Profile...')" type="button">
+<span class="material-symbols-outlined text-[16px]">link</span>
+<span>Connect Profile</span>
+</button>
+<span class="font-label-sm text-[11px] text-[#A09DB0]">Takes 1 minute</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 5. Smart Counter Tools Grid -->
+<div class="pt-1">
+<div class="flex items-center justify-between mb-2.5 px-0.5">
+<h2 class="font-headline-sm text-base text-[#FAF9F6] font-bold">Smart Counter Tools</h2>
+<span class="font-label-sm text-xs text-[#F5B544] font-semibold tracking-wide">Quick Actions</span>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<!-- Tool 1: WhatsApp Request -->
+<button class="bg-[#151329]/90 border border-[rgba(245,181,68,0.12)] p-4 rounded-[24px] shadow-[0_8px_24px_rgba(0,0,0,0.3)] text-left flex flex-col justify-between active:scale-[0.98] transition-all min-h-[136px] hover:border-[#F5B544]/30" onclick="triggerToast('Opening WhatsApp invite dialog...')" type="button">
+<div class="flex items-center justify-between w-full">
+<div class="w-10 h-10 rounded-2xl bg-[#4fe088]/15 border border-[#4fe088]/30 flex items-center justify-center text-[#4fe088] shadow-[0_0_12px_rgba(79,224,136,0.15)]">
+<span class="material-symbols-outlined text-[20px]">chat</span>
+</div>
+<span class="font-label-sm text-[10px] text-[#4fe088] bg-[#4fe088]/10 border border-[#4fe088]/20 px-2 py-0.5 rounded-full font-bold">Direct</span>
+</div>
+<div class="mt-3 min-w-0">
+<div class="font-label-md text-sm text-[#FAF9F6] font-bold truncate">WhatsApp Invite</div>
+<p class="font-body-sm text-[11px] text-[#A09DB0] line-clamp-1 mt-0.5">Send link to customer bill</p>
+</div>
+</button>
+<!-- Tool 2: QR Standee -->
+<button class="bg-[#151329]/90 border border-[rgba(245,181,68,0.12)] p-4 rounded-[24px] shadow-[0_8px_24px_rgba(0,0,0,0.3)] text-left flex flex-col justify-between active:scale-[0.98] transition-all min-h-[136px] hover:border-[#F5B544]/30" onclick="triggerToast('Generating Acrylic QR Standee printout...')" type="button">
+<div class="flex items-center justify-between w-full">
+<div class="w-10 h-10 rounded-2xl bg-[#F5B544]/15 border border-[#F5B544]/30 flex items-center justify-center text-[#F5B544] shadow-[0_0_12px_rgba(245,181,68,0.15)]">
+<span class="material-symbols-outlined text-[20px]">qr_code_2</span>
+</div>
+<span class="font-label-sm text-[10px] text-[#F5B544] bg-[#F5B544]/10 border border-[#F5B544]/25 px-2 py-0.5 rounded-full font-bold">Print</span>
+</div>
+<div class="mt-3 min-w-0">
+<div class="font-label-md text-sm text-[#FAF9F6] font-bold truncate">Counter QR Standee</div>
+<p class="font-body-sm text-[11px] text-[#A09DB0] line-clamp-1 mt-0.5">Physical acrylic display</p>
+</div>
+</button>
+<!-- Tool 3: Private Customer Feedback -->
+<button class="bg-[#151329]/90 border border-[rgba(245,181,68,0.12)] p-4 rounded-[24px] shadow-[0_8px_24px_rgba(0,0,0,0.3)] text-left flex flex-col justify-between active:scale-[0.98] transition-all min-h-[136px] hover:border-[#F5B544]/30" onclick="triggerToast('Loading private feedback inbox...')" type="button">
+<div class="flex items-center justify-between w-full">
+<div class="w-10 h-10 rounded-2xl bg-[#ffd698]/15 border border-[#ffd698]/30 flex items-center justify-center text-[#ffd698] shadow-[0_0_12px_rgba(255,214,152,0.12)]">
+<span class="material-symbols-outlined text-[20px]">feedback</span>
+</div>
+<span class="font-label-sm text-[10px] text-[#ffd698] bg-[#ffd698]/10 border border-[#ffd698]/20 px-2 py-0.5 rounded-full font-bold">Inbox</span>
+</div>
+<div class="mt-3 min-w-0">
+<div class="font-label-md text-sm text-[#FAF9F6] font-bold truncate">Customer Feedback</div>
+<p class="font-body-sm text-[11px] text-[#A09DB0] line-clamp-1 mt-0.5">Private customer notes</p>
+</div>
+</button>
+<!-- Tool 4: Review Feed -->
+<button class="bg-[#151329]/90 border border-[rgba(245,181,68,0.12)] p-4 rounded-[24px] shadow-[0_8px_24px_rgba(0,0,0,0.3)] text-left flex flex-col justify-between active:scale-[0.98] transition-all min-h-[136px] hover:border-[#F5B544]/30" onclick="triggerToast('Opening Public Review Feed...')" type="button">
+<div class="flex items-center justify-between w-full">
+<div class="w-10 h-10 rounded-2xl bg-[#4fe088]/15 border border-[#4fe088]/30 flex items-center justify-center text-[#4fe088] shadow-[0_0_12px_rgba(79,224,136,0.12)]">
+<span class="material-symbols-outlined text-[20px]">reviews</span>
+</div>
+<span class="font-label-sm text-[10px] text-[#4fe088] bg-[#4fe088]/10 border border-[#4fe088]/20 px-2 py-0.5 rounded-full font-bold">Feed</span>
+</div>
+<div class="mt-3 min-w-0">
+<div class="font-label-md text-sm text-[#FAF9F6] font-bold truncate">Review Feed</div>
+<p class="font-body-sm text-[11px] text-[#A09DB0] line-clamp-1 mt-0.5">Public reviews &amp; replies</p>
+</div>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Dark Glass Navigation Bar -->
+<nav class="fixed bottom-0 w-full z-50 pb-safe bg-[#0E0D1A]/90 backdrop-blur-2xl border-t border-[rgba(245,181,68,0.12)] shadow-[0_-8px_32px_rgba(0,0,0,0.6)]">
+<div class="h-[72px] px-2 flex items-center justify-around">
+<!-- Tab 1: Home (Active with gold accent) -->
+<a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 transition-all text-[#F5B544] font-label-md" data-path="dashboard" href="#">
+<span class="material-symbols-outlined material-symbols-filled text-[22px]">storefront</span>
+<span class="font-label-sm text-[11px] font-bold tracking-tight mt-0.5">Home</span>
+</a>
+<!-- Tab 2: Reviews -->
+<a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 relative text-[#A09DB0] hover:text-[#FAF9F6] transition-all" data-path="reviews" href="#">
+<div class="relative">
+<span class="material-symbols-outlined text-[22px]">rate_review</span>
+<span class="absolute -top-1 -right-2 px-1 py-0.2 bg-[#F5B544] text-[#281900] font-label-sm text-[9px] leading-tight font-extrabold rounded-full shadow-[0_0_8px_#F5B544]">3</span>
+</div>
+<span class="font-label-sm text-[11px] tracking-tight mt-0.5">Reviews</span>
+</a>
+<!-- Tab 3: Central Highlighted Action (Get Reviews) -->
+<a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] px-2 py-1 -mt-5 transition-transform active:scale-95" data-path="get-reviews" href="#">
+<div class="w-13 h-13 p-3 rounded-full bg-gradient-to-tr from-[#F5B544] to-[#ffdf9b] text-[#281900] flex items-center justify-center shadow-[0_0_24px_rgba(245,181,68,0.5)] border-2 border-[#0E0D1A] relative">
+<span class="material-symbols-outlined material-symbols-filled text-[26px]">auto_awesome</span>
+</div>
+<span class="font-label-sm text-[11px] font-bold text-[#F5B544] tracking-tight mt-1">Get Reviews</span>
+</a>
+<!-- Tab 4: Google Profile -->
+<a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 text-[#A09DB0] hover:text-[#FAF9F6] transition-all" data-path="google-profile" href="#">
+<div class="relative">
+<span class="material-symbols-outlined text-[22px]">travel_explore</span>
+<span class="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-[#4fe088] shadow-[0_0_4px_#4fe088]"></span>
+</div>
+<span class="font-label-sm text-[11px] tracking-tight mt-0.5">Google</span>
+</a>
+<!-- Tab 5: Account -->
+<a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 text-[#A09DB0] hover:text-[#FAF9F6] transition-all" data-path="business-account" href="#">
+<span class="material-symbols-outlined text-[22px]">store</span>
+<span class="font-label-sm text-[11px] tracking-tight mt-0.5">Account</span>
+</a>
+</div>
+</nav>
+<script>
+    function triggerToast(message) {
+      const toast = document.getElementById('actionToast');
+      const msgElem = document.getElementById('toastMessage');
+      if (!toast || !msgElem) return;
+      
+      msgElem.textContent = message;
+      toast.classList.remove('-translate-y-28', 'opacity-0', 'pointer-events-none');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      
+      setTimeout(() => {
+        toast.classList.add('-translate-y-28', 'opacity-0', 'pointer-events-none');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }, 2600);
+    }
+  </script>
+</body></html>

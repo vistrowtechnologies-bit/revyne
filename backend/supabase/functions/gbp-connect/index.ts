@@ -136,8 +136,12 @@ Deno.serve(async (req) => {
           return json({ error: "Invalid location" }, 400);
         }
 
-        const mine = await db(`businesses?owner_id=eq.${userId}&select=id&limit=1`);
-        if (mine.ok && (await mine.json() as unknown[]).length) return json({ status: "already_has_business" });
+        // An owner with a business that isn't linked to Google yet (made before
+        // connect-only onboarding, or the dev seed) links it in place, keeping
+        // its review link, products and history. A linked one can't be replaced.
+        const mineRes = await db(`businesses?owner_id=eq.${userId}&select=id,gbp_location&limit=1`);
+        const [mine] = mineRes.ok ? await mineRes.json() as { id: string; gbp_location: string | null }[] : [];
+        if (mine?.gbp_location) return json({ status: "already_has_business" });
 
         const token = await accessTokenFor(userId);
         if (!token) return json({ status: "reconnect" });
@@ -150,26 +154,33 @@ Deno.serve(async (req) => {
         const address = g.storefrontAddress
           ? [...(g.storefrontAddress.addressLines ?? []), g.storefrontAddress.locality].filter(Boolean).join(", ")
           : null;
-        const created = await db("businesses", {
-          method: "POST",
-          headers: { Prefer: "return=representation" },
-          body: JSON.stringify({
-            owner_id: userId,
-            name: loc.title.slice(0, 120) || "My business",
-            category: g.categories?.primaryCategory?.displayName ?? null,
-            city: loc.city,
-            address,
-            phone: g.phoneNumbers?.primaryPhone ?? null,
-            google_place_id: g.metadata?.placeId ?? null,
-            google_review_url: g.metadata?.newReviewUri ?? null,
-            gbp_account: account,
-            gbp_location: location,
-            verified_at: new Date().toISOString(),
-          }),
-        });
-        if (created.status === 409) return json({ status: "location_taken" });
-        if (!created.ok) throw new Error(`create business: ${created.status} ${await created.text()}`);
-        const [business] = await created.json();
+        const fields = {
+          name: loc.title.slice(0, 120) || "My business",
+          category: g.categories?.primaryCategory?.displayName ?? null,
+          city: loc.city,
+          address,
+          phone: g.phoneNumbers?.primaryPhone ?? null,
+          google_place_id: g.metadata?.placeId ?? null,
+          google_review_url: g.metadata?.newReviewUri ?? null,
+          gbp_account: account,
+          gbp_location: location,
+          verified_at: new Date().toISOString(),
+        };
+        const saved = mine
+          ? await db(`businesses?id=eq.${mine.id}&gbp_location=is.null`, {
+            method: "PATCH",
+            headers: { Prefer: "return=representation" },
+            body: JSON.stringify(fields),
+          })
+          : await db("businesses", {
+            method: "POST",
+            headers: { Prefer: "return=representation" },
+            body: JSON.stringify({ owner_id: userId, ...fields }),
+          });
+        if (saved.status === 409) return json({ status: "location_taken" });
+        if (!saved.ok) throw new Error(`save business: ${saved.status} ${await saved.text()}`);
+        const [business] = await saved.json();
+        if (!business) return json({ status: "already_has_business" }); // linked by a parallel request
         return json({ status: "ok", business });
       }
 

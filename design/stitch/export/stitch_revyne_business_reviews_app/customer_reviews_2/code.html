@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+
+<html class="h-full dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;min-height:100%;margin:0;padding:0;}body{overscroll-behavior:none;background-color:#0E0D1A;color:#FAF9F6;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 84px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 500,'GRAD' 0,'opsz' 24;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "gold-primary": "#F5B544",
+        "gold-light": "#FFD698",
+        "gold-glow": "rgba(245, 181, 68, 0.25)",
+        "gold-border": "rgba(245, 181, 68, 0.14)",
+        "night-bg": "#0E0D1A",
+        "night-card": "#151329",
+        "night-card-alt": "#1B1A2E",
+        "night-surface": "#1F1D36",
+        "text-ivory": "#FAF9F6",
+        "text-muted": "#9E9AA7",
+        "emerald-accent": "#4FE088",
+        "coral-accent": "#FF7566"
+      },
+      borderRadius: {
+        DEFAULT: "1rem",
+        lg: "1.75rem",
+        xl: "2.5rem",
+        full: "9999px"
+      },
+      spacing: {
+        "space-xs": "0.25rem",
+        "space-sm": "0.5rem",
+        "space-md": "1rem",
+        "space-lg": "1.5rem",
+        "space-xl": "2rem",
+        margin: "1rem",
+        gutter: "1rem"
+      },
+      fontFamily: {
+        "headline-lg": ["Plus Jakarta Sans"],
+        "headline-md": ["Plus Jakarta Sans"],
+        "headline-sm": ["Plus Jakarta Sans"],
+        "body-lg": ["Noto Sans"],
+        "body-md": ["Noto Sans"],
+        "body-sm": ["Noto Sans"],
+        "label-lg": ["Plus Jakarta Sans"],
+        "label-md": ["Plus Jakarta Sans"],
+        "label-sm": ["Plus Jakarta Sans"]
+      }
+    }
+  }
+};</script></head><body class="bg-night-bg text-text-ivory flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-[#0E0D1A]/85 backdrop-blur-xl border-b border-gold-border"><div class="h-16 px-margin flex items-center justify-between gap-space-xs"><div class="flex items-center gap-space-xs min-w-0 flex-1"><div class="flex items-center gap-1 flex-shrink-0"><span class="font-headline-md text-headline-md font-extrabold text-text-ivory tracking-tight">RevYne</span><span class="text-gold-primary font-bold text-[18px]">✦</span></div><button class="min-h-[44px] px-3 py-1.5 flex items-center gap-1.5 bg-night-card-alt/90 border border-gold-border rounded-full active:scale-[0.98] transition-all text-left max-w-[210px]" type="button"><span class="w-2 h-2 rounded-full bg-emerald-accent flex-shrink-0 animate-pulse"></span><span class="font-label-md text-label-md text-text-ivory truncate">Sharma Sweets &amp; Chaat</span><span class="material-symbols-outlined text-[16px] text-emerald-accent flex-shrink-0">verified</span><span class="material-symbols-outlined text-[16px] text-text-muted flex-shrink-0">arrow_drop_down</span></button></div><div class="flex items-center gap-space-xs flex-shrink-0"><button aria-label="Notifications" class="w-11 h-11 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center text-text-muted hover:text-text-ivory bg-night-card-alt/80 border border-gold-border relative transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-gold-primary shadow-[0_0_8px_#F5B544]"></span></button><div class="flex items-center justify-center pl-1"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-gold-primary/40 shadow-[0_2px_8px_rgba(245,181,68,0.2)]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVpCuLcNaeVnIcIhzfyj2du_xzfO3FaJgN_9omLeupjvkRa39mzZbtwvGvV5Phhi7ScBuAng1rgk6i8idW-yCxjyKBaRut8XTnyq5SUyKXZls1pd4PW3d5H7AA9_UdbPnoybGRUKrC9ySNWl2N3VZTf3yYyfdmG09M6ftd1eCzrT-56a_gP24sUqMnel-DXzXeFssjfb5rQyEVt2ilnHBET4dd2FL1Ez7Cn-eYlqpt"/></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-safe bg-night-bg min-h-screen"><div class="flex flex-col w-full px-margin pb-space-xl gap-space-md mt-3">
+<!-- Top Sentiment / Overview Bento Card (Midnight Gold frosted luxury container) -->
+<div class="w-full bg-night-card/90 backdrop-blur-md rounded-lg p-space-md border border-gold-border shadow-[0_12px_32px_rgba(0,0,0,0.5)] flex flex-col gap-space-md relative overflow-hidden">
+<div class="flex items-start justify-between relative z-10">
+<div>
+<span class="font-label-sm text-[11px] uppercase tracking-wider text-gold-primary font-bold">Customer Sentiment</span>
+<h2 class="font-headline-md text-headline-md text-text-ivory mt-0.5">Reviews &amp; Ratings</h2>
+</div>
+<span class="font-label-md text-label-md bg-night-card-alt border border-gold-border px-3 py-1 rounded-full text-gold-light font-semibold">
+        482 Total
+      </span>
+</div>
+<!-- Rating Distribution Grid with Radial Golden Glow -->
+<div class="grid grid-cols-12 gap-space-md items-center relative z-10">
+<!-- Big Score Column with Ambient Gold Glow -->
+<div class="col-span-5 relative flex flex-col items-center justify-center bg-night-card-alt/90 border border-gold-border rounded-DEFAULT p-space-sm text-center overflow-hidden">
+<div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(245,181,68,0.28),transparent_70%)] pointer-events-none"></div>
+<span class="font-headline-lg text-[38px] font-extrabold text-gold-primary leading-none relative z-10 drop-shadow-[0_2px_12px_rgba(245,181,68,0.4)]">4.8</span>
+<div class="flex items-center gap-0.5 text-gold-primary my-1.5 relative z-10">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted font-medium relative z-10">on Google Maps</span>
+</div>
+<!-- Star Bars Column with Sleek Golden Horizontal Bars -->
+<div class="col-span-7 flex flex-col gap-1.5">
+<!-- 5 Star -->
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-gold-light w-4 font-semibold">5★</span>
+<div class="flex-1 h-2 bg-night-card-alt rounded-full overflow-hidden border border-gold-border/40">
+<div class="h-full bg-gradient-to-r from-gold-primary to-gold-light rounded-full shadow-[0_0_8px_rgba(245,181,68,0.4)]" style="width: 84%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted w-7 text-right">84%</span>
+</div>
+<!-- 4 Star -->
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-gold-light w-4 font-semibold">4★</span>
+<div class="flex-1 h-2 bg-night-card-alt rounded-full overflow-hidden border border-gold-border/40">
+<div class="h-full bg-gradient-to-r from-gold-primary to-gold-light rounded-full shadow-[0_0_8px_rgba(245,181,68,0.3)]" style="width: 12%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted w-7 text-right">12%</span>
+</div>
+<!-- 3 Star -->
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-text-muted w-4 font-semibold">3★</span>
+<div class="flex-1 h-2 bg-night-card-alt rounded-full overflow-hidden border border-gold-border/40">
+<div class="h-full bg-gold-primary/40 rounded-full" style="width: 2%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted w-7 text-right">2%</span>
+</div>
+<!-- 2 Star -->
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-text-muted w-4 font-semibold">2★</span>
+<div class="flex-1 h-2 bg-night-card-alt rounded-full overflow-hidden border border-gold-border/40">
+<div class="h-full bg-gold-primary/30 rounded-full" style="width: 1%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted w-7 text-right">1%</span>
+</div>
+<!-- 1 Star -->
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-text-muted w-4 font-semibold">1★</span>
+<div class="flex-1 h-2 bg-night-card-alt rounded-full overflow-hidden border border-gold-border/40">
+<div class="h-full bg-coral-accent/80 rounded-full" style="width: 1%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted w-7 text-right">1%</span>
+</div>
+</div>
+</div>
+<!-- Response Stats Row -->
+<div class="grid grid-cols-2 gap-space-xs pt-space-xs border-t border-gold-border/60">
+<div class="bg-night-card-alt/80 border border-emerald-accent/20 p-space-sm rounded-DEFAULT flex items-center gap-space-xs">
+<div class="w-8 h-8 rounded-full bg-emerald-accent/15 border border-emerald-accent/30 flex items-center justify-center flex-shrink-0 text-emerald-accent">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+</div>
+<div class="min-w-0">
+<span class="font-label-sm text-label-sm text-emerald-accent font-bold block truncate">98% Replied</span>
+<span class="font-body-sm text-body-sm text-text-muted block truncate">Avg 45m speed</span>
+</div>
+</div>
+<div class="bg-night-card-alt/80 border border-coral-accent/25 p-space-sm rounded-DEFAULT flex items-center gap-space-xs">
+<div class="w-8 h-8 rounded-full bg-coral-accent/15 border border-coral-accent/30 flex items-center justify-center flex-shrink-0 text-coral-accent">
+<span class="material-symbols-outlined text-[18px]">pending_actions</span>
+</div>
+<div class="min-w-0">
+<span class="font-label-sm text-label-sm text-coral-accent font-bold block truncate">3 Pending</span>
+<span class="font-body-sm text-body-sm text-text-muted block truncate">Needs your reply</span>
+</div>
+</div>
+</div>
+</div>
+<!-- RevYne Smart Bhasha AI Card -->
+<div class="w-full bg-gradient-to-br from-[#1F1B38] to-[#151329] border border-gold-border text-text-ivory rounded-lg p-space-md shadow-[0_10px_30px_rgba(0,0,0,0.55)] relative overflow-hidden">
+<div class="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-gold-primary/10 blur-2xl pointer-events-none"></div>
+<div class="flex items-start gap-space-sm relative z-10">
+<div class="w-10 h-10 rounded-full bg-gold-primary flex items-center justify-center flex-shrink-0 text-[#13121F] shadow-[0_0_16px_rgba(245,181,68,0.5)]">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">neurology</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2 flex-wrap">
+<h3 class="font-headline-sm text-headline-sm font-bold text-text-ivory">RevYne Smart Bhasha AI</h3>
+<span class="bg-gold-primary/20 border border-gold-primary/40 text-gold-primary px-2.5 py-0.5 rounded-full font-label-sm text-[11px] font-bold">Active</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted mt-1 leading-relaxed">Warm, personal replies in Hindi, Hinglish or English. You approve every reply before it is posted.</p>
+</div>
+</div>
+</div>
+<!-- Filter Chips (Horizontal Touch Strip) -->
+<div class="w-full flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-margin px-margin">
+<button class="px-4 py-2 rounded-full font-label-md text-label-md bg-gold-primary text-[#13121F] font-bold shadow-[0_0_12px_rgba(245,181,68,0.35)] flex-shrink-0" type="button">
+      All (482)
+    </button>
+<button class="px-4 py-2 rounded-full font-label-md text-label-md bg-night-card text-text-ivory border border-gold-border flex-shrink-0 flex items-center gap-1.5 active:scale-95 transition-transform" type="button">
+<span class="w-2 h-2 rounded-full bg-coral-accent shadow-[0_0_6px_#FF7566]"></span>
+      Needs Reply (3)
+    </button>
+<button class="px-4 py-2 rounded-full font-label-md text-label-md bg-night-card text-text-ivory border border-gold-border flex-shrink-0 flex items-center gap-1" type="button">
+      5 Stars (410)
+      <span class="material-symbols-outlined text-[14px] text-gold-primary" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button class="px-4 py-2 rounded-full font-label-md text-label-md bg-night-card text-text-ivory border border-gold-border flex-shrink-0 flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px] text-gold-light">photo_library</span>
+      With Photos (142)
+    </button>
+<button class="px-4 py-2 rounded-full font-label-md text-label-md bg-night-card text-coral-accent border border-coral-accent/30 flex-shrink-0" type="button">
+      Critical (4)
+    </button>
+<button class="px-3 py-2 rounded-full font-label-md text-label-md bg-night-card text-text-muted border border-gold-border flex-shrink-0" type="button">
+      "Sweets" (189)
+    </button>
+</div>
+<!-- Reviews Feed Header -->
+<div class="flex items-center justify-between pt-1">
+<span class="font-label-lg text-label-lg text-text-ivory font-semibold">Showing priority reviews</span>
+<span class="font-label-sm text-label-sm text-gold-primary font-bold flex items-center gap-1">
+      Sorted by Action Needed
+      <span class="material-symbols-outlined text-[16px]">tune</span>
+</span>
+</div>
+<!-- REVIEW 1: Pooja Sharma (Pending, 4★, with photos, AI Draft + 1-Tap Post to Google) -->
+<div class="w-full bg-night-card/90 backdrop-blur-md rounded-lg p-space-md border border-gold-border shadow-[0_10px_28px_rgba(0,0,0,0.5)] flex flex-col gap-space-sm relative">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<div class="w-10 h-10 rounded-full bg-gold-primary/20 border border-gold-primary/40 flex items-center justify-center text-gold-primary font-headline-sm text-headline-sm font-bold flex-shrink-0">
+          P
+        </div>
+<div>
+<h4 class="font-headline-sm text-headline-sm text-text-ivory leading-tight font-bold">Pooja Sharma</h4>
+<span class="font-body-sm text-body-sm text-text-muted">Yesterday • Local Guide Level 4</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm bg-coral-accent/15 border border-coral-accent/40 text-coral-accent px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-coral-accent shadow-[0_0_4px_#FF7566]"></span>
+        Pending
+      </span>
+</div>
+<!-- Rating & Photos Badge (4★) -->
+<div class="flex items-center gap-2 pt-1">
+<div class="flex items-center text-gold-primary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px] text-[#4A465B]" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<span class="font-label-sm text-label-sm bg-night-card-alt border border-gold-border/60 px-2 py-0.5 rounded-full text-gold-light flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">image</span> 2 Photos
+      </span>
+</div>
+<!-- Review Text -->
+<p class="font-body-md text-body-md text-text-ivory leading-relaxed">
+      Ordered Motichoor Laddoos for wedding gift boxes. Packaging was exquisite and taste was heavenly! Everyone praised it. Will definitely reorder for Diwali festivities.
+    </p>
+<!-- Attached Photos Preview Grid -->
+<div class="grid grid-cols-2 gap-space-xs pt-1">
+<img class="w-full h-24 object-cover rounded-DEFAULT border border-gold-border/50 shadow-md" data-alt="Traditional Indian wedding sweet box filled with golden yellow motichoor laddoos garnished with silver vark and pistachios on a decorative silk cloth" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZk35xY6hMG5LjpGVnJYni9hWpQVLsjNjgsBza_H85S0qsSsty_lQDCdSBjTdzRLfHltk-UrZFxQcrT-AItqTMwkk40MkPezBZHGpAdwfhFmnHpHW1o63oGqEQdBGgHKTk3U1GErknBDd9_8oTR8_e-pUUeOcsFyHQjsI8OpDKU3RsitTKODVroToDDikageA9U_TIodSSUIFORkFDUxTWAvf8Dqod_Ov1cjAirnhh"/>
+<img class="w-full h-24 object-cover rounded-DEFAULT border border-gold-border/50 shadow-md" data-alt="Elegant festive gift box with golden ribbon packaging for Sharma Sweets shop counter in Delhi" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwDaHWYErQXmDw5K7zn2ST0YykzQlqxoHSdkHfkcpiHBXclEbcNi-UBAnlhGuDqxrHYP_hA4ZC4zWVGaYIttljmU9DLirlohPejIRVb6EBY3OVn5Z32AXB4kQZT-vmwd5eIhotD6wbtzWc1l8yLFrVAOOpIdj1fXpmtq6Rv-jOsi24G0RKess-a-1-1NZ7MxbCJJHmJ9vwtdVYcvmJqWqSuKasnlLsR_g3r7oYhvYY"/>
+</div>
+<!-- AI Reply Preview Tray -->
+<div class="mt-space-xs bg-night-card-alt/95 border border-gold-border rounded-DEFAULT p-space-sm flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5 text-gold-primary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="font-label-sm text-label-sm font-bold">AI Draft (Hinglish)</span>
+</div>
+<button class="font-label-sm text-label-sm text-gold-light hover:text-gold-primary font-bold flex items-center gap-0.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[14px]">translate</span>
+          Switch to हिंदी
+        </button>
+</div>
+<div class="bg-night-bg/80 border border-gold-border/40 p-space-sm rounded-DEFAULT">
+<p class="font-body-md text-body-md text-text-ivory italic leading-relaxed">
+          “Dhanyawad Pooja ji! We are honoured to be a part of your auspicious celebrations. Warmest wishes to the newly wedded couple from the entire Sharma Sweets family! We look forward to sweetening your Diwali too! 🙏✨”
+        </p>
+</div>
+<!-- Action Buttons: Golden pill 1-tap post -->
+<div class="flex items-center gap-space-xs pt-1">
+<button class="min-h-[44px] flex-1 bg-gold-primary text-[#13121F] rounded-full font-label-md text-label-md font-bold flex items-center justify-center gap-1.5 shadow-[0_4px_20px_rgba(245,181,68,0.4)] active:scale-98 transition-all hover:brightness-105" type="button">
+<span class="material-symbols-outlined text-[18px]">send</span>
+          Post to Google (1-Tap)
+        </button>
+<button class="min-h-[44px] px-4 bg-night-card border border-gold-border rounded-full font-label-md text-label-md text-text-ivory font-semibold flex items-center justify-center gap-1 hover:bg-night-surface transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px] text-gold-light">edit</span>
+          Edit
+        </button>
+</div>
+</div>
+</div>
+<!-- REVIEW 2: Karan Mehta (Needs Care, 3★, Empathetic Namaste Reply) -->
+<div class="w-full bg-night-card/90 backdrop-blur-md rounded-lg p-space-md border border-gold-border shadow-[0_10px_28px_rgba(0,0,0,0.5)] flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<div class="w-10 h-10 rounded-full bg-night-card-alt border border-gold-border flex items-center justify-center text-text-muted font-headline-sm text-headline-sm font-bold flex-shrink-0">
+          K
+        </div>
+<div>
+<h4 class="font-headline-sm text-headline-sm text-text-ivory leading-tight font-bold">Karan Mehta</h4>
+<span class="font-body-sm text-body-sm text-text-muted">2 days ago • Verified Visitor</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm bg-gold-primary/20 border border-gold-primary/40 text-gold-primary px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">flag</span>
+        Needs Care
+      </span>
+</div>
+<!-- Rating: 3 Stars -->
+<div class="flex items-center gap-2 pt-0.5">
+<div class="flex items-center text-gold-primary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px] text-[#4A465B]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px] text-[#4A465B]" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted font-medium">3.0 Rating</span>
+</div>
+<p class="font-body-md text-body-md text-text-ivory leading-relaxed">
+      Rasmalai was delicious but parking was a nightmare on Saturday evening. Had to circle the block three times before finding a spot.
+    </p>
+<!-- Context Tip Alert -->
+<div class="bg-night-card-alt/80 border border-gold-border/60 rounded-DEFAULT p-space-sm flex items-start gap-space-xs">
+<span class="material-symbols-outlined text-[20px] text-gold-primary flex-shrink-0 mt-0.5">tips_and_updates</span>
+<div class="min-w-0 flex-1">
+<p class="font-label-sm text-label-sm text-gold-light font-bold">Suggested Strategy:</p>
+<p class="font-body-sm text-body-sm text-text-muted mt-0.5 leading-relaxed">
+          Acknowledge rasmalai quality, apologize warmly for parking pressure, and guide customers toward the new Metro Gate 3 valet lot.
+        </p>
+</div>
+</div>
+<!-- Generate Reply Button -->
+<button class="min-h-[48px] w-full bg-gradient-to-r from-night-card-alt to-night-surface border border-gold-primary/50 text-gold-light hover:text-gold-primary rounded-full font-label-md text-label-md font-bold flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(0,0,0,0.4)] active:scale-98 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px] text-gold-primary" style="font-variation-settings: 'FILL' 1;">auto_fix_high</span>
+      Generate Empathetic Namaste Reply
+    </button>
+</div>
+<!-- REVIEW 3: Dr. Neha Verma (Replied, 5★, Success State) -->
+<div class="w-full bg-night-card/90 backdrop-blur-md rounded-lg p-space-md border border-gold-border shadow-[0_10px_28px_rgba(0,0,0,0.5)] flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<div class="w-10 h-10 rounded-full bg-emerald-accent/15 border border-emerald-accent/30 flex items-center justify-center text-emerald-accent font-headline-sm text-headline-sm font-bold flex-shrink-0">
+          N
+        </div>
+<div>
+<div class="flex items-center gap-1">
+<h4 class="font-headline-sm text-headline-sm text-text-ivory leading-tight font-bold">Dr. Neha Verma</h4>
+<span class="material-symbols-outlined text-[16px] text-emerald-accent">verified</span>
+</div>
+<span class="font-body-sm text-body-sm text-text-muted">4 days ago • Doctor • Local Guide</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm bg-emerald-accent/15 border border-emerald-accent/30 text-emerald-accent px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">done_all</span>
+        Replied
+      </span>
+</div>
+<!-- Rating: 5 Stars -->
+<div class="flex items-center text-gold-primary pt-0.5">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<p class="font-body-md text-body-md text-text-ivory leading-relaxed">
+      Consistently great hygienic chaat. Clean stainless steel counter and staff always wearing gloves. Golgappa water is clearly mineral water. Top marks!
+    </p>
+<!-- Merchant's Live Response Preview -->
+<div class="bg-night-card-alt/90 border border-gold-border/50 rounded-DEFAULT p-space-sm flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm font-bold text-gold-light flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-emerald-accent shadow-[0_0_6px_#4FE088]"></span>
+          Your reply on Google
+        </span>
+<span class="font-body-sm text-body-sm text-text-muted">3 days ago</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-ivory leading-relaxed">
+        “Thank you so much Dr. Neha! Hygiene has been the foundation of Sharma Sweets for over 35 years. We only use RO purified water and fresh ingredients daily. See you again soon for Dahi Bhalla! 🙏”
+      </p>
+</div>
+</div>
+<!-- WhatsApp Growth Card (Request Reviews on WhatsApp) -->
+<div class="w-full bg-night-card/90 backdrop-blur-md rounded-lg p-space-md border border-gold-border shadow-[0_10px_28px_rgba(0,0,0,0.5)] flex items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-11 h-11 rounded-full bg-emerald-accent/20 border border-emerald-accent/40 flex items-center justify-center text-emerald-accent flex-shrink-0 shadow-[0_0_12px_rgba(79,224,136,0.3)]">
+<span class="material-symbols-outlined text-[24px]">chat</span>
+</div>
+<div class="min-w-0">
+<h4 class="font-label-lg text-label-lg text-text-ivory font-bold truncate">Request Reviews on WhatsApp</h4>
+<p class="font-body-sm text-body-sm text-text-muted truncate">Send 1-click Google rating link to counter bills</p>
+</div>
+</div>
+<button class="min-h-[44px] px-4 bg-emerald-accent text-[#00391B] font-bold rounded-full font-label-md text-label-md flex-shrink-0 flex items-center gap-1 active:scale-95 transition-transform shadow-[0_0_14px_rgba(79,224,136,0.3)]" type="button">
+      Send
+      <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<script>
+  // Micro-interaction for 1-Tap Post to Google button
+  document.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (this.textContent.includes('Post to Google')) {
+        this.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span> Posting...';
+        this.disabled = true;
+        setTimeout(() => {
+          this.innerHTML = '<span class="material-symbols-outlined text-[18px]">check_circle</span> Published to Google!';
+          this.classList.remove('bg-gold-primary', 'text-[#13121F]');
+          this.classList.add('bg-emerald-accent', 'text-[#00391B]');
+        }, 1200);
+      }
+    });
+  });
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-[#0E0D1A]/90 backdrop-blur-xl border-t border-gold-border shadow-[0_-8px_24px_rgba(0,0,0,0.6)]"><div class="h-[72px] px-space-xs flex items-center justify-around"><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 text-text-muted hover:text-text-ivory transition-all" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[22px]">storefront</span><span class="font-label-sm text-label-sm tracking-tight mt-0.5">Home</span></a><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 relative transition-all text-gold-primary font-label-md" data-path="reviews" href="#"><div class="relative"><span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">rate_review</span><span class="absolute -top-1 -right-2 px-1 py-0.2 bg-gold-primary text-[#13121F] font-label-sm text-[10px] leading-tight font-extrabold rounded-full shadow-[0_0_8px_#F5B544]">3</span></div><span class="font-label-sm text-label-sm font-bold tracking-tight mt-0.5 text-gold-primary">Reviews</span></a><a class="flex flex-col items-center justify-center min-w-[54px] min-h-[44px] px-2 py-1 -mt-4 text-[#13121F] transition-transform active:scale-95" data-path="get-reviews" href="#"><div class="w-12 h-12 rounded-full bg-gold-primary flex items-center justify-center shadow-[0_0_20px_rgba(245,181,68,0.55)] border-2 border-gold-light relative"><span class="material-symbols-outlined text-[26px] text-[#13121F]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span></div><span class="font-label-sm text-label-sm font-bold text-gold-primary tracking-tight mt-1">Get Reviews</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 text-text-muted hover:text-text-ivory transition-all" data-path="google-profile" href="#"><div class="relative"><span class="material-symbols-outlined text-[22px]">travel_explore</span><span class="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-emerald-accent"></span></div><span class="font-label-sm text-label-sm tracking-tight mt-0.5">Google</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 text-text-muted hover:text-text-ivory transition-all" data-path="business-account" href="#"><span class="material-symbols-outlined text-[22px]">store</span><span class="font-label-sm text-label-sm tracking-tight mt-0.5">Account</span></a></div></nav></body></html>

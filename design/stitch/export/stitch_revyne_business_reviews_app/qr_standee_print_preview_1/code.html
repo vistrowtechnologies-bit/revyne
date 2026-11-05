@@ -1,0 +1,298 @@
+<!DOCTYPE html><html class="h-full" lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100vw;min-height:100%;margin:0;padding:0;}body{overscroll-behavior:none;background-color:#fff8f0;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 84px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 500,'GRAD' 0,'opsz' 24;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: 'class', theme: { extend: { colors: { 'tertiary': '#000201', 'on-secondary': '#ffffff', 'secondary-container': '#fd9d1a', 'primary-fixed-dim': '#c6c1f4', 'on-secondary-fixed-variant': '#683d00', 'on-error-container': '#93000a', 'surface-container-lowest': '#ffffff', 'secondary-fixed-dim': '#ffb86b', 'surface-tint': '#5d5986', 'on-secondary-fixed': '#2c1700', 'on-tertiary-fixed': '#002112', 'on-error': '#ffffff', 'tertiary-fixed': '#7ffaba', 'surface-container-highest': '#e8e2d9', 'tertiary-container': '#002213', 'on-primary-fixed': '#1a163f', 'surface-container-low': '#f9f3ea', 'on-primary-container': '#8480af', 'on-tertiary-fixed-variant': '#005233', 'tertiary-fixed-dim': '#61dda0', 'inverse-surface': '#33302a', 'outline': '#78767f', 'on-surface-variant': '#47464e', 'on-secondary-container': '#663b00', 'inverse-primary': '#c6c1f4', 'surface-container-high': '#eee7de', 'primary-fixed': '#e4dfff', 'on-primary': '#ffffff', 'surface': '#fff8f0', 'primary': '#020017', 'inverse-on-surface': '#f7f0e7', 'background': '#fff8f0', 'error': '#ba1a1a', 'on-primary-fixed-variant': '#45426d', 'surface-dim': '#dfd9d0', 'surface-bright': '#fff8f0', 'primary-container': '#1b1740', 'on-tertiary': '#ffffff', 'error-container': '#ffdad6', 'on-tertiary-container': '#009863', 'surface-container': '#f4ede4', 'outline-variant': '#c9c5cf', 'secondary-fixed': '#ffdcbc', 'on-background': '#1e1b16', 'on-surface': '#1e1b16', 'surface-variant': '#e8e2d9', 'secondary': '#895100' }, borderRadius: { 'DEFAULT': '1rem', 'lg': '2rem', 'xl': '3rem', 'full': '9999px' }, spacing: { 'space-sm': '0.5rem', 'gutter': '1rem', 'space-xl': '2rem', 'space-xs': '0.25rem', 'space-md': '1rem', 'margin': '1rem', 'space-lg': '1.5rem' }, fontFamily: { 'headline-lg': ['Plus Jakarta Sans'], 'headline-xl': ['Plus Jakarta Sans'], 'headline-md': ['Plus Jakarta Sans'], 'label-lg': ['Plus Jakarta Sans'], 'headline-xl-mobile': ['Plus Jakarta Sans'], 'body-sm': ['Noto Sans'], 'body-lg': ['Noto Sans'], 'headline-sm': ['Plus Jakarta Sans'], 'label-md': ['Plus Jakarta Sans'], 'body-md': ['Noto Sans'], 'label-sm': ['Plus Jakarta Sans'] }, fontSize: { 'headline-lg': ['24px', { lineHeight: '32px', fontWeight: '700' }], 'headline-xl': ['32px', { lineHeight: '40px', fontWeight: '800' }], 'headline-md': ['20px', { lineHeight: '28px', fontWeight: '700' }], 'label-lg': ['14px', { lineHeight: '20px', letterSpacing: '0.2px', fontWeight: '700' }], 'headline-xl-mobile': ['26px', { lineHeight: '34px', fontWeight: '800' }], 'body-sm': ['12px', { lineHeight: '18px', fontWeight: '400' }], 'body-lg': ['16px', { lineHeight: '24px', fontWeight: '400' }], 'headline-sm': ['18px', { lineHeight: '24px', fontWeight: '600' }], 'label-md': ['12px', { lineHeight: '16px', letterSpacing: '0.4px', fontWeight: '600' }], 'body-md': ['14px', { lineHeight: '20px', fontWeight: '400' }], 'label-sm': ['11px', { lineHeight: '14px', letterSpacing: '0.5px', fontWeight: '600' }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head><body class="bg-surface text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(27,23,64,0.05)]"><div class="h-16 px-margin flex items-center justify-between gap-space-xs"><div class="flex items-center gap-space-xs min-w-0 flex-1"><div class="flex items-center gap-1 flex-shrink-0"><span class="font-headline-md text-headline-md tracking-tight text-primary font-bold">RevYne</span><span class="material-symbols-outlined text-secondary-container text-[18px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span></div><button class="min-h-[44px] px-space-xs py-space-xs flex items-center gap-space-xs bg-surface-container-low rounded-full shadow-[0_2px_8px_rgba(27,23,64,0.04)] active:scale-[0.98] transition-all text-left max-w-[210px]" type="button"><span class="w-2 h-2 rounded-full bg-on-tertiary-container flex-shrink-0 animate-pulse ml-1"></span><span class="font-label-md text-label-md text-on-surface truncate">Sharma Sweets &amp; Chaat</span><span class="material-symbols-outlined text-[16px] text-on-tertiary-container flex-shrink-0">verified</span><span class="material-symbols-outlined text-[16px] text-on-surface-variant flex-shrink-0 mr-1">arrow_drop_down</span></button></div><div class="flex items-center gap-space-xs flex-shrink-0"><button aria-label="Notifications" class="w-11 h-11 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface active:bg-surface-container relative transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-secondary-container shadow-[0_0_8px_rgba(253,157,26,0.6)]"></span></button><div class="flex items-center justify-center pl-1"><img alt="Profile" class="w-8 h-8 rounded-full object-cover shadow-[0_2px_6px_rgba(27,23,64,0.12)]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVpCuLcNaeVnIcIhzfyj2du_xzfO3FaJgN_9omLeupjvkRa39mzZbtwvGvV5Phhi7ScBuAng1rgk6i8idW-yCxjyKBaRut8XTnyq5SUyKXZls1pd4PW3d5H7AA9_UdbPnoybGRUKrC9ySNWl2N3VZTf3yYyfdmG09M6ftd1eCzrT-56a_gP24sUqMnel-DXzXeFssjfb5rQyEVt2ilnHBET4dd2FL1Ez7Cn-eYlqpt"></div></div></div><div class="hidden"><span class="font-headline-sm text-headline-sm">Get Reviews</span></div></header><main class="flex flex-col relative w-full pt-16 pb-safe bg-surface min-h-screen"><div class="flex flex-col w-full">
+<!-- Top Action & Meta Info Bar -->
+<div class="px-margin pt-space-sm pb-space-xs flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<button aria-label="Go back" class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface active:scale-95 transition-transform shadow-sm" type="button">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+</button>
+<div>
+<h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">QR Standee Studio</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Live Customizer &amp; Print Ready</p>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-3 py-1 bg-surface-container-low text-secondary rounded-full shadow-sm">
+<span class="w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-on-secondary-container">300 DPI CMYK</span>
+</div>
+</div>
+<!-- Verified Place ID Pill -->
+<div class="w-full flex items-center justify-between px-3 py-2 bg-surface-container-low rounded-xl">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-on-tertiary-container text-[18px] flex-shrink-0" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-md text-label-md text-on-surface truncate">Linked: Sharma Sweets (ChIJ78K...08A)</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-tertiary-container flex-shrink-0 font-bold bg-tertiary-fixed-dim/30 px-2 py-0.5 rounded-full">Active</span>
+</div>
+</div>
+<!-- Interactive 3D Mockup Stage -->
+<div class="px-margin py-space-sm">
+<div class="w-full bg-surface-container-lowest rounded-lg p-space-md shadow-xl relative overflow-hidden flex flex-col items-center">
+<!-- Perspective Background Aura -->
+<div class="absolute -top-16 -right-16 w-48 h-48 bg-secondary-container/15 rounded-full blur-2xl pointer-events-none"></div>
+<div class="absolute -bottom-16 -left-16 w-48 h-48 bg-primary-container/10 rounded-full blur-2xl pointer-events-none"></div>
+<!-- Mockup View Controls -->
+<div class="w-full flex items-center justify-between mb-space-md z-10">
+<div class="flex items-center bg-surface-container-low p-1 rounded-full shadow-sm" id="viewToggleGroup">
+<button class="view-toggle px-3 py-1 rounded-full font-label-sm text-label-sm bg-primary-container text-on-primary shadow-xs transition-all" data-view="front" type="button">Front View</button>
+<button class="view-toggle px-3 py-1 rounded-full font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface transition-all" data-view="counter" type="button">Counter Look</button>
+</div>
+<div class="flex items-center gap-1 px-2.5 py-1 bg-surface-container-high rounded-full">
+<span class="material-symbols-outlined text-[15px] text-on-surface-variant">straighten</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">A5 (148 × 210 mm)</span>
+</div>
+</div>
+<!-- 3D Standee Container with Depth Effects -->
+<div class="relative w-full max-w-[280px] transition-transform duration-300 transform perspective-1000" id="standeeWrapper">
+<!-- Physical Standee Plate (Acrylic Face) -->
+<div class="relative w-full rounded-2xl p-4 shadow-[0_16px_36px_rgba(27,23,64,0.18)] transition-all duration-300 bg-gradient-to-b from-[#1b1740] via-[#241f54] to-[#120f2e] text-on-primary" id="acrylicSheet">
+<!-- Glossy Acrylic Corner Highlights -->
+<div class="absolute top-2 left-2 w-8 h-8 rounded-full bg-white/10 blur-[1px] pointer-events-none"></div>
+<div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-white/15 via-white/5 to-transparent rounded-tr-2xl pointer-events-none"></div>
+<!-- Standee Header Bar -->
+<div class="flex flex-col items-center text-center pb-2">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 bg-secondary-container text-primary-container rounded-full shadow-[0_4px_12px_rgba(253,157,26,0.35)] mb-2"><span class="material-symbols-outlined text-[16px]">travel_explore</span><span class="font-label-sm text-label-sm font-bold tracking-tight">Google Review Station</span></div>
+<h2 class="font-headline-sm text-headline-sm text-white tracking-tight leading-tight" id="previewStoreName">
+              Sharma Misthan Bhandar
+            </h2>
+<p class="font-body-sm text-body-sm text-secondary-fixed text-opacity-90">Chandni Chowk, Old Delhi</p>
+</div>
+<!-- Star Rating Highlight -->
+
+<p class="font-label-md text-label-md text-center text-white/95 mb-3" id="previewHeadline">Share your experience on Google</p>
+<!-- Core Crisp QR Code Card -->
+<div class="bg-white rounded-xl p-3 shadow-md flex flex-col items-center justify-center relative">
+<div class="w-44 h-44 bg-surface-container-lowest p-2 rounded-lg flex items-center justify-center relative">
+<!-- High-Contrast Vector QR Representation -->
+<svg class="w-full h-full text-primary-container" fill="currentColor" viewBox="0 0 160 160">
+<!-- QR Position Detection Patterns (Top-Left) -->
+<rect fill="#1b1740" height="40" rx="6" width="40" x="10" y="10"></rect>
+<rect fill="#ffffff" height="24" rx="2" width="24" x="18" y="18"></rect>
+<rect fill="#fd9d1a" height="12" rx="2" width="12" x="24" y="24"></rect>
+<!-- QR Position Detection Patterns (Top-Right) -->
+<rect fill="#1b1740" height="40" rx="6" width="40" x="110" y="10"></rect>
+<rect fill="#ffffff" height="24" rx="2" width="24" x="118" y="18"></rect>
+<rect fill="#fd9d1a" height="12" rx="2" width="12" x="124" y="24"></rect>
+<!-- QR Position Detection Patterns (Bottom-Left) -->
+<rect fill="#1b1740" height="40" rx="6" width="40" x="10" y="110"></rect>
+<rect fill="#ffffff" height="24" rx="2" width="24" x="18" y="118"></rect>
+<rect fill="#fd9d1a" height="12" rx="2" width="12" x="124" y="124"></rect>
+<!-- Dynamic Data Matrix Pixels -->
+<rect fill="#1b1740" height="8" width="8" x="58" y="14"></rect>
+<rect fill="#1b1740" height="8" width="8" x="74" y="14"></rect>
+<rect fill="#1b1740" height="8" width="8" x="90" y="14"></rect>
+<rect fill="#1b1740" height="8" width="8" x="66" y="26"></rect>
+<rect fill="#1b1740" height="8" width="8" x="82" y="26"></rect>
+<rect fill="#1b1740" height="8" width="8" x="58" y="38"></rect>
+<rect fill="#1b1740" height="8" width="8" x="90" y="38"></rect>
+<rect fill="#1b1740" height="8" width="8" x="14" y="58"></rect>
+<rect fill="#1b1740" height="8" width="8" x="26" y="66"></rect>
+<rect fill="#1b1740" height="8" width="8" x="38" y="58"></rect>
+<rect fill="#1b1740" height="8" width="8" x="46" y="74"></rect>
+<rect fill="#1b1740" height="8" width="8" x="58" y="58"></rect>
+<rect fill="#1b1740" height="8" width="8" x="66" y="66"></rect>
+<rect fill="#1b1740" height="8" width="8" x="86" y="58"></rect>
+<rect fill="#1b1740" height="8" width="8" x="94" y="74"></rect>
+<rect fill="#1b1740" height="8" width="8" x="114" y="66"></rect>
+<rect fill="#1b1740" height="8" width="8" x="130" y="58"></rect>
+<rect fill="#1b1740" height="8" width="8" x="142" y="74"></rect>
+<rect fill="#1b1740" height="8" width="8" x="58" y="86"></rect>
+<rect fill="#1b1740" height="8" width="8" x="70" y="94"></rect>
+<rect fill="#1b1740" height="8" width="8" x="86" y="86"></rect>
+<rect fill="#1b1740" height="8" width="8" x="106" y="94"></rect>
+<rect fill="#1b1740" height="8" width="8" x="122" y="86"></rect>
+<rect fill="#1b1740" height="8" width="8" x="138" y="94"></rect>
+<rect fill="#1b1740" height="8" width="8" x="58" y="114"></rect>
+<rect fill="#1b1740" height="8" width="8" x="66" y="126"></rect>
+<rect fill="#1b1740" height="8" width="8" x="74" y="138"></rect>
+<rect fill="#1b1740" height="8" width="8" x="90" y="114"></rect>
+<rect fill="#1b1740" height="8" width="8" x="102" y="130"></rect>
+<rect fill="#1b1740" height="8" width="8" x="114" y="114"></rect>
+<rect fill="#1b1740" height="8" width="8" x="130" y="126"></rect>
+<rect fill="#1b1740" height="8" width="8" x="142" y="138"></rect>
+</svg>
+<!-- Central Marigold Icon Emblem -->
+<div class="absolute inset-0 m-auto w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center shadow-md">
+<span class="material-symbols-outlined text-primary-container text-[20px]">local_florist</span>
+</div>
+</div>
+<!-- UPI & Camera scan instruction -->
+<div class="mt-2 text-center w-full px-1">
+<p class="font-label-sm text-label-sm text-on-surface font-bold" id="previewScanHindi">
+                कैमरा या किसी भी UPI ऐप से स्कैन करें
+              </p>
+<div class="flex items-center justify-center gap-1.5 mt-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">photo_camera</span>
+<span class="material-symbols-outlined text-[14px]">qr_code_scanner</span>
+<span class="material-symbols-outlined text-[14px]">payments</span>
+<span class="font-body-sm text-body-sm text-[10px]">Google Pay • Paytm • PhonePe</span>
+</div>
+</div>
+</div>
+<!-- Bottom Footer Details -->
+<div class="mt-3 flex items-center justify-between text-white/80 px-1">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary-container">travel_explore</span>
+<span class="font-label-sm text-label-sm text-[11px] tracking-tight text-secondary-fixed">g.page/r/sharma-sweets</span>
+</div>
+<span class="font-label-sm text-label-sm text-[10px] text-white/60">Powered by RevYne</span>
+</div>
+</div>
+<!-- Realistic Wooden/Teak Counter Base Mount -->
+<div class="relative w-[108%] -left-[4%] h-5 bg-gradient-to-r from-[#6d4c1b] via-[#936427] to-[#593d15] rounded-b-xl shadow-[0_12px_24px_rgba(27,23,64,0.25)] flex items-center justify-center">
+<div class="w-16 h-1 bg-[#422c0d] rounded-full opacity-60"></div>
+<div class="absolute -bottom-1 w-[90%] h-1 bg-primary/20 blur-xs rounded-full"></div>
+</div>
+</div>
+<!-- Live Context Simulator (Counter preview mode toggle indicator) -->
+<div class="hidden mt-3 px-3 py-1.5 bg-surface-container rounded-full flex items-center gap-2" id="counterSimNotice">
+<span class="material-symbols-outlined text-secondary-container text-[16px]">store</span>
+<span class="font-body-sm text-body-sm text-on-surface">Simulated Billing Counter View (Chandni Chowk)</span>
+</div>
+</div>
+</div>
+<!-- Customization Studio -->
+<div class="px-margin py-space-sm flex flex-col gap-space-md"><div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex flex-col gap-space-sm"><div class="flex items-center justify-between"><span class="font-headline-sm text-headline-sm text-on-surface">Print Size</span><span class="font-label-sm text-label-sm text-on-surface-variant">Ready to Print</span></div><div class="grid grid-cols-3 gap-2"><button class="py-2.5 px-2 rounded-xl border border-secondary-container bg-secondary-container/15 text-primary-container font-label-md text-label-md text-center font-bold flex flex-col items-center gap-0.5" type="button"><span class="">A5</span><span class="text-[10px] text-on-surface-variant font-normal">148 × 210 mm</span></button><button class="py-2.5 px-2 rounded-xl bg-surface-container-low text-on-surface font-label-md text-label-md text-center flex flex-col items-center gap-0.5 hover:bg-surface-container" type="button"><span class="">A4</span><span class="text-[10px] text-on-surface-variant font-normal">210 × 297 mm</span></button><button class="py-2.5 px-2 rounded-xl bg-surface-container-low text-on-surface font-label-md text-label-md text-center flex flex-col items-center gap-0.5 hover:bg-surface-container" type="button"><span class="">Table Tent</span><span class="text-[10px] text-on-surface-variant font-normal">Dual Sided</span></button></div></div><div class="bg-surface-container-lowest p-space-md rounded-lg shadow-sm flex flex-col gap-space-sm"><div class="flex items-center justify-between"><span class="font-headline-sm text-headline-sm text-on-surface">Color Style</span><span class="font-label-sm text-label-sm text-secondary-container bg-surface-container px-2 py-0.5 rounded-full">High Contrast</span></div><div class="grid grid-cols-2 gap-2"><button class="theme-btn flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-container-high shadow-xs text-left" data-theme="royal" type="button"><div class="w-8 h-8 rounded-lg bg-gradient-to-r from-primary-container to-secondary-container flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-white text-[16px]">palette</span></div><div><p class="font-label-md text-label-md text-on-surface font-bold">Royal Marigold</p><p class="font-body-sm text-body-sm text-[11px] text-on-secondary-container">Default Brand</p></div></button><button class="theme-btn flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-left" data-theme="classic" type="button"><div class="w-8 h-8 rounded-lg bg-white shadow-xs flex items-center justify-center border border-outline-variant flex-shrink-0"><span class="material-symbols-outlined text-primary-container text-[16px]">format_paint</span></div><div><p class="font-label-md text-label-md text-on-surface font-bold">Clean White</p><p class="font-body-sm text-body-sm text-[11px] text-on-surface-variant">Minimalist Eco</p></div></button></div></div></div>
+<!-- Immediate Self-Printing Pathway -->
+<div class="px-margin py-space-xs"><div class="w-full bg-surface-container-low p-space-md rounded-lg shadow-sm flex flex-col gap-space-sm"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-primary-container text-white flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-[20px]">print</span></div><div><h3 class="font-headline-sm text-headline-sm text-on-surface">Print Ready QR Standee</h3><p class="font-body-sm text-body-sm text-on-surface-variant">Instant 300 DPI CMYK vector PDF for high-clarity scanning</p></div></div><div class="flex flex-col gap-2.5 pt-1"><button class="w-full min-h-[48px] py-3 px-5 rounded-full bg-secondary-container text-primary-container font-label-lg text-label-lg shadow-[0_4px_12px_rgba(253,157,26,0.35)] flex items-center justify-center gap-2.5 active:scale-[0.98] transition-transform font-bold" id="downloadPdfBtn" type="button"><span class="material-symbols-outlined text-[22px]">picture_as_pdf</span><span class="">Download PDF to print</span></button><button class="w-full min-h-[48px] py-2.5 px-4 rounded-full bg-surface-container-lowest text-on-surface font-label-lg text-label-lg border border-outline-variant/50 shadow-xs flex items-center justify-center gap-2 active:scale-[0.98] transition-transform" id="whatsappShareBtn" type="button"><span class="material-symbols-outlined text-[20px] text-on-tertiary-container">share</span><span class="">Share PDF to WhatsApp / Print Shop</span></button></div></div></div>
+<!-- Premium Physical Standee Order Card -->
+
+<!-- Merchant Wisdom / Placement Tip Card -->
+<div class="px-margin pt-space-xs pb-space-lg">
+<div class="w-full bg-surface-container p-space-md rounded-lg flex items-start gap-3 shadow-xs">
+<div class="w-9 h-9 rounded-full bg-secondary-container/20 text-secondary flex items-center justify-center flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[20px]">tips_and_updates</span>
+</div>
+<div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface">Counter Placement Tip</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-relaxed">
+          Place right next to the UPI soundbox or billing scanner. <strong class="text-on-surface">7 out of 10 customers</strong> scan while waiting for their sweets packing or payment confirmation sound!
+        </p>
+</div>
+</div>
+</div>
+<!-- Notification Toast Container -->
+<div class="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 bg-inverse-surface text-inverse-on-surface rounded-full font-label-md text-label-md shadow-xl transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2" id="toastMessage">
+<span class="material-symbols-outlined text-[18px] text-tertiary-fixed">check_circle</span>
+<span id="toastText" class="">Download started</span>
+</div>
+</div>
+<script>
+  (function initStandeeStudio() {
+    const acrylicSheet = document.getElementById('acrylicSheet');
+    const standeeWrapper = document.getElementById('standeeWrapper');
+    const previewHeadline = document.getElementById('previewHeadline');
+    const previewScanHindi = document.getElementById('previewScanHindi');
+    const counterSimNotice = document.getElementById('counterSimNotice');
+    const toast = document.getElementById('toastMessage');
+    const toastText = document.getElementById('toastText');
+
+    function showToast(msg) {
+      if (!toast) return;
+      toastText.textContent = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+        toast.classList.remove('opacity-100');
+      }, 2500);
+    }
+
+    // View Angle Toggles
+    const viewButtons = document.querySelectorAll('.view-toggle');
+    viewButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewButtons.forEach(b => {
+          b.classList.remove('bg-primary-container', 'text-on-primary', 'shadow-xs');
+          b.classList.add('text-on-surface-variant');
+        });
+        btn.classList.add('bg-primary-container', 'text-on-primary', 'shadow-xs');
+        btn.classList.remove('text-on-surface-variant');
+
+        const view = btn.dataset.view;
+        if (view === 'counter') {
+          standeeWrapper.style.transform = 'rotateX(10deg) rotateY(-8deg) scale(0.96)';
+          if (counterSimNotice) counterSimNotice.classList.remove('hidden');
+        } else {
+          standeeWrapper.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
+          if (counterSimNotice) counterSimNotice.classList.add('hidden');
+        }
+      });
+    });
+
+    // Theme Customizer
+    const themeButtons = document.querySelectorAll('.theme-btn');
+    themeButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        themeButtons.forEach(b => {
+          b.classList.remove('bg-surface-container-high', 'shadow-xs');
+          b.classList.add('bg-surface-container-low');
+        });
+        btn.classList.add('bg-surface-container-high', 'shadow-xs');
+        btn.classList.remove('bg-surface-container-low');
+
+        const theme = btn.dataset.theme;
+        if (theme === 'classic') {
+          acrylicSheet.className = 'relative w-full rounded-2xl p-4 shadow-[0_16px_36px_rgba(27,23,64,0.18)] transition-all duration-300 bg-white text-primary-container';
+          document.getElementById('previewStoreName').className = 'font-headline-sm text-headline-sm text-primary-container tracking-tight leading-tight';
+          previewHeadline.className = 'font-label-md text-label-md text-center text-on-surface mb-3';
+        } else if (theme === 'festive') {
+          acrylicSheet.className = 'relative w-full rounded-2xl p-4 shadow-[0_16px_36px_rgba(27,23,64,0.18)] transition-all duration-300 bg-gradient-to-b from-[#683d00] via-[#895100] to-[#3a1d00] text-on-primary';
+          document.getElementById('previewStoreName').className = 'font-headline-sm text-headline-sm text-secondary-fixed tracking-tight leading-tight';
+          previewHeadline.className = 'font-label-md text-label-md text-center text-white/95 mb-3';
+        } else {
+          acrylicSheet.className = 'relative w-full rounded-2xl p-4 shadow-[0_16px_36px_rgba(27,23,64,0.18)] transition-all duration-300 bg-gradient-to-b from-[#1b1740] via-[#241f54] to-[#120f2e] text-on-primary';
+          document.getElementById('previewStoreName').className = 'font-headline-sm text-headline-sm text-white tracking-tight leading-tight';
+          previewHeadline.className = 'font-label-md text-label-md text-center text-white/95 mb-3';
+        }
+      });
+    });
+
+    // Language framing toggle
+    const langButtons = document.querySelectorAll('.lang-btn');
+    langButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        langButtons.forEach(b => {
+          b.classList.remove('bg-primary-container', 'text-on-primary', 'shadow-xs');
+          b.classList.add('bg-surface-container-low', 'text-on-surface');
+        });
+        btn.classList.add('bg-primary-container', 'text-on-primary', 'shadow-xs');
+        btn.classList.remove('bg-surface-container-low', 'text-on-surface');
+
+        const lang = btn.dataset.lang;
+        if (lang === 'english') {
+          previewHeadline.textContent = "Loved our taste? Rate us 5-Stars on Google!";
+          previewScanHindi.textContent = "Scan using any camera or UPI app";
+        } else if (lang === 'hindi') {
+          previewHeadline.textContent = "स्वाद पसंद आया? गूगल पर 5★ रेटिंग दें!";
+          previewScanHindi.textContent = "कैमरा या UPI ऐप से स्कैन करके रिव्यू दें";
+        } else {
+          previewHeadline.textContent = "Mithai pasand aayi? Rate us 5-Star!";
+          previewScanHindi.textContent = "कैमरा या किसी भी UPI ऐप से स्कैन करें";
+        }
+      });
+    });
+
+    // Interactive button triggers
+    document.getElementById('downloadPdfBtn')?.addEventListener('click', () => {
+      showToast('Generating 300 DPI PDF for Print...');
+    });
+
+    document.getElementById('whatsappShareBtn')?.addEventListener('click', () => {
+      showToast('Dispatching PDF to WhatsApp contact...');
+    });
+
+    document.getElementById('orderStandeeBtn')?.addEventListener('click', () => {
+      showToast('Opening 1-Tap Checkout for Ramesh ji...');
+    });
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_-4px_20px_rgba(27,23,64,0.06)]" data-active-classes="text-primary-container font-label-md"><div class="h-[72px] px-space-xs flex items-center justify-around"><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 text-on-surface-variant hover:text-on-surface transition-all" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[22px]">storefront</span><span class="font-label-sm text-label-sm tracking-tight mt-0.5">Home</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 relative text-on-surface-variant hover:text-on-surface transition-all" data-path="reviews" href="#"><div class="relative"><span class="material-symbols-outlined text-[22px]">rate_review</span><span class="absolute -top-1 -right-2 px-1 py-0.2 bg-secondary-container text-primary-container font-label-sm text-[10px] leading-tight font-bold rounded-full shadow-[0_2px_6px_rgba(253,157,26,0.4)]">3</span></div><span class="font-label-sm text-label-sm tracking-tight mt-0.5">Reviews</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 text-on-surface-variant hover:text-on-surface transition-all" data-path="get-reviews" href="#"><div class="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center shadow-[0_6px_20px_rgba(255,159,28,0.4)] relative"><span class="material-symbols-outlined text-[26px] text-primary-container">auto_awesome</span></div><span class="font-label-sm text-label-sm font-bold text-primary-container tracking-tight mt-1">Get Reviews</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 text-on-surface-variant hover:text-on-surface transition-all" data-path="google-profile" href="#"><div class="relative"><span class="material-symbols-outlined text-[22px]">travel_explore</span><span class="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-on-tertiary-container"></span></div><span class="font-label-sm text-label-sm tracking-tight mt-0.5">Google</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-14 py-1 text-on-surface-variant hover:text-on-surface transition-all" data-path="business-account" href="#"><span class="material-symbols-outlined text-[22px]">store</span><span class="font-label-sm text-label-sm tracking-tight mt-0.5">Account</span></a></div></nav>
+
+</body></html>

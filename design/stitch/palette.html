@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RevYne Palette</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#16112E; --muted:#5B5577; --line:#E4E1F2; --bg:#F7F6FC; --v:#6334E2; --grad:linear-gradient(135deg,#B02FE5 0%,#6334E2 50%,#363DDD 100%); }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 "Plus Jakarta Sans", system-ui, sans-serif; padding:24px 16px 48px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size:26px; margin:0 0 4px; font-weight:800; }
+  h2 { font-size:15px; margin:28px 0 10px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+  .top { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+  .top img { width:84px; height:84px; border-radius:20px; box-shadow:0 10px 30px rgba(99,52,226,.35); }
+  .muted { color:var(--muted); }
+  .hero { background:var(--grad); color:#fff; border-radius:24px; padding:22px; box-shadow:0 18px 40px rgba(70,27,187,.30); }
+  .hero .big { font-size:44px; font-weight:800; line-height:1; }
+  .ramp { display:grid; grid-template-columns:repeat(11,1fr); border-radius:14px; overflow:hidden; border:1px solid var(--line); }
+  .ramp div { height:64px; display:flex; align-items:flex-end; padding:6px; font-size:11px; font-weight:700; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+  .sw { background:#fff; border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+  .sw .c { height:64px; }
+  .sw .t { padding:10px 12px; font-size:13px; }
+  .sw .t b { display:block; font-size:14px; }
+  .demo { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:20px; padding:18px; }
+  .btn { display:inline-block; background:var(--v); color:#fff; border-radius:999px; padding:12px 20px; font-weight:700; }
+  .btn.ghost { background:#fff; color:var(--v); border:1.5px solid var(--v); }
+  .stars { color:#F5A524; font-size:20px; letter-spacing:2px; }
+  .pill { display:inline-block; border-radius:999px; padding:4px 10px; font-size:12px; font-weight:700; }
+</style>
+</head>
+<body><div class="wrap">
+  <div class="top">
+    <img src="/brand/revyne-icon-512.png" alt="RevYne logo">
+    <div><h1>RevYne palette</h1><div class="muted">Sampled from the logo: violet-magenta → royal violet → indigo, with white.</div></div>
+  </div>
+
+  <h2>Brand gradient (one hero moment per screen)</h2>
+  <div class="hero">
+    <div style="opacity:.85;font-weight:700">This week</div>
+    <div class="big">12 <span style="font-size:20px;font-weight:700">went to Google</span></div>
+    <div style="margin-top:6px;opacity:.9">31 review page visits · +40% vs last week</div>
+  </div>
+
+  <h2>Violet ramp — primary</h2>
+  <div class="ramp">
+    <div style="background:#F5F2FC;color:#391698">50</div><div style="background:#E8E2F9;color:#391698">100</div><div style="background:#CFC1F6;color:#391698">200</div><div style="background:#AD94F0;color:#1E0B50">300</div><div style="background:#8A67E9;color:#fff">400</div><div style="background:#6334E2;color:#fff">500</div><div style="background:#461BBB;color:#fff">600</div><div style="background:#391698;color:#fff">700</div><div style="background:#2B1174;color:#fff">800</div><div style="background:#1E0B50;color:#fff">900</div><div style="background:#120731;color:#fff">950</div>
+  </div>
+
+  <h2>Core colours</h2>
+  <div class="grid">
+    <div class="sw"><div class="c" style="background:#B02FE5"></div><div class="t"><b>Magenta</b>#B02FE5 · gradient start</div></div>
+    <div class="sw"><div class="c" style="background:#6334E2"></div><div class="t"><b>Royal violet</b>#6334E2 · primary</div></div>
+    <div class="sw"><div class="c" style="background:#363DDD"></div><div class="t"><b>Indigo</b>#363DDD · gradient end</div></div>
+    <div class="sw"><div class="c" style="background:#16112E"></div><div class="t"><b>Ink</b>#16112E · text</div></div>
+    <div class="sw"><div class="c" style="background:#5B5577"></div><div class="t"><b>Muted</b>#5B5577 · secondary text</div></div>
+    <div class="sw"><div class="c" style="background:#F7F6FC;border-bottom:1px solid #E4E1F2"></div><div class="t"><b>Background</b>#F7F6FC</div></div>
+    <div class="sw"><div class="c" style="background:#F5A524"></div><div class="t"><b>Star</b>#F5A524 · ratings only</div></div>
+    <div class="sw"><div class="c" style="background:#0B7F57"></div><div class="t"><b>Success</b>#0B7F57</div></div>
+    <div class="sw"><div class="c" style="background:#D02F35"></div><div class="t"><b>Danger</b>#D02F35</div></div>
+  </div>
+
+  <h2>In use</h2>
+  <div class="demo">
+    <div class="card">
+      <div class="stars">★★★★★</div>
+      <div style="font-weight:700;margin:6px 0 2px">Priya · 10m ago</div>
+      <div class="muted">"Kaju katli was fresh and the staff were helpful."</div>
+      <div style="margin-top:12px"><span class="pill" style="background:#E7F4EE;color:#0B7F57">Went to Google</span></div>
+    </div>
+    <div class="card">
+      <div style="font-weight:700;font-size:17px">2 private messages</div>
+      <div class="muted" style="margin:4px 0 14px">Only you can see these.</div>
+      <span class="btn">Read messages</span> <span class="btn ghost">Later</span>
+    </div>
+    <div class="card" style="background:#F5F2FC;border-color:#E8E2F9">
+      <div style="font-weight:700;color:#391698">✦ AI reply ready</div>
+      <div style="margin-top:6px">"Thank you Priya! We're glad you enjoyed the kaju katli."</div>
+      <div style="margin-top:12px"><span class="btn">Approve & post</span></div>
+    </div>
+  </div>
+</div></body>
+</html>

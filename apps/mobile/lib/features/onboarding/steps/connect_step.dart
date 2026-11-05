@@ -111,12 +111,11 @@ class ConnectStep extends ConsumerWidget {
           Text(draft.error!, style: const TextStyle(color: AppColors.error)),
         ],
         const SizedBox(height: AppSpacing.lg),
-        FilledButton.icon(
-          onPressed: draft.busy ? null : controller.connect,
-          icon: draft.busy
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.storefront_rounded),
-          label: Text(draft.status == null ? 'Connect Google Business Profile' : 'Connect a different account'),
+        GradientButton(
+          label: draft.status == null ? 'Connect Google Business Profile' : 'Connect a different account',
+          icon: Icons.storefront_rounded,
+          busy: draft.busy,
+          onPressed: controller.connect,
         ),
         if (draft.status == ConnectStatus.apiNotApproved) ...[
           const SizedBox(height: AppSpacing.sm),

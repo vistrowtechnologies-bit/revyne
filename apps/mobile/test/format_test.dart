@@ -22,9 +22,10 @@ void main() {
   test('review request message names the customer and includes the review link', () {
     final b = Business.fromJson({'id': 'b', 'owner_id': 'u', 'name': 'Sharma Sweets', 'public_slug': 'abc123def456'});
     final msg = reviewRequestMessage(b, customerName: ' Ravi ');
-    expect(msg, startsWith('Hi Ravi, thank you for visiting Sharma Sweets!'));
+    expect(msg, startsWith('Namaste Ravi! Thank you for visiting Sharma Sweets.'));
     expect(msg, contains('/r/abc123def456'));
-    expect(reviewRequestMessage(b), startsWith('Hi, thank you'));
+    expect(msg.toLowerCase(), isNot(anyOf(contains('star'), contains('★'), contains('rating'))), reason: 'never ask for a star rating');
+    expect(reviewRequestMessage(b), startsWith('Namaste! Thank you'));
   });
 
   test('visits map copied / opened-Google timestamps to flags', () {

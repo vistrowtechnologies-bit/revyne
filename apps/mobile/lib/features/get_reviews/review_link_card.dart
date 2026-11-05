@@ -11,8 +11,8 @@ import '../business/business.dart';
 /// Message shared with customers on WhatsApp. Asks for honest feedback only —
 /// no incentives, no pressure (Google review policy).
 String reviewRequestMessage(Business business, {String? customerName}) {
-  final greeting = customerName == null || customerName.trim().isEmpty ? 'Hi' : 'Hi ${customerName.trim()}';
-  return '$greeting, thank you for visiting ${business.name}! '
+  final name = customerName?.trim() ?? '';
+  return 'Namaste${name.isEmpty ? '' : ' $name'}! Thank you for visiting ${business.name}. '
       'We\'d love to hear about your experience: ${Env.reviewLink(business.publicSlug)}';
 }
 
