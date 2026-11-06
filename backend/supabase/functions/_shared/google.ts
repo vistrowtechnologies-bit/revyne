@@ -229,6 +229,36 @@ export async function addPhoto(account: string, location: string, sourceUrl: str
   });
 }
 
+// ── Performance (stats) ──────────────────────────────────────────────────────
+
+const PERF_API = "https://businessprofileperformance.googleapis.com/v1";
+
+const dateParams = (prefix: string, iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return [[`${prefix}.year`, String(y)], [`${prefix}.month`, String(m)], [`${prefix}.day`, String(d)]];
+};
+
+export function dailyMetrics(location: string, metrics: readonly string[], start: string, end: string, accessToken: string) {
+  const qs = new URLSearchParams([
+    ...metrics.map((m) => ["dailyMetrics", m]),
+    ...dateParams("dailyRange.startDate", start),
+    ...dateParams("dailyRange.endDate", end),
+  ]);
+  return gbpGet(`${PERF_API}/${location}:fetchMultiDailyMetricsTimeSeries?${qs}`, accessToken);
+}
+
+/** Search terms people used to find the business, for whole months (inclusive). */
+export function monthlyKeywords(location: string, start: { year: number; month: number }, end: { year: number; month: number }, accessToken: string) {
+  const qs = new URLSearchParams({
+    "monthlyRange.startMonth.year": String(start.year),
+    "monthlyRange.startMonth.month": String(start.month),
+    "monthlyRange.endMonth.year": String(end.year),
+    "monthlyRange.endMonth.month": String(end.month),
+    pageSize: "50",
+  });
+  return gbpGet(`${PERF_API}/${location}/searchkeywords/impressions/monthly?${qs}`, accessToken);
+}
+
 /** Every location the Google user manages, across up to 20 accounts. */
 export async function listAllLocations(accessToken: string): Promise<GbpLocation[]> {
   const data = await gbpGet(`${ACCOUNTS_API}/accounts?pageSize=20`, accessToken);

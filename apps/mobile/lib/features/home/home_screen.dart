@@ -7,6 +7,8 @@ import '../../core/format.dart';
 import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../reports/report_repository.dart';
+import '../reports/report_screen.dart';
 import '../business/business_repository.dart';
 import '../reviews/reviews_repository.dart';
 import 'dashboard.dart';
@@ -151,6 +153,31 @@ class _Dashboard extends StatelessWidget {
             const SizedBox(width: AppSpacing.gutter),
             _QuickAction(icon: Icons.forum_outlined, label: 'Messages', onTap: () => context.go(Routes.reviews)),
           ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        const SectionHeader(title: 'Reports'),
+        const SizedBox(height: AppSpacing.sm),
+        AppCard(
+          padding: const EdgeInsets.all(18),
+          onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ReportScreen())),
+          child: Row(
+            children: [
+              const IconTile(Icons.description_outlined),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${monthLabel(DateTime(DateTime.now().year, DateTime.now().month - 1))} report',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                    const SizedBox(height: 2),
+                    const Text('Views, calls, reviews and more — share as PDF', style: TextStyle(color: AppColors.muted, fontSize: 14)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+            ],
+          ),
         ),
         if (!verified) ...[
           const SizedBox(height: AppSpacing.lg),

@@ -72,6 +72,32 @@ class GbpPost {
       );
 }
 
+/// A post waiting for (or that failed at) its scheduled time.
+class ScheduledPost {
+  const ScheduledPost({required this.id, required this.type, required this.summary, required this.publishAt, required this.status, this.title, this.error});
+
+  final String id;
+  final PostType type;
+  final String summary;
+  final String? title;
+  final DateTime publishAt;
+  final String status; // pending | publishing | failed
+  final String? error;
+
+  factory ScheduledPost.fromJson(Map<String, dynamic> j) {
+    final post = Map<String, dynamic>.from(j['post'] as Map);
+    return ScheduledPost(
+      id: j['id'] as String,
+      type: PostType.parse(post['type'] as String?),
+      summary: post['summary'] as String? ?? '',
+      title: (post['title'] as String?)?.isEmpty ?? true ? null : post['title'] as String,
+      publishAt: DateTime.parse(j['publish_at'] as String).toLocal(),
+      status: j['status'] as String,
+      error: j['error'] as String?,
+    );
+  }
+}
+
 class GbpPhoto {
   const GbpPhoto({required this.name, required this.url, this.thumbnailUrl, this.category});
   final String name;
@@ -154,6 +180,27 @@ class ContentRepository {
 
   Future<void> deletePost(String name) => _call({'action': 'post_delete', 'name': name});
 
+  Future<void> schedulePost(PostForm form, DateTime publishAt, {String? mediaPath}) => _call({
+        'action': 'post_schedule',
+        'post': form.toJson(),
+        'publishAt': publishAt.toUtc().toIso8601String(),
+        'mediaPath': ?mediaPath,
+      });
+
+  Future<void> cancelScheduled(String id) => _call({'action': 'schedule_cancel', 'id': id});
+
+  /// Upcoming posts, plus ones that failed in the last week (owner-only RLS).
+  Future<List<ScheduledPost>> scheduled(String businessId) async {
+    final weekAgo = DateTime.now().toUtc().subtract(const Duration(days: 7)).toIso8601String();
+    final rows = await _client
+        .from('scheduled_posts')
+        .select('id,post,publish_at,status,error')
+        .eq('business_id', businessId)
+        .or('status.in.(pending,publishing),and(status.eq.failed,publish_at.gte.$weekAgo)')
+        .order('publish_at');
+    return rows.map(ScheduledPost.fromJson).toList();
+  }
+
   Future<PhotoPage> photos() async {
     final d = await _call({'action': 'photos'});
     return PhotoPage([for (final p in d['photos'] as List) GbpPhoto.fromJson(Map<String, dynamic>.from(p as Map))], (d['total'] as num).toInt());
@@ -189,7 +236,13 @@ final gbpPostsProvider = FutureProvider<List<GbpPost>>(retry: (_, _) => null, (r
   return ref.watch(contentRepositoryProvider).posts();
 });
 
-final gbpPhotosProvider = FutureProvider<PhotoPage>(retry: (_, _) => null, (ref) async {
+final scheduledPostsProvider = FutureProvider<List<ScheduledPost>>(retry: (_, _) => null, (ref) async {
+  final b = await ref.watch(myBusinessProvider.future);
+  if (b == null || !b.isVerified) return const [];
+  return ref.watch(contentRepositoryProvider).scheduled(b.id);
+});
+
+final gbpPhotosProvider =FutureProvider<PhotoPage>(retry: (_, _) => null, (ref) async {
   await _requireLinked(ref);
   return ref.watch(contentRepositoryProvider).photos();
 });

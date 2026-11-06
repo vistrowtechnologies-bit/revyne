@@ -151,8 +151,10 @@ Scaling limits to design for (not the database):
 - [x] Google Score (RevYne's own 0–100; Google's profile strength has no API) with fix-it tasks (5 Nov)
 - [x] Profile editor (description with AI, hours, holiday hours, phone, website) with confirm before sending (5 Nov; real description edit accepted by Google, shown as pending review)
 - [x] Posts (update/offer/event, AI text, photo, button) and photo upload/delete via private `gbp-media` bucket + signed URL (6 Nov; real post went Live, real photo added and listed)
-- [ ] Scheduled posts (server-side, Google's API has no scheduling)
-- [ ] Insights (Performance API: calls, directions, website clicks, search keywords)
+- [x] Scheduled posts: `scheduled_posts` + `gbp-scheduler` run by pg_cron every 5 min with a vault-generated secret (6 Nov; schedule + cancel checked on phone, cron call returns 200; a scheduled post has not yet been published end to end)
+- [x] Insights (Performance API: Search/Maps views, calls, directions, website, chats, search keywords) (6 Nov; real numbers shown on phone; 7/28/90 days or custom range)
+- [x] Monthly report (Google stats vs last month, reviews, RevYne review page, posts, top searches) with PDF share; on Home, Account and the stats screen (6 Nov)
+- [x] Android Back: previous tab, then Home, then press-again-to-exit (6 Nov)
 - [ ] Activity log + change notifications (≤48 h)
 - [ ] OAuth consent screen verification passed (demo video, privacy policy, domain verification)
 

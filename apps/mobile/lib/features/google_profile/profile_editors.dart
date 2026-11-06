@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/pickers.dart';
 import '../../core/widgets/ui.dart';
 import 'profile_repository.dart';
 
@@ -264,7 +265,8 @@ class _HoursEditorState extends State<HoursEditor> {
 
   Future<void> _pick(String day, {required bool open}) async {
     final current = _days[day]!;
-    final picked = await showTimePicker(context: context, initialTime: parseTime(open ? current.open : current.close));
+    final picked = await pickTime(context,
+        initial: parseTime(open ? current.open : current.close), title: '${weekDayLabels[day]} · ${open ? 'opens' : 'closes'} at');
     if (picked == null) return;
     setState(() => _days[day] = open ? DayHours(day, hhmm(picked), current.close) : DayHours(day, current.open, hhmm(picked)));
   }
@@ -366,7 +368,7 @@ class _HolidayHoursEditorState extends State<HolidayHoursEditor> {
 
   Future<void> _add() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(context: context, firstDate: now, lastDate: now.add(const Duration(days: 365)), initialDate: now);
+    final picked = await pickDate(context, first: now, last: now.add(const Duration(days: 365)), title: 'Holiday date');
     if (picked == null) return;
     final iso = _iso(picked);
     if (_days.any((d) => d.date == iso)) return;
@@ -377,7 +379,8 @@ class _HolidayHoursEditorState extends State<HolidayHoursEditor> {
 
   Future<void> _pick(int i, {required bool open}) async {
     final d = _days[i];
-    final picked = await showTimePicker(context: context, initialTime: parseTime((open ? d.open : d.close) ?? (open ? '10:00' : '14:00')));
+    final picked = await pickTime(context,
+        initial: parseTime((open ? d.open : d.close) ?? (open ? '10:00' : '14:00')), title: open ? 'Opens at' : 'Closes at');
     if (picked == null) return;
     setState(() => _days[i] = SpecialDay(
           date: d.date,

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/pickers.dart';
 import '../../core/widgets/ui.dart';
 import '../business/business_repository.dart';
 import 'content_repository.dart';
@@ -36,8 +37,9 @@ Future<({Uint8List bytes, bool png})?> pickPhoto(BuildContext context) async {
 class CreatePostScreen extends ConsumerStatefulWidget {
   const CreatePostScreen({super.key});
 
-  static Future<bool?> open(BuildContext context) =>
-      Navigator.of(context, rootNavigator: true).push<bool>(MaterialPageRoute(builder: (_) => const CreatePostScreen()));
+  /// Resolves to 'posted', 'scheduled', or null when closed without sending.
+  static Future<String?> open(BuildContext context) =>
+      Navigator.of(context, rootNavigator: true).push<String>(MaterialPageRoute(builder: (_) => const CreatePostScreen()));
 
   @override
   ConsumerState<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -54,6 +56,25 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   ({Uint8List bytes, bool png})? _photo;
   bool _drafting = false;
   bool _posting = false;
+  DateTime? _scheduleAt; // null → post now
+
+  Future<void> _pickSchedule() async {
+    final now = DateTime.now();
+    final date = await pickDate(context, first: now, last: now.add(const Duration(days: 90)), initial: _scheduleAt ?? now, title: 'Publish on');
+    if (date == null || !mounted) return;
+    final time = await pickTime(context, initial: TimeOfDay.fromDateTime(_scheduleAt ?? now.add(const Duration(hours: 1))), title: 'Publish at');
+    if (time == null) return;
+    final at = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    if (at.isBefore(DateTime.now().add(const Duration(minutes: 10)))) return _toast('Pick a time at least 10 minutes from now.');
+    setState(() => _scheduleAt = at);
+  }
+
+  String _when(DateTime d) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    return '${days[d.weekday - 1]} ${d.day} ${months[d.month - 1]}, $h:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'am' : 'pm'}';
+  }
 
   @override
   void dispose() {
@@ -81,11 +102,12 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   Future<void> _pickDate({required bool start}) async {
     final now = DateTime.now();
     final first = start ? now : (_form.startDate ?? now);
-    final picked = await showDatePicker(
-      context: context,
-      firstDate: DateTime(first.year, first.month, first.day),
-      lastDate: now.add(const Duration(days: 365)),
-      initialDate: (start ? _form.startDate : _form.endDate) ?? first,
+    final picked = await pickDate(
+      context,
+      first: DateTime(first.year, first.month, first.day),
+      last: now.add(const Duration(days: 365)),
+      initial: (start ? _form.startDate : _form.endDate) ?? first,
+      title: start ? 'Starts on' : 'Ends on',
     );
     if (picked == null) return;
     setState(() {
@@ -106,14 +128,17 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       ..terms = _terms.text
       ..buttonUrl = _link.text;
     if (_form.summary.trim().isEmpty) return _toast('Write the post text, or use AI to draft it.');
+    final at = _scheduleAt;
     final ok = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Post this on Google?'),
-            content: const Text('It appears on your Google profile in Search and Maps. Google checks posts first — usually a few minutes.'),
+            title: Text(at == null ? 'Post this on Google?' : 'Schedule this post?'),
+            content: Text(at == null
+                ? 'It appears on your Google profile in Search and Maps. Google checks posts first — usually a few minutes.'
+                : 'RevYne will post it on your Google profile on ${_when(at)} (within 5 minutes of that time). You can cancel it until then.'),
             actions: [
               TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Post')),
+              TextButton(onPressed: () => Navigator.pop(context, true), child: Text(at == null ? 'Post' : 'Schedule')),
             ],
           ),
         ) ??
@@ -127,10 +152,15 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         final business = await ref.read(myBusinessProvider.future);
         path = await repo.upload(business!.id, _photo!.bytes, png: _photo!.png);
       }
-      await repo.createPost(_form, mediaPath: path);
-      ref.invalidate(gbpPostsProvider);
+      if (at == null) {
+        await repo.createPost(_form, mediaPath: path);
+        ref.invalidate(gbpPostsProvider);
+      } else {
+        await repo.schedulePost(_form, at, mediaPath: path);
+        ref.invalidate(scheduledPostsProvider);
+      }
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(at == null ? 'posted' : 'scheduled');
     } on ContentException catch (e) {
       _toast(e.message);
     } catch (_) {
@@ -244,7 +274,19 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             ],
           ],
           const SizedBox(height: AppSpacing.lg),
-          GradientButton(label: 'Post on Google', icon: Icons.send_rounded, busy: _posting, onPressed: _posting ? null : _post),
+          const SectionHeader(title: 'When'),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(spacing: AppSpacing.sm, runSpacing: AppSpacing.sm, children: [
+            SelectChip(label: 'Post now', selected: _scheduleAt == null, onTap: () => setState(() => _scheduleAt = null)),
+            SelectChip(label: _scheduleAt == null ? 'Schedule' : _when(_scheduleAt!), selected: _scheduleAt != null, onTap: _pickSchedule),
+          ]),
+          const SizedBox(height: AppSpacing.lg),
+          GradientButton(
+            label: _scheduleAt == null ? 'Post on Google' : 'Schedule post',
+            icon: _scheduleAt == null ? Icons.send_rounded : Icons.schedule_send_rounded,
+            busy: _posting,
+            onPressed: _posting ? null : _post,
+          ),
         ],
       ),
     );

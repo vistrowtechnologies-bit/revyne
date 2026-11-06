@@ -31,10 +31,12 @@ Future<bool> _confirm(BuildContext context, String title, String body, String ac
 /// Opens the create-post screen; refreshes posts and score after posting.
 Future<void> startNewPost(BuildContext context, WidgetRef ref) async {
   final messenger = ScaffoldMessenger.of(context);
-  final posted = await CreatePostScreen.open(context);
-  if (posted == true) {
+  final result = await CreatePostScreen.open(context);
+  if (result == 'posted') {
     ref.invalidate(gbpProfileProvider);
     messenger.showSnackBar(const SnackBar(content: Text('Posted. Google checks posts first — usually a few minutes.')));
+  } else if (result == 'scheduled') {
+    messenger.showSnackBar(const SnackBar(content: Text('Scheduled. RevYne will post it at the time you picked.')));
   }
 }
 
@@ -98,14 +100,26 @@ class PostsSection extends ConsumerWidget {
     }
   }
 
+  Future<void> _cancel(BuildContext context, WidgetRef ref, ScheduledPost s) async {
+    if (!await _confirm(context, 'Cancel this scheduled post?', 'It won\'t be posted on Google.', 'Cancel post', danger: true)) return;
+    try {
+      await ref.read(contentRepositoryProvider).cancelScheduled(s.id);
+      ref.invalidate(scheduledPostsProvider);
+    } on ContentException catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final posts = ref.watch(gbpPostsProvider);
+    final scheduled = ref.watch(scheduledPostsProvider).value ?? const [];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         GradientButton(label: 'Create a post', icon: Icons.edit_note_rounded, onPressed: () => startNewPost(context, ref)),
         const SizedBox(height: AppSpacing.gutter),
+        for (final s in scheduled) _ScheduledCard(item: s, onCancel: s.status == 'pending' ? () => _cancel(context, ref, s) : null),
         posts.when(
           loading: () => const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator())),
           error: (e, _) => Text(e is ContentException ? e.message : "Couldn't load posts.", style: const TextStyle(color: AppColors.muted)),
@@ -118,6 +132,58 @@ class PostsSection extends ConsumerWidget {
               : Column(children: [for (final p in items.take(5)) _PostCard(post: p, onDelete: () => _delete(context, ref, p))]),
         ),
       ],
+    );
+  }
+}
+
+String _scheduledLabel(DateTime d) {
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  return '${days[d.weekday - 1]} ${d.day} ${months[d.month - 1]}, $h:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'am' : 'pm'}';
+}
+
+class _ScheduledCard extends StatelessWidget {
+  const _ScheduledCard({required this.item, this.onCancel});
+  final ScheduledPost item;
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final failed = item.status == 'failed';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.gutter),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(16, 12, 4, 14),
+        borderColor: failed ? AppColors.danger.withValues(alpha: 0.35) : AppColors.violet200,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              failed
+                  ? const StatusPill(label: 'Not posted', background: AppColors.dangerSoft, foreground: AppColors.danger, dot: true)
+                  : StatusPill(
+                      label: item.status == 'publishing' ? 'Posting now' : 'Scheduled',
+                      background: AppColors.violet50,
+                      foreground: AppColors.violet700,
+                      dot: true,
+                    ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text('${item.type.label} · ${_scheduledLabel(item.publishAt)}',
+                    overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+              ),
+              if (onCancel != null) IconButton(tooltip: 'Cancel', onPressed: onCancel, icon: const Icon(Icons.close_rounded, color: AppColors.muted)),
+            ]),
+            if (item.title != null) Text(item.title!, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            Text(item.summary, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, height: 1.45)),
+            if (failed && item.error != null) ...[
+              const SizedBox(height: 6),
+              Text(item.error!, style: const TextStyle(color: AppColors.danger, fontSize: 13.5)),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../reports/report_screen.dart';
 import '../auth/auth_repository.dart';
 import '../business/business_repository.dart';
 import 'business_settings_sheet.dart';
@@ -118,6 +119,11 @@ class AccountScreen extends ConsumerWidget {
                 Icons.tune_rounded,
                 'Products, tone & languages',
                 onTap: business == null ? null : () => BusinessSettingsSheet.show(context, business),
+              ),
+              row(
+                Icons.description_outlined,
+                'Monthly reports',
+                onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ReportScreen())),
               ),
             ]),
             const SizedBox(height: AppSpacing.lg),

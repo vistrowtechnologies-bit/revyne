@@ -11,6 +11,9 @@
 //   photos                                 latest photos + total
 //   photo_add   { mediaPath, category }
 //   photo_delete { name }
+//   post_schedule { post, mediaPath?, publishAt }   stored; gbp-scheduler publishes it
+//   schedule_cancel { id }
+//   (the app lists scheduled posts directly from `scheduled_posts`, owner-only RLS)
 //
 // Expected outcomes come back as 200 { status }: ok | not_linked | reconnect |
 // api_not_approved | invalid (with message) | limit.
@@ -19,6 +22,7 @@
 import { accessTokenFor } from "../_shared/gbp_auth.ts";
 import { addPhoto, createPost, deleteByName, GoogleApiError, listPhotos, listPosts } from "../_shared/google.ts";
 import { db, getUserId, json, str } from "../_shared/http.ts";
+import { signedMediaUrl } from "../_shared/media.ts";
 import { AiUnavailable, generateText } from "../_shared/openai.ts";
 import { buildPostPrompt, ownMediaPath, PHOTO_CATEGORIES, PostInput, postBody, PostType } from "../_shared/post_edit.ts";
 import { EditError } from "../_shared/profile_edit.ts";
@@ -48,19 +52,11 @@ async function countToday(businessId: string, kind: string): Promise<number> {
   return res.ok ? Number(res.headers.get("content-range")?.split("/")[1] ?? 999) : 999;
 }
 
-/** A 1-hour signed URL Google can fetch the uploaded photo from. */
-async function signedUrl(path: string): Promise<string> {
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const res = await fetch(`${url}/storage/v1/object/sign/gbp-media/${path}`, {
-    method: "POST",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ expiresIn: 3600 }),
-  });
-  if (!res.ok) throw new EditError("That photo couldn't be found. Please add it again.");
-  const { signedURL } = await res.json() as { signedURL: string };
-  return `${url}/storage/v1${signedURL}`;
-}
+const signedUrl = signedMediaUrl;
+
+const MIN_LEAD_MS = 10 * 60_000; // schedule at least 10 minutes ahead
+const MAX_LEAD_MS = 90 * 86400_000;
+const MAX_PENDING = 30;
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -119,6 +115,49 @@ Deno.serve(async (req) => {
         const post = await createPost(b.gbp_account, b.gbp_location, request, token);
         await record(b.id, "post_created", post.type);
         return json({ status: "ok", post });
+      }
+
+      case "post_schedule": {
+        const mediaPath = str(body.mediaPath, 200);
+        if (mediaPath && !ownMediaPath(mediaPath, b.id)) return json({ status: "invalid", message: "That photo can't be used." });
+        const publishAt = Date.parse(str(body.publishAt, 40));
+        if (Number.isNaN(publishAt)) return json({ status: "invalid", message: "Pick when to publish." });
+        if (publishAt < Date.now() + MIN_LEAD_MS) return json({ status: "invalid", message: "Pick a time at least 10 minutes from now." });
+        if (publishAt > Date.now() + MAX_LEAD_MS) return json({ status: "invalid", message: "You can schedule up to 90 days ahead." });
+        const post = (body.post ?? {}) as PostInput;
+        try {
+          // Checked as of the publish time (e.g. an offer must not have ended by then).
+          postBody(post, mediaPath ? "https://scheduled.invalid/photo.jpg" : null, new Date(publishAt));
+        } catch (e) {
+          if (e instanceof EditError) return json({ status: "invalid", message: e.message });
+          throw e;
+        }
+        const pending = await db(`scheduled_posts?business_id=eq.${b.id}&status=eq.pending&select=id`, { method: "HEAD", headers: { Prefer: "count=exact" } });
+        if (Number(pending.headers.get("content-range")?.split("/")[1] ?? MAX_PENDING) >= MAX_PENDING) {
+          return json({ status: "invalid", message: `You can have up to ${MAX_PENDING} scheduled posts.` });
+        }
+        const saved = await db("scheduled_posts", {
+          method: "POST",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify({ business_id: b.id, post, media_path: mediaPath || null, publish_at: new Date(publishAt).toISOString() }),
+        });
+        if (!saved.ok) throw new Error(`save schedule: ${saved.status} ${await saved.text()}`);
+        await record(b.id, "post_scheduled", post.type);
+        return json({ status: "ok", scheduled: (await saved.json())[0] });
+      }
+
+      case "schedule_cancel": {
+        const id = str(body.id, 40);
+        if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: "Invalid item" }, 400);
+        const res = await db(`scheduled_posts?id=eq.${id}&business_id=eq.${b.id}&status=eq.pending`, {
+          method: "PATCH",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify({ status: "cancelled" }),
+        });
+        const rows = res.ok ? await res.json() as unknown[] : [];
+        if (!rows.length) return json({ status: "invalid", message: "This post is already being published or was removed." });
+        await record(b.id, "post_schedule_cancelled");
+        return json({ status: "ok" });
       }
 
       case "post_delete":

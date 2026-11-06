@@ -26,6 +26,23 @@ void main() {
     expect(j['button'], 'CALL');
   });
 
+  test('parses a scheduled post into local time with its form fields', () {
+    final s = ScheduledPost.fromJson({
+      'id': '6b1c0e0a-1111-2222-3333-444455556666',
+      'post': {'type': 'OFFER', 'summary': 'Diwali deal', 'title': 'Diwali offer'},
+      'publish_at': '2026-11-08T04:30:00Z',
+      'status': 'failed',
+      'error': 'Google access expired.',
+    });
+    expect(s.type, PostType.offer);
+    expect(s.title, 'Diwali offer');
+    expect(s.publishAt.isUtc, isFalse);
+    expect(s.publishAt.toUtc(), DateTime.utc(2026, 11, 8, 4, 30));
+    expect(s.error, 'Google access expired.');
+    final noTitle = ScheduledPost.fromJson({'id': 'x', 'post': {'type': 'STANDARD', 'summary': 's', 'title': ''}, 'publish_at': '2026-11-08T04:30:00Z', 'status': 'pending'});
+    expect(noTitle.title, isNull);
+  });
+
   test('parses posts from the server', () {
     final p = GbpPost.fromJson({'name': 'accounts/1/locations/2/localPosts/3', 'type': 'OFFER', 'summary': 's', 'title': 'Diwali', 'state': 'LIVE', 'createdAt': '2026-11-06T10:00:00Z'});
     expect(p.type, PostType.offer);

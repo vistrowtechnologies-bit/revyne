@@ -11,6 +11,8 @@ import '../gbp/gbp_repository.dart';
 import '../google_reviews/google_reviews_repository.dart';
 import '../google_content/content_repository.dart';
 import '../google_content/content_sections.dart';
+import '../insights/insights_repository.dart';
+import '../insights/insights_screen.dart';
 import 'profile_panel.dart';
 import 'profile_repository.dart';
 
@@ -117,6 +119,8 @@ class _GoogleProfileScreenState extends ConsumerState<GoogleProfileScreen> {
             ref.invalidate(googleReviewsProvider);
             ref.invalidate(gbpPostsProvider);
             ref.invalidate(gbpPhotosProvider);
+            ref.invalidate(scheduledPostsProvider);
+            ref.invalidate(insightsProvider(last28Days));
             try {
               await ref.read(gbpProfileProvider.future);
             } catch (_) {
@@ -185,6 +189,11 @@ class _GoogleProfileScreenState extends ConsumerState<GoogleProfileScreen> {
               ),
               if (verified) ...[
                 const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.sm),
+                const SectionHeader(title: 'Google stats'),
+                const SizedBox(height: AppSpacing.sm),
+                const InsightsCard(),
+                const SizedBox(height: AppSpacing.lg),
                 const GoogleProfilePanel(),
                 const SizedBox(height: AppSpacing.lg),
                 const SectionHeader(title: 'Google reviews'),
@@ -199,10 +208,12 @@ class _GoogleProfileScreenState extends ConsumerState<GoogleProfileScreen> {
                 const SizedBox(height: AppSpacing.sm),
                 const PhotosSection(),
               ],
-              const SizedBox(height: AppSpacing.lg),
-              SectionHeader(title: verified ? 'Coming next' : 'What you unlock'),
-              const SizedBox(height: AppSpacing.sm),
-              for (final (icon, title, body) in verified ? unlocks.skip(2) : unlocks)
+              if (!verified) ...[
+                const SizedBox(height: AppSpacing.lg),
+                const SectionHeader(title: 'What you unlock'),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+              for (final (icon, title, body) in verified ? const <(IconData, String, String)>[] : unlocks)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.gutter),
                   child: AppCard(
