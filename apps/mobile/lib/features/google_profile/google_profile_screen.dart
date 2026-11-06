@@ -9,6 +9,8 @@ import '../../core/widgets/ui.dart';
 import '../business/business_repository.dart';
 import '../gbp/gbp_repository.dart';
 import '../google_reviews/google_reviews_repository.dart';
+import '../google_content/content_repository.dart';
+import '../google_content/content_sections.dart';
 import 'profile_panel.dart';
 import 'profile_repository.dart';
 
@@ -113,6 +115,8 @@ class _GoogleProfileScreenState extends ConsumerState<GoogleProfileScreen> {
           onRefresh: () async {
             ref.invalidate(gbpProfileProvider);
             ref.invalidate(googleReviewsProvider);
+            ref.invalidate(gbpPostsProvider);
+            ref.invalidate(gbpPhotosProvider);
             try {
               await ref.read(gbpProfileProvider.future);
             } catch (_) {
@@ -186,11 +190,19 @@ class _GoogleProfileScreenState extends ConsumerState<GoogleProfileScreen> {
                 const SectionHeader(title: 'Google reviews'),
                 const SizedBox(height: AppSpacing.sm),
                 const _ReviewsShortcut(),
+                const SizedBox(height: AppSpacing.lg),
+                const SectionHeader(title: 'Posts'),
+                const SizedBox(height: AppSpacing.sm),
+                const PostsSection(),
+                const SizedBox(height: AppSpacing.md),
+                const SectionHeader(title: 'Photos'),
+                const SizedBox(height: AppSpacing.sm),
+                const PhotosSection(),
               ],
               const SizedBox(height: AppSpacing.lg),
               SectionHeader(title: verified ? 'Coming next' : 'What you unlock'),
               const SizedBox(height: AppSpacing.sm),
-              for (final (icon, title, body) in verified ? unlocks.skip(1) : unlocks)
+              for (final (icon, title, body) in verified ? unlocks.skip(2) : unlocks)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.gutter),
                   child: AppCard(

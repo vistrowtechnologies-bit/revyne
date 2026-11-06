@@ -162,6 +162,73 @@ export async function lastPostTime(account: string, location: string, accessToke
   return times.at(-1) ?? null;
 }
 
+// ── Posts and photos (v4) ────────────────────────────────────────────────────
+
+export type GbpPost = {
+  name: string;
+  type: string; // STANDARD | OFFER | EVENT
+  summary: string;
+  title: string | null;
+  state: string; // LIVE | PROCESSING | REJECTED
+  createdAt: string;
+  photoUrl: string | null;
+  searchUrl: string | null;
+  button: string | null;
+};
+
+export function toPost(p: Record<string, any>): GbpPost {
+  return {
+    name: p.name,
+    type: p.topicType ?? "STANDARD",
+    summary: p.summary ?? "",
+    title: p.event?.title ?? null,
+    state: p.state ?? "PROCESSING",
+    createdAt: p.createTime,
+    photoUrl: p.media?.[0]?.googleUrl ?? null,
+    searchUrl: p.searchUrl ?? null,
+    button: p.callToAction?.actionType ?? null,
+  };
+}
+
+const v4 = (account: string, location: string) => `${REVIEWS_API}/${account}/${location}`;
+
+export async function listPosts(account: string, location: string, accessToken: string): Promise<GbpPost[]> {
+  const data = await gbpGet(`${v4(account, location)}/localPosts?pageSize=20`, accessToken);
+  return ((data.localPosts ?? []) as Record<string, any>[]).map(toPost);
+}
+
+export async function createPost(account: string, location: string, body: Record<string, unknown>, accessToken: string) {
+  return toPost(await gbpGet(`${v4(account, location)}/localPosts`, accessToken, { method: "POST", body: JSON.stringify(body) }));
+}
+
+/** `name` must already be checked to belong to this location. */
+export async function deleteByName(name: string, accessToken: string) {
+  await gbpGet(`${REVIEWS_API}/${name}`, accessToken, { method: "DELETE" });
+}
+
+export type GbpPhoto = { name: string; url: string; thumbnailUrl: string | null; category: string | null; createdAt: string };
+
+export async function listPhotos(account: string, location: string, accessToken: string) {
+  const data = await gbpGet(`${v4(account, location)}/media?pageSize=24`, accessToken);
+  const photos: GbpPhoto[] = ((data.mediaItems ?? []) as Record<string, any>[])
+    .filter((m) => m.mediaFormat === "PHOTO" && m.googleUrl)
+    .map((m) => ({
+      name: m.name,
+      url: m.googleUrl,
+      thumbnailUrl: m.thumbnailUrl ?? null,
+      category: m.locationAssociation?.category ?? null,
+      createdAt: m.createTime,
+    }));
+  return { photos, total: typeof data.totalMediaItemCount === "number" ? data.totalMediaItemCount : photos.length };
+}
+
+export async function addPhoto(account: string, location: string, sourceUrl: string, category: string, accessToken: string) {
+  return gbpGet(`${v4(account, location)}/media`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ mediaFormat: "PHOTO", locationAssociation: { category }, sourceUrl }),
+  });
+}
+
 /** Every location the Google user manages, across up to 20 accounts. */
 export async function listAllLocations(accessToken: string): Promise<GbpLocation[]> {
   const data = await gbpGet(`${ACCOUNTS_API}/accounts?pageSize=20`, accessToken);

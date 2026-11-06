@@ -150,7 +150,8 @@ Scaling limits to design for (not the database):
 - [ ] Pub/Sub new-review push notifications
 - [x] Google Score (RevYne's own 0–100; Google's profile strength has no API) with fix-it tasks (5 Nov)
 - [x] Profile editor (description with AI, hours, holiday hours, phone, website) with confirm before sending (5 Nov; real description edit accepted by Google, shown as pending review)
-- [ ] Posts (update/offer/event, AI text + image, scheduling) and photos
+- [x] Posts (update/offer/event, AI text, photo, button) and photo upload/delete via private `gbp-media` bucket + signed URL (6 Nov; real post went Live, real photo added and listed)
+- [ ] Scheduled posts (server-side, Google's API has no scheduling)
 - [ ] Insights (Performance API: calls, directions, website clicks, search keywords)
 - [ ] Activity log + change notifications (≤48 h)
 - [ ] OAuth consent screen verification passed (demo video, privacy policy, domain verification)
@@ -187,6 +188,7 @@ Scaling limits to design for (not the database):
 | 2026-11-05 | Logo-palette redesign of every screen | Palette in `design/brand/PALETTE.md`; Plus Jakarta Sans bundled (500-800); gradient hero per screen, raised Get Reviews tab, 7-day chart (`dashboard_daily` migration). Verified all 5 tabs on the Realme (arm64 release build, 21 MB - phone too full for the 192 MB debug APK) |
 | 2026-11-05 | First real Business Profile linked | Google's Business Profile APIs answered for pranav28.nair@gmail.com (access appears approved). Test store linked to a real Pune profile: name, category, address, phone, place ID, review URL from Google; review page shows it |
 | 2026-11-05 | Google reviews inbox live | Needed the v4 `Google My Business API` enabled in `revyne-513306` (owner enabled it). New reviews reached the API ~25 min after showing on Search (count first, list later). `gbp-reviews` function + `owner_actions` table |
+| 2026-11-06 | GBP API access approved | Account Management quota 300 req/min; v4, Business Information, Performance, Notifications, Verifications APIs all enabled in `revyne-513306` |
 | 2026-11-04 | GBP API access requested | Case 0-6496000041329; build continues on the seeded test business meanwhile |
 | 2026-11-03 | Connect-only onboarding decided | Migration pushed; test business seeded for pranav28.nair@gmail.com |
 | 2026-11-02 | First real sign-in on phone | Debug APK on Realme RMX2156; user + profile + free subscription created |

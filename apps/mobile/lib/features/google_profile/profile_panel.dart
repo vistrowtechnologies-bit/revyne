@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/router.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../google_content/content_sections.dart';
 import 'profile_editors.dart';
 import 'profile_repository.dart';
 
 /// Opens the screen that fixes a score task or edits a profile field.
-Future<void> openProfileAction(BuildContext context, ScoreAction action, GbpProfile p) async {
+Future<void> openProfileAction(BuildContext context, WidgetRef ref, ScoreAction action, GbpProfile p) async {
   switch (action) {
     case ScoreAction.description:
       await showProfileEditor(context, DescriptionEditor(current: p.description));
@@ -25,12 +25,9 @@ Future<void> openProfileAction(BuildContext context, ScoreAction action, GbpProf
     case ScoreAction.reply:
       context.go(Routes.reviews);
     case ScoreAction.photos:
+      await startAddPhoto(context, ref);
     case ScoreAction.posts:
-      final what = action == ScoreAction.photos ? 'Photos' : 'Posts';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('$what are coming to RevYne next. For now you can add them on Google Maps.'),
-        action: p.mapsUri == null ? null : SnackBarAction(label: 'Open Maps', onPressed: () => launchUrl(Uri.parse(p.mapsUri!), mode: LaunchMode.externalApplication)),
-      ));
+      await startNewPost(context, ref);
     case ScoreAction.none:
       break;
   }
@@ -84,7 +81,7 @@ class _ScoreCardState extends ConsumerState<ScoreCard> {
           if (shown.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             const Divider(),
-            for (final t in shown) _TaskRow(task: t, onTap: () => openProfileAction(context, t.action, v.profile)),
+            for (final t in shown) _TaskRow(task: t, onTap: () => openProfileAction(context, ref, t.action, v.profile)),
             if (tasks.length > 3)
               Center(
                 child: TextButton(
@@ -141,7 +138,7 @@ class _TaskRow extends StatelessWidget {
 }
 
 /// What Google shows about the business, each row editable.
-class ProfileDetails extends StatelessWidget {
+class ProfileDetails extends ConsumerWidget {
   const ProfileDetails({super.key, required this.profile});
   final GbpProfile profile;
 
@@ -155,7 +152,7 @@ class ProfileDetails extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final p = profile;
     final rows = [
       (Icons.notes_rounded, 'Description', p.description.isEmpty ? 'Not set' : p.description, ScoreAction.description, p.description.isEmpty),
@@ -190,7 +187,7 @@ class ProfileDetails extends StatelessWidget {
               trailing: const Icon(Icons.edit_outlined, size: 20, color: AppColors.muted),
               onTap: () => action == null
                   ? showProfileEditor(context, HolidayHoursEditor(current: p.specialHours))
-                  : openProfileAction(context, action, p),
+                  : openProfileAction(context, ref, action, p),
             ),
           ],
           if (p.primaryCategory != null) ...[
