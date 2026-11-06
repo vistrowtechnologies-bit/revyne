@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/tokens.dart';
-import '../../core/widgets/pickers.dart';
+import '../../core/widgets/range_calendar.dart';
 import '../../core/widgets/ui.dart';
 import '../reports/report_screen.dart';
 import 'insights_repository.dart';
@@ -85,12 +85,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   Future<void> _pickCustom() async {
     final now = DateTime.now();
     final last = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 2));
-    final picked = await pickDateRange(
+    final picked = await showRangeCalendar(
       context,
       first: last.subtract(const Duration(days: 538)),
       last: last,
-      initial: _custom ? DateTimeRange(start: _range.start!, end: _range.end!) : DateTimeRange(start: last.subtract(const Duration(days: 27)), end: last),
-      title: 'Pick dates for your stats',
+      initial: _custom ? DateTimeRange(start: _range.start!, end: _range.end!) : null,
+      title: 'Google stats for',
     );
     if (picked == null) return;
     if (picked.duration.inDays > 365) {
@@ -124,13 +124,26 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xl),
           children: [
-            Wrap(spacing: AppSpacing.sm, runSpacing: AppSpacing.sm, children: [
-              for (final d in const [7, 28, 90])
+            Row(children: [
+              for (final d in const [7, 28, 90]) ...[
                 SelectChip(label: '$d days', selected: !_custom && _range.days == d, onTap: () => setState(() => _range = (days: d, start: null, end: null))),
-              SelectChip(
-                label: _custom ? '${_short(_range.start!)} – ${_short(_range.end!)}' : 'Custom dates',
-                selected: _custom,
-                onTap: _pickCustom,
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              Tooltip(
+                message: 'Pick dates',
+                child: Material(
+                  color: _custom ? AppColors.violet : Colors.white,
+                  shape: CircleBorder(side: BorderSide(color: _custom ? AppColors.violet : AppColors.line)),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: _pickCustom,
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Icon(Icons.calendar_month_rounded, size: 22, color: _custom ? Colors.white : AppColors.violet),
+                    ),
+                  ),
+                ),
               ),
             ]),
             const SizedBox(height: AppSpacing.md),

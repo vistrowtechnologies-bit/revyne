@@ -17,20 +17,6 @@ Future<TimeOfDay?> pickTime(BuildContext context, {required TimeOfDay initial, S
   );
 }
 
-/// Start–end range on a calendar (full screen on phones).
-Future<DateTimeRange?> pickDateRange(BuildContext context,
-    {required DateTime first, required DateTime last, DateTimeRange? initial, String? title}) {
-  FocusScope.of(context).unfocus();
-  return showDateRangePicker(
-    context: context,
-    firstDate: first,
-    lastDate: last,
-    initialDateRange: initial,
-    helpText: title ?? 'Pick dates',
-    saveText: 'Show',
-  );
-}
-
 /// RevYne's date picker (calendar view), with the same focus handling.
 Future<DateTime?> pickDate(BuildContext context, {required DateTime first, required DateTime last, DateTime? initial, String? title}) {
   FocusScope.of(context).unfocus();
