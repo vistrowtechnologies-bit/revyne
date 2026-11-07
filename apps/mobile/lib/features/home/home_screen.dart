@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../notifications/push_prompt.dart';
 import '../reports/report_repository.dart';
 import '../reports/report_screen.dart';
 import '../business/business_repository.dart';
@@ -142,6 +143,7 @@ class _Dashboard extends StatelessWidget {
             ),
           ),
         ],
+        const PushPromptCard(),
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader(title: 'Customer actions'),
         const SizedBox(height: AppSpacing.sm),

@@ -47,3 +47,6 @@ app.*.map.json
 # Environment config (run with --dart-define-from-file=env/dev.json)
 /env/*.json
 !/env/example.json
+
+# Firebase app config (download from Firebase console > Project settings > RevYne Android)
+/android/app/google-services.json

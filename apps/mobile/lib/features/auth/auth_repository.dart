@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/google/google_sign_in_service.dart';
 import '../../core/supabase/supabase_providers.dart';
+import '../notifications/push_service.dart';
 
 class AuthRepository {
   AuthRepository(this._client);
@@ -22,6 +23,8 @@ class AuthRepository {
   }
 
   Future<void> signOut() async {
+    // While still signed in (RLS): stop review alerts reaching this phone.
+    await PushService.unregister(_client);
     await _client.auth.signOut();
     try {
       await (await GoogleSignInService.instance()).signOut();

@@ -86,7 +86,7 @@ Scaling limits to design for (not the database):
 - [x] Google Cloud project created under Vistrow org (`revyne-513306`)
 - [ ] Billing account linked to `revyne-513306` (needed for Places API) — **owner to do** (needs payment details)
 - [x] APIs enabled (31 Oct): My Business Account Management, My Business Business Information, Business Profile Performance, My Business Verifications, My Business Notifications, My Business Place Actions, Cloud Pub/Sub
-- [ ] Google My Business API (v4, reviews + posts) — hidden until Google approves GBP access; enable right after approval
+- [x] Google My Business API (v4, reviews + posts) — enabled 5 Nov after GBP approval
 - [ ] Places API (New) — enable after billing is linked
 - [x] OAuth consent screen (Google Auth Platform) basic setup: app name RevYne, support + contact email vistrowtechnologies@gmail.com, audience External, status Testing
 - [ ] OAuth branding: logo, homepage, privacy policy, terms, authorized domain `revyneai.com` (+ Supabase domain) — after domain is live
@@ -121,15 +121,15 @@ Scaling limits to design for (not the database):
 - [ ] Customer review page — **built 4 Nov** (`apps/review-web`, plain HTML/JS): rate → highlights/own words/language → AI draft (optional) → Copy & post on Google, and "send private feedback" offered to every rating (no gating). Backed by migration `20261104000000_review_sessions.sql` (review_sessions, private_feedback, owner-read RLS) + `review-page` edge function (rate limits per visitor-hash and per business, CORS allowlist). Verified in browser against revyne-dev incl. a 2★ customer getting the Google option. `OPENAI_API_KEY` set by owner 4 Nov (model default gpt-5-mini); real drafts verified in English, Hinglish, Hindi incl. 2★ and a prompt-injection attempt. Prompt tightened after first run invented details ("will come back", remarks about staff) and assumed gender — every sentence must now trace to the customer's input, gender-neutral phrasing. **Still needed:** OpenAI monthly spend limit (owner, OpenAI dashboard); hosting + domain `revyneai.com` (Cloudflare Pages/Vercel with `/r/*` → index.html)
 - [x] Found + fixed: service_role had no table privileges (auto-expose off) — `20261104000100_service_role_grants.sql`; rule added to backend README
 - [x] Reviews tab: private feedback (unread, mark read, call/WhatsApp back) + review-page visits (4 Nov). Verified on phone: 2 private feedback with unread count, tap marks read (DB confirms), page visits show rating/highlights/text/"Went to Google"
-- [ ] Google Score (Places: rating, review count, profile completeness, nearby competitors)
+- [x] Google Score — built from the Business Profile instead of Places (see Phase 3); nearby-competitor comparison not built
 - [x] Home dashboard (4 Nov): `get_dashboard_stats` (security invoker — verified a stranger's session gets zeros, owner gets real numbers), this-week tiles with week-over-week change, reached-Google %, 30-day average rating, unread-feedback card, up to 3 next steps from real activity, On Google / Not connected badge. Verified on phone
-- [ ] Notifications (push) — later, with FCM
-- [ ] Reviews inbox (Places latest reviews + paste a review) + AI reply drafts (copy & open Google)
-- [ ] Customer review web page (5 states, 10+ languages, no gating)
+- [x] Push notifications via FCM (Firebase project `revyne-234e1` under the RevYne account): private-message alerts (verified on phone 7 Nov), Home/Account opt-in, tap opens the right tab
+- [x] Reviews inbox + AI reply drafts — built on the Business Profile API with posting (see Phase 3)
+- [x] Customer review web page (built 4 Nov; **not hosted yet** — needs revyneai.com)
 - [x] Private feedback inbox (Reviews tab: Private + Visits, Reply on WhatsApp / Call) (5 Nov)
 - [x] QR & poster (A5/A4 PDF download), WhatsApp single request, review page settings (products, tone, languages) (5 Nov)
 - [x] Help & support, settings, legal links, in-app account deletion (`account-delete` revokes the Google token, then deletes the user) (5 Nov)
-- [ ] AI edge functions with server-side limits + rate limits
+- [x] AI edge functions with server-side limits + rate limits (review page, reply/description/post drafts)
 - [ ] Create upload keystore (back up key + password in 2 safe places) — only now, right before the first Play upload
 - [ ] Internal testing release, then closed testing
 - [ ] Register Play App Signing SHA-1 (from Play Console) as an Android OAuth client so Google sign-in works for Play installs
@@ -147,7 +147,7 @@ Scaling limits to design for (not the database):
 - [x] Connect flow: incremental `business.manage` + server auth code → refresh token stored server-side (5 Nov, verified with a real profile)
 - [x] Location picker; location stored as `accounts/{a}/locations/{l}`; an existing unlinked business is linked in place (keeps its review link) (5 Nov)
 - [x] Reviews inbox (live from Google, not stored) + AI reply drafts (60/day/business) + reply posting with owner confirmation (5 Nov; draft + post verified on a real review)
-- [ ] Pub/Sub new-review push notifications
+- [x] New-review alerts: `gbp-review-watch` polls every 10 min (stores only the newest review time). Pub/Sub can replace polling later
 - [x] Google Score (RevYne's own 0–100; Google's profile strength has no API) with fix-it tasks (5 Nov)
 - [x] Profile editor (description with AI, hours, holiday hours, phone, website) with confirm before sending (5 Nov; real description edit accepted by Google, shown as pending review)
 - [x] Posts (update/offer/event, AI text, photo, button) and photo upload/delete via private `gbp-media` bucket + signed URL (6 Nov; real post went Live, real photo added and listed)

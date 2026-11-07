@@ -12,6 +12,7 @@
 // REVIEW_PAGE_ORIGINS (comma list; defaults to revyneai.com + local dev).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { pushToUser } from "../_shared/fcm.ts";
 import { db, str } from "../_shared/http.ts";
 import { AiUnavailable, generateText } from "../_shared/openai.ts";
 import { buildReviewPrompt, REVIEW_LANGUAGES } from "../_shared/review_prompt.ts";
@@ -37,11 +38,11 @@ function cors(req: Request): Record<string, string> {
   };
 }
 
-type Business = { id: string; name: string; category: string | null };
+type Business = { id: string; owner_id: string; name: string; category: string | null };
 
 async function businessBySlug(slug: string): Promise<Business | null> {
   if (!/^[a-z0-9]{6,32}$/.test(slug)) return null;
-  const res = await db(`businesses?public_slug=eq.${slug}&select=id,name,category&limit=1`);
+  const res = await db(`businesses?public_slug=eq.${slug}&select=id,owner_id,name,category&limit=1`);
   const rows = res.ok ? await res.json() as Business[] : [];
   return rows[0] ?? null;
 }
@@ -188,6 +189,13 @@ Deno.serve(async (req) => {
           }),
         });
         if (!res.ok) throw new Error(`feedback write ${res.status} ${await res.text()}`);
+        // Tell the owner (never fails the customer's request).
+        const who = str(body.contactName, 80) || "A customer";
+        await pushToUser(business.owner_id, {
+          title: "New private message",
+          body: `${who}: “${message.length > 100 ? `${message.slice(0, 97)}…` : message}”`,
+          route: "/reviews?tab=private",
+        });
         return reply({ ok: true });
       }
 

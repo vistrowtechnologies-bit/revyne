@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification icons are only referenced by name from Dart
+     (flutter_local_notifications), so the release resource shrinker can't see
+     them; keep them. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_notification_large,@drawable/ic_stat_revyne" />

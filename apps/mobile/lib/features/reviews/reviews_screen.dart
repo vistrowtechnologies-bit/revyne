@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/format.dart';
@@ -24,6 +25,19 @@ class ReviewsScreen extends ConsumerStatefulWidget {
 
 class _ReviewsScreenState extends ConsumerState<ReviewsScreen> {
   _Tab? _picked; // null → Google when linked, otherwise Private
+  String? _linkedTab; // ?tab= from a notification, applied once per link
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // A "new private message" alert opens /reviews?tab=private.
+    final tab = GoRouterState.of(context).uri.queryParameters['tab'];
+    if (tab != null && tab != _linkedTab) {
+      _linkedTab = tab;
+      if (tab == 'private') _picked = _Tab.private;
+      if (tab == 'google') _picked = _Tab.google;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

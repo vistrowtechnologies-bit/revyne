@@ -1,9 +1,11 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'core/config/env.dart';
+import 'features/notifications/push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +17,13 @@ Future<void> main() async {
   }
 
   await Supabase.initialize(url: Env.supabaseUrl, publishableKey: Env.supabasePublishableKey);
+  // Push alerts are optional: the app must still start if Firebase can't.
+  try {
+    await Firebase.initializeApp();
+    await PushService.start();
+  } catch (e) {
+    debugPrint('Firebase unavailable, review alerts off: $e');
+  }
   runApp(const ProviderScope(child: RevyneApp()));
 }
 

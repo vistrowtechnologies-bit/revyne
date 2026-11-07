@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../notifications/push_prompt.dart';
+import '../notifications/push_service.dart';
 import '../reports/report_screen.dart';
 import '../auth/auth_repository.dart';
 import '../business/business_repository.dart';
@@ -125,6 +128,17 @@ class AccountScreen extends ConsumerWidget {
                 'Monthly reports',
                 onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ReportScreen())),
               ),
+              if (PushService.available)
+                row(
+                  Icons.notifications_outlined,
+                  'Review alerts',
+                  value: switch (ref.watch(pushStatusProvider).value) {
+                    AuthorizationStatus.authorized => 'On',
+                    null => null,
+                    _ => 'Off',
+                  },
+                  onTap: ref.watch(pushStatusProvider).value == AuthorizationStatus.authorized ? null : () => turnOnAlerts(context, ref),
+                ),
             ]),
             const SizedBox(height: AppSpacing.lg),
             const SectionHeader(title: 'Help & legal'),
