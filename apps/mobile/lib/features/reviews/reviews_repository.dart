@@ -96,6 +96,9 @@ class ReviewsRepository {
     return rows.map(ReviewVisit.fromJson).toList();
   }
 
+  /// Permanently removes a private message (owner-only RLS).
+  Future<void> deleteFeedback(String feedbackId) => _client.from('private_feedback').delete().eq('id', feedbackId);
+
   Future<void> markRead(String feedbackId) =>
       _client.from('private_feedback').update({'read_at': DateTime.now().toUtc().toIso8601String()}).eq('id', feedbackId);
 }

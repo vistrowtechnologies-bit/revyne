@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/router.dart';
 import '../../core/theme/tokens.dart';
@@ -175,6 +176,25 @@ class ProfileDetails extends ConsumerWidget {
                 Icon(Icons.hourglass_top_rounded, size: 18, color: Color(0xFF8A5A00)),
                 SizedBox(width: 8),
                 Expanded(child: Text('Google is reviewing a recent change. It shows once approved.', style: TextStyle(fontSize: 13.5, color: Color(0xFF5C3D00)))),
+              ]),
+            ),
+          if (p.googleUpdated)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+              padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+              decoration: BoxDecoration(color: AppColors.dangerSoft, borderRadius: BorderRadius.circular(14)),
+              child: Row(children: [
+                const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.danger),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text('Google changed some of your details (often from public suggestions). Check they\'re right.',
+                      style: TextStyle(fontSize: 13.5, color: AppColors.ink)),
+                ),
+                if (p.mapsUri != null)
+                  TextButton(
+                    onPressed: () => launchUrl(Uri.parse(p.mapsUri!), mode: LaunchMode.externalApplication),
+                    child: const Text('Check'),
+                  ),
               ]),
             ),
           for (final (i, (icon, label, value, action, missing)) in rows.indexed) ...[

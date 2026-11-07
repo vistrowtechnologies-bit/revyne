@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../activity/activity_screen.dart';
 import '../notifications/push_prompt.dart';
 import '../notifications/push_service.dart';
 import '../reports/report_screen.dart';
@@ -127,6 +128,11 @@ class AccountScreen extends ConsumerWidget {
                 Icons.description_outlined,
                 'Monthly reports',
                 onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ReportScreen())),
+              ),
+              row(
+                Icons.history_rounded,
+                'Activity log',
+                onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ActivityScreen())),
               ),
               if (PushService.available)
                 row(

@@ -50,6 +50,7 @@ class GbpProfile {
     this.splitHours = false,
     this.openStatus = 'OPEN',
     this.hasPendingEdits = false,
+    this.googleUpdated = false,
     this.mapsUri,
   });
 
@@ -64,6 +65,7 @@ class GbpProfile {
   final bool splitHours;
   final String openStatus;
   final bool hasPendingEdits;
+  final bool googleUpdated; // Google changed details itself (e.g. from public suggestions)
   final String? mapsUri;
 
   factory GbpProfile.fromJson(Map<String, dynamic> j) => GbpProfile(
@@ -78,6 +80,7 @@ class GbpProfile {
         splitHours: j['splitHours'] as bool? ?? false,
         openStatus: j['openStatus'] as String? ?? 'OPEN',
         hasPendingEdits: j['hasPendingEdits'] as bool? ?? false,
+        googleUpdated: j['googleUpdated'] as bool? ?? false,
         mapsUri: j['mapsUri'] as String?,
       );
 }

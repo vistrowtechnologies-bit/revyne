@@ -159,6 +159,35 @@ class _FeedbackCard extends ConsumerWidget {
 
   final PrivateFeedback feedback;
 
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete this message?'),
+            content: const Text('It will be removed for good. This can\'t be undone.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!ok) return;
+    try {
+      await ref.read(reviewsRepositoryProvider).deleteFeedback(feedback.id);
+      ref.invalidate(privateFeedbackProvider);
+      ref.invalidate(dashboardStatsProvider);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not delete right now. Please try again.')));
+      }
+    }
+  }
+
   Future<void> _markRead(WidgetRef ref) async {
     if (!feedback.isUnread) return;
     await ref.read(reviewsRepositoryProvider).markRead(feedback.id);
@@ -199,6 +228,16 @@ class _FeedbackCard extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Container(width: 9, height: 9, decoration: const BoxDecoration(color: AppColors.magenta, shape: BoxShape.circle)),
                 ],
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton(
+                    tooltip: 'Delete message',
+                    padding: EdgeInsets.zero,
+                    onPressed: () => _delete(context, ref),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.muted),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.gutter),

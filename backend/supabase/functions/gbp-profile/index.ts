@@ -88,6 +88,8 @@ function profileView(loc: Record<string, any>) {
       .map((s) => ({ date: isoDate(s.startDate), closed: !!s.closed, ...(s.closed ? {} : { open: hhmm(s.openTime), close: hhmm(s.closeTime) }) })),
     openStatus: loc.openInfo?.status ?? "OPEN",
     hasPendingEdits: !!loc.metadata?.hasPendingEdits,
+    // Google itself changed some details (e.g. from user suggestions); the owner should check them.
+    googleUpdated: !!loc.metadata?.hasGoogleUpdated,
     mapsUri: loc.metadata?.mapsUri ?? null,
   };
 }
