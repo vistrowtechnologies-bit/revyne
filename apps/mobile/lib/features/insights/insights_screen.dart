@@ -93,6 +93,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
       title: 'Google stats for',
     );
     if (picked == null) return;
+    if (identical(picked, RangeCalendar.cleared)) {
+      setState(() => _range = last28Days);
+      return;
+    }
     if (picked.duration.inDays > 365) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pick up to one year at a time.')));
       return;
@@ -240,7 +244,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     dense: true,
                     leading: const Icon(Icons.search_rounded, color: AppColors.muted, size: 20),
                     title: Text(k.keyword, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                    trailing: Text(k.label, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.violet700)),
+                    trailing: Text(k.label, style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.violet700)),
                   ),
                 ],
               ]),

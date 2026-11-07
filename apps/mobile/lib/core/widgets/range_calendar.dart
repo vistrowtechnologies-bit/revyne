@@ -28,6 +28,9 @@ Future<DateTimeRange?> showRangeCalendar(BuildContext context,
 class RangeCalendar extends StatefulWidget {
   const RangeCalendar({super.key, required this.first, required this.last, this.initial, this.title = 'Pick dates'});
 
+  /// Returned when the owner taps Clear: go back to the default range.
+  static final cleared = DateTimeRange(start: DateTime(1970), end: DateTime(1970));
+
   final DateTime first;
   final DateTime last;
   final DateTimeRange? initial;
@@ -104,14 +107,24 @@ class _RangeCalendarState extends State<RangeCalendar> {
           children: [
             Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: AppSpacing.md),
-            Text(widget.title, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 13.5)),
+            Row(children: [
+              Expanded(child: Text(widget.title, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 13.5))),
+              // Clears the picked dates and tells the caller to go back to its default range.
+              if (_start != null || widget.initial != null)
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(context, RangeCalendar.cleared),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  label: const Text('Clear'),
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                ),
+            ]),
             const SizedBox(height: 2),
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Expanded(child: Text(summary, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2))),
               if (_end != null && days > 1)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 3),
-                  child: Text('$days days', style: const TextStyle(color: AppColors.violet, fontWeight: FontWeight.w800)),
+                  child: Text('$days days', style: TextStyle(color: AppColors.violet, fontWeight: FontWeight.w800)),
                 ),
             ]),
             const SizedBox(height: AppSpacing.md),
@@ -234,7 +247,7 @@ class _DayCell extends StatelessWidget {
               bottom: 4,
               left: isStart ? 22 : 0,
               right: isEnd ? 22 : 0,
-              child: const ColoredBox(color: AppColors.violet100),
+              child: ColoredBox(color: AppColors.violet100),
             ),
           Container(
             width: 38,

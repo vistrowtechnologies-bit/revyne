@@ -72,7 +72,7 @@ class _ScoreCardState extends ConsumerState<ScoreCard> {
                     if (tasks.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text('${tasks.length} way${tasks.length == 1 ? '' : 's'} to improve',
-                          style: const TextStyle(color: AppColors.violet, fontWeight: FontWeight.w700, fontSize: 14)),
+                          style: TextStyle(color: AppColors.violet, fontWeight: FontWeight.w700, fontSize: 14)),
                     ],
                   ],
                 ),
@@ -213,7 +213,7 @@ class ProfileDetails extends ConsumerWidget {
           if (p.primaryCategory != null) ...[
             const Divider(indent: 56),
             ListTile(
-              leading: const Icon(Icons.category_outlined, color: AppColors.violet),
+              leading: Icon(Icons.category_outlined, color: AppColors.violet),
               title: const Text('Category', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               subtitle: Text([p.primaryCategory!, ...p.additionalCategories].join(', '),
                   style: const TextStyle(color: AppColors.muted, fontSize: 14)),

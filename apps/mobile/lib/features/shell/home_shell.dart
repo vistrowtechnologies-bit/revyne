@@ -101,7 +101,7 @@ class _HomeShellState extends State<HomeShell> {
               children: [
                 Container(
                   height: 70,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: Colors.white,
                     border: Border(top: BorderSide(color: AppColors.line)),
                     boxShadow: [BoxShadow(color: Color(0x0F2B1174), blurRadius: 20, offset: Offset(0, -4))],

@@ -206,7 +206,7 @@ class GoogleReviewCard extends StatelessWidget {
             ],
             const SizedBox(height: AppSpacing.gutter),
             if (r.needsReply)
-              const Row(children: [
+              Row(children: [
                 StatusPill(label: 'Needs reply', background: AppColors.violet50, foreground: AppColors.violet700, dot: true),
                 Spacer(),
                 Icon(Icons.auto_awesome_rounded, size: 18, color: AppColors.violet),
@@ -221,7 +221,7 @@ class GoogleReviewCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('YOUR REPLY', style: TextStyle(color: AppColors.violet700, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+                    Text('YOUR REPLY', style: TextStyle(color: AppColors.violet700, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
                     const SizedBox(height: 4),
                     Text(r.reply!, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, color: AppColors.ink)),
                   ],

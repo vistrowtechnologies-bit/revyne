@@ -338,7 +338,7 @@ class _TimeChip extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Text(label, style: const TextStyle(color: AppColors.violet700, fontWeight: FontWeight.w700, fontSize: 14)),
+            child: Text(label, style: TextStyle(color: AppColors.violet700, fontWeight: FontWeight.w700, fontSize: 14)),
           ),
         ),
       );

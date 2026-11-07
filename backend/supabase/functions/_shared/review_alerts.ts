@@ -9,10 +9,18 @@ import type { Push } from "./fcm.ts";
  * first run (`seenAt` null) nothing is "new" — we only start watching.
  */
 export function newReviews(reviews: GbpReview[], seenAt: string | null): { fresh: GbpReview[]; watermark: string | null } {
-  const newest = reviews.reduce<string | null>((m, r) => (r.createdAt && (!m || r.createdAt > m) ? r.createdAt : m), null);
-  const watermark = newest && (!seenAt || newest > seenAt) ? newest : seenAt;
-  if (!seenAt) return { fresh: [], watermark };
-  const fresh = reviews.filter((r) => r.createdAt > seenAt).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  // Compare real times, never text: Google sends "2026-11-05T10:33:41Z" while the
+  // database returns "2026-11-05 10:33:41+00", and as text "T" > " " made the
+  // same review look new on every run.
+  const t = (s: string | null) => (s ? Date.parse(s.replace(" ", "T").replace(/\+00$/, "Z")) : NaN);
+  const seen = t(seenAt);
+  const dated = reviews.filter((r) => !Number.isNaN(t(r.createdAt)));
+  const newest = dated.reduce<GbpReview | null>((m, r) => (!m || t(r.createdAt) > t(m.createdAt) ? r : m), null);
+  const watermark = newest && (Number.isNaN(seen) || t(newest.createdAt) > seen) ? newest.createdAt : seenAt;
+  if (Number.isNaN(seen)) return { fresh: [], watermark };
+  const fresh = dated
+    .filter((r) => t(r.createdAt) > seen && !r.reply) // already answered (e.g. on Google) → no alert
+    .sort((a, b) => t(a.createdAt) - t(b.createdAt));
   return { fresh, watermark };
 }
 

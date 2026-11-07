@@ -61,7 +61,7 @@ class RevyneTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.violet,
-          side: const BorderSide(color: AppColors.violet200, width: 1.5),
+          side: BorderSide(color: AppColors.violet200, width: 1.5),
           minimumSize: const Size.fromHeight(54),
           shape: pill,
           textStyle: buttonText,
@@ -80,15 +80,15 @@ class RevyneTheme {
         hintStyle: const TextStyle(color: AppColors.outline),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: const BorderSide(color: AppColors.line),
+          borderSide: BorderSide(color: AppColors.line),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: const BorderSide(color: AppColors.line),
+          borderSide: BorderSide(color: AppColors.line),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: const BorderSide(color: AppColors.violet, width: 2),
+          borderSide: BorderSide(color: AppColors.violet, width: 2),
         ),
       ),
       cardTheme: CardThemeData(
@@ -97,10 +97,10 @@ class RevyneTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.card),
-          side: const BorderSide(color: AppColors.line),
+          side: BorderSide(color: AppColors.line),
         ),
       ),
-      dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
+      dividerTheme: DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
       // Clock dial in brand colours: big hour/minute boxes, clear AM/PM toggle.
       timePickerTheme: TimePickerThemeData(
         backgroundColor: Colors.white,
@@ -111,7 +111,7 @@ class RevyneTheme {
         hourMinuteTextColor: WidgetStateColor.resolveWith((s) => s.contains(WidgetState.selected) ? AppColors.violet700 : AppColors.ink),
         hourMinuteTextStyle: const TextStyle(fontFamily: font, fontSize: 52, fontWeight: FontWeight.w800),
         dayPeriodShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        dayPeriodBorderSide: const BorderSide(color: AppColors.violet200, width: 1.5),
+        dayPeriodBorderSide: BorderSide(color: AppColors.violet200, width: 1.5),
         dayPeriodColor: WidgetStateColor.resolveWith((s) => s.contains(WidgetState.selected) ? AppColors.violet : Colors.white),
         dayPeriodTextColor: WidgetStateColor.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : AppColors.muted),
         dayPeriodTextStyle: const TextStyle(fontFamily: font, fontSize: 16, fontWeight: FontWeight.w800),
@@ -128,7 +128,7 @@ class RevyneTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         headerForegroundColor: AppColors.ink,
         headerHeadlineStyle: const TextStyle(fontFamily: font, fontSize: 28, fontWeight: FontWeight.w800),
-        todayBorder: const BorderSide(color: AppColors.violet, width: 1.5),
+        todayBorder: BorderSide(color: AppColors.violet, width: 1.5),
         cancelButtonStyle: TextButton.styleFrom(foregroundColor: AppColors.muted, textStyle: const TextStyle(fontFamily: font, fontWeight: FontWeight.w700, fontSize: 15)),
         confirmButtonStyle: TextButton.styleFrom(foregroundColor: AppColors.violet, textStyle: const TextStyle(fontFamily: font, fontWeight: FontWeight.w800, fontSize: 15)),
       ),

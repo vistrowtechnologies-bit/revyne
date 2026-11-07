@@ -1,26 +1,33 @@
 import 'package:flutter/material.dart';
 
-/// Brand palette sampled from the RevYne logo (see design/brand/PALETTE.md).
+import 'palettes.dart';
+
+/// App colours. The brand colours follow the owner's chosen theme
+/// ([BrandPalette], default "Royal" = the RevYne logo, see
+/// design/brand/PALETTE.md), so they are getters, not constants. Names keep the
+/// original "violet" wording; they mean "the theme's primary ramp".
 /// Contrast-checked: every text/background pair used here is WCAG AA.
 class AppColors {
-  // Logo gradient stops.
-  static const magenta = Color(0xFFB02FE5);
-  static const violet = Color(0xFF6334E2); // primary
-  static const indigo = Color(0xFF363DDD);
+  static BrandPalette get _p => BrandPalette.current;
 
-  // Violet ramp.
-  static const violet50 = Color(0xFFF5F2FC);
-  static const violet100 = Color(0xFFE8E2F9);
-  static const violet200 = Color(0xFFCFC1F6);
-  static const violet600 = Color(0xFF461BBB);
-  static const violet700 = Color(0xFF391698);
-  static const violet900 = Color(0xFF1E0B50);
+  // Gradient stops.
+  static Color get magenta => _p.start;
+  static Color get violet => _p.primary; // primary
+  static Color get indigo => _p.end;
 
-  // Neutrals (violet-tinted).
+  // Primary ramp.
+  static Color get violet50 => _p.shade50;
+  static Color get violet100 => _p.shade100;
+  static Color get violet200 => _p.shade200;
+  static Color get violet600 => _p.shade600;
+  static Color get violet700 => _p.shade700;
+  static Color get violet900 => _p.shade900;
+
+  // Neutrals.
   static const ink = Color(0xFF16112E);
   static const muted = Color(0xFF5B5577);
-  static const line = Color(0xFFE4E1F2);
-  static const bg = Color(0xFFF7F6FC);
+  static Color get line => _p.line;
+  static Color get bg => _p.background;
 
   // Supporting.
   static const star = Color(0xFFF5A524); // ratings only
@@ -31,32 +38,28 @@ class AppColors {
   static const amberSoft = Color(0xFFFFF4E0);
 
   // Semantic aliases used across the app.
-  static const primary = violet;
-  static const primaryDark = violet600;
-  static const primarySoft = violet50;
-  static const surface = bg;
-  static const surfaceContainerLow = violet50;
-  static const surfaceContainer = violet100;
-  static const surfaceContainerHigh = violet100;
+  static Color get primary => violet;
+  static Color get primaryDark => violet600;
+  static Color get primarySoft => violet50;
+  static Color get surface => bg;
+  static Color get surfaceContainerLow => violet50;
+  static Color get surfaceContainer => violet100;
+  static Color get surfaceContainerHigh => violet100;
   static const onSurface = ink;
   static const onSurfaceVariant = muted;
   static const outline = Color(0xFF8A85A3);
-  static const outlineVariant = line;
+  static Color get outlineVariant => line;
   static const error = danger;
   static const errorContainer = dangerSoft;
   static const successContainer = successSoft;
   static const warning = star;
   static const warningContainer = amberSoft;
   static const googleStar = star;
-  static const secondary = magenta;
-  static const tertiary = indigo;
+  static Color get secondary => magenta;
+  static Color get tertiary => indigo;
 
-  /// The logo gradient — one hero moment per screen.
-  static const brandGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [magenta, violet, indigo],
-  );
+  /// The theme gradient — one hero moment per screen.
+  static LinearGradient get brandGradient => _p.gradient;
 }
 
 class AppRadius {
@@ -79,6 +82,7 @@ class AppShadows {
   /// Very soft, violet-tinted elevation for cards.
   static const card = [BoxShadow(color: Color(0x0F2B1174), blurRadius: 24, offset: Offset(0, 8))];
 
-  /// Glow under gradient hero cards and the center nav button.
-  static const glow = [BoxShadow(color: Color(0x40461BBB), blurRadius: 28, offset: Offset(0, 12))];
+  /// Glow under gradient hero cards and the center nav button (theme-tinted).
+  static List<BoxShadow> get glow =>
+      [BoxShadow(color: BrandPalette.current.shade600.withValues(alpha: 0.25), blurRadius: 28, offset: const Offset(0, 12))];
 }

@@ -8,6 +8,7 @@ import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
 import '../notifications/push_prompt.dart';
+import '../profile/user_avatar.dart';
 import '../reports/report_repository.dart';
 import '../reports/report_screen.dart';
 import '../business/business_repository.dart';
@@ -44,7 +45,7 @@ class HomeScreen extends ConsumerWidget {
                   const Spacer(),
                   GestureDetector(
                     onTap: () => context.go(Routes.account),
-                    child: InitialsAvatar(user?.userMetadata?['full_name'] as String?, size: 40),
+                    child: const UserAvatar(size: 40),
                   ),
                 ],
               ),
@@ -137,7 +138,7 @@ class _Dashboard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                   decoration: BoxDecoration(color: AppColors.violet50, borderRadius: BorderRadius.circular(AppRadius.chip)),
-                  child: const Text('Read', style: TextStyle(color: AppColors.violet, fontWeight: FontWeight.w800)),
+                  child: Text('Read', style: TextStyle(color: AppColors.violet, fontWeight: FontWeight.w800)),
                 ),
               ],
             ),
@@ -187,7 +188,7 @@ class _Dashboard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
                     IconTile(Icons.lock_outline_rounded),
                     SizedBox(width: AppSpacing.gutter),

@@ -25,6 +25,22 @@ test("later runs return only newer reviews, oldest first, and move the watermark
   assert.equal(newReviews([r("a", "2026-11-01T10:00:00Z")], "2026-11-06T10:00:00Z").watermark, "2026-11-06T10:00:00Z");
 });
 
+test("database-format watermark vs Google-format times: the same review is never new again", () => {
+  // Regression: text comparison made this review alert every 10 minutes.
+  const stored = "2026-11-05 10:33:41.007886+00"; // as Postgres returns it
+  const same = r("a", "2026-11-05T10:33:41.007886Z"); // as Google sends it
+  assert.deepEqual(newReviews([same], stored).fresh, []);
+  assert.equal(newReviews([same], stored).watermark, stored);
+  assert.deepEqual(newReviews([r("b", "2026-11-07T09:00:00Z"), same], stored).fresh.map((x) => x.id), ["b"]);
+});
+
+test("reviews already replied to (e.g. on Google) don't alert", () => {
+  const replied = { ...r("c", "2026-11-07T09:00:00Z"), reply: { comment: "Thanks", updatedAt: "2026-11-07T09:05:00Z" } };
+  const { fresh, watermark } = newReviews([replied], "2026-11-06T00:00:00Z");
+  assert.deepEqual(fresh, []);
+  assert.equal(watermark, "2026-11-07T09:00:00Z"); // still moves forward
+});
+
 test("alert text: stars, reviewer, short comment; rating-only and anonymous fallbacks", () => {
   const p = reviewPush(r("x", "2026-11-06T10:00:00Z", 4, "Great gate work, delivered on time"));
   assert.equal(p.title, "New 4★ Google review");

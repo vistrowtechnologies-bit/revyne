@@ -28,7 +28,7 @@ class ChooseLocationStep extends ConsumerWidget {
                   margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                   child: ListTile(
                     enabled: !l.takenByOther && draft.claiming == null,
-                    leading: const Icon(Icons.storefront_rounded, color: AppColors.primary),
+                    leading: Icon(Icons.storefront_rounded, color: AppColors.primary),
                     title: Text(l.title, style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text(l.takenByOther ? 'Already connected to another RevYne account' : (l.city ?? '')),
                     trailing: draft.claiming == l.location

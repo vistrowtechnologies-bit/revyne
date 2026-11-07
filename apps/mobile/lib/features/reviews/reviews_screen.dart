@@ -226,7 +226,7 @@ class _FeedbackCard extends ConsumerWidget {
                 if (f.rating != null) Stars(f.rating!, size: 17),
                 if (f.isUnread) ...[
                   const SizedBox(width: 8),
-                  Container(width: 9, height: 9, decoration: const BoxDecoration(color: AppColors.magenta, shape: BoxShape.circle)),
+                  Container(width: 9, height: 9, decoration: BoxDecoration(color: AppColors.magenta, shape: BoxShape.circle)),
                 ],
                 SizedBox(
                   width: 36,
@@ -287,7 +287,7 @@ class _PillAction extends StatelessWidget {
               children: [
                 Icon(icon, size: 18, color: AppColors.violet),
                 const SizedBox(width: 6),
-                Text(label, style: const TextStyle(color: AppColors.violet, fontWeight: FontWeight.w700)),
+                Text(label, style: TextStyle(color: AppColors.violet, fontWeight: FontWeight.w700)),
               ],
             ),
           ),
@@ -340,7 +340,7 @@ class _VisitList extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(color: AppColors.violet50, borderRadius: BorderRadius.circular(AppRadius.chip)),
-                                child: Text(h, style: const TextStyle(color: AppColors.violet700, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                                child: Text(h, style: TextStyle(color: AppColors.violet700, fontSize: 12.5, fontWeight: FontWeight.w700)),
                               ),
                           ],
                         ),
@@ -353,8 +353,8 @@ class _VisitList extends ConsumerWidget {
                       v.openedGoogle
                           ? const StatusPill(label: 'Went to Google', background: AppColors.successSoft, foreground: AppColors.success, dot: true)
                           : v.copied
-                              ? const StatusPill(label: 'Copied the review', background: AppColors.violet50, foreground: AppColors.violet700)
-                              : const StatusPill(label: 'Did not finish', background: AppColors.violet50, foreground: AppColors.muted),
+                              ? StatusPill(label: 'Copied the review', background: AppColors.violet50, foreground: AppColors.violet700)
+                              : StatusPill(label: 'Did not finish', background: AppColors.violet50, foreground: AppColors.muted),
                     ],
                   ),
                 ),

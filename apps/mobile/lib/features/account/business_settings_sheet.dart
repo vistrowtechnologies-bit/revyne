@@ -99,7 +99,7 @@ class _BusinessSettingsSheetState extends ConsumerState<BusinessSettingsSheet> {
             onSubmitted: (_) => _addProduct(),
             decoration: InputDecoration(
               hintText: 'Add a product, e.g. Kaju katli',
-              suffixIcon: IconButton(onPressed: _addProduct, icon: const Icon(Icons.add_rounded, color: AppColors.violet)),
+              suffixIcon: IconButton(onPressed: _addProduct, icon: Icon(Icons.add_rounded, color: AppColors.violet)),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),

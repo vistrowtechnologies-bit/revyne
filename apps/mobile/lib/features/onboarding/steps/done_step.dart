@@ -16,7 +16,7 @@ class DoneStep extends ConsumerWidget {
 
     return ListView(
       children: [
-        const Icon(Icons.celebration_rounded, size: 40, color: AppColors.primary),
+        Icon(Icons.celebration_rounded, size: 40, color: AppColors.primary),
         const SizedBox(height: AppSpacing.sm),
         Text('${business.name} is connected!', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: AppSpacing.xs),

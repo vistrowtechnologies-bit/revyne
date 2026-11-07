@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'core/config/env.dart';
+import 'core/theme/palettes.dart';
 import 'features/notifications/push_service.dart';
 
 Future<void> main() async {
@@ -17,6 +18,7 @@ Future<void> main() async {
   }
 
   await Supabase.initialize(url: Env.supabaseUrl, publishableKey: Env.supabasePublishableKey);
+  await BrandPalette.load(); // the owner's chosen app colour
   // Push alerts are optional: the app must still start if Firebase can't.
   try {
     await Firebase.initializeApp();

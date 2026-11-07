@@ -66,6 +66,16 @@ void main() {
     expect(find.text('1 Oct – 20 Oct'), findsOneWidget);
   });
 
+  testWidgets('Clear appears once something is picked and returns the cleared marker', (tester) async {
+    final result = await open(tester);
+    expect(find.text('Clear'), findsNothing); // nothing picked yet
+    await tester.tap(find.text('7'));
+    await tester.pump();
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+    expect(identical(result.single, RangeCalendar.cleared), isTrue);
+  });
+
   testWidgets('a single day is a valid range', (tester) async {
     final result = await open(tester);
     await tester.tap(find.text('7'));

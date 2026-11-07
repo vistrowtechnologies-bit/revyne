@@ -54,7 +54,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           Expanded(
             flex: 11,
             child: Container(
-              decoration: const BoxDecoration(gradient: AppColors.brandGradient),
+              decoration: BoxDecoration(gradient: AppColors.brandGradient),
               child: SafeArea(
                 bottom: false,
                 child: Padding(

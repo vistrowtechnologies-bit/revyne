@@ -170,6 +170,8 @@ class _PushBinderState extends ConsumerState<PushBinder> {
       ..showSnackBar(SnackBar(
         content: Text([title, body].whereType<String>().join('\n')),
         duration: const Duration(seconds: 6),
+        // Flutter keeps snackbars with an action until tapped; this one should fade.
+        persist: false,
         action: SnackBarAction(label: 'View', onPressed: () => _open(m)),
       ));
   }

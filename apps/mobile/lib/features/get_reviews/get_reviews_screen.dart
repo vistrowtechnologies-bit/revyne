@@ -96,7 +96,7 @@ class _PosterCardState extends State<_PosterCard> {
                   Text(b.name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
                   if (b.city != null) Text(b.city!, style: const TextStyle(color: AppColors.muted, fontSize: 13)),
                   const SizedBox(height: 14),
-                  const Text(
+                  Text(
                     'Share your experience\non Google',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.violet, height: 1.25),
@@ -129,7 +129,7 @@ class _PosterCardState extends State<_PosterCard> {
                   await Clipboard.setData(ClipboardData(text: link));
                   if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review link copied')));
                 },
-                icon: const Icon(Icons.link_rounded, color: AppColors.violet),
+                icon: Icon(Icons.link_rounded, color: AppColors.violet),
               ),
             ],
           ),
@@ -214,7 +214,7 @@ class _WhatsAppRequestFormState extends State<_WhatsAppRequestForm> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('MESSAGE PREVIEW', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.violet700, letterSpacing: 0.8)),
+                Text('MESSAGE PREVIEW', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.violet700, letterSpacing: 0.8)),
                 const SizedBox(height: 6),
                 Text(reviewRequestMessage(widget.business, customerName: _name.text), style: const TextStyle(fontSize: 14.5, height: 1.45)),
               ],

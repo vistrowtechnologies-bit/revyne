@@ -7,7 +7,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../../core/theme/palettes.dart';
 import '../activity/activity_screen.dart';
+import '../profile/user_avatar.dart';
+import 'theme_picker.dart';
 import '../notifications/push_prompt.dart';
 import '../notifications/push_service.dart';
 import '../reports/report_screen.dart';
@@ -98,7 +101,27 @@ class AccountScreen extends ConsumerWidget {
             AppCard(
               child: Row(
                 children: [
-                  InitialsAvatar(name, size: 56),
+                  // Tap to change: own photo, or back to the Google one.
+                  GestureDetector(
+                    onTap: () => changeProfilePhoto(context, ref),
+                    child: Stack(clipBehavior: Clip.none, children: [
+                      const UserAvatar(size: 60),
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: AppColors.violet,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(Icons.photo_camera_rounded, size: 13, color: Colors.white),
+                        ),
+                      ),
+                    ]),
+                  ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
@@ -107,7 +130,7 @@ class AccountScreen extends ConsumerWidget {
                         Text(name ?? 'Your account', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
                         Text(user?.email ?? '', style: const TextStyle(color: AppColors.muted)),
                         const SizedBox(height: 6),
-                        const StatusPill(label: 'Free plan', background: AppColors.violet50, foreground: AppColors.violet700),
+                        StatusPill(label: 'Free plan', background: AppColors.violet50, foreground: AppColors.violet700),
                       ],
                     ),
                   ),
@@ -128,6 +151,12 @@ class AccountScreen extends ConsumerWidget {
                 Icons.description_outlined,
                 'Monthly reports',
                 onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ReportScreen())),
+              ),
+              row(
+                Icons.palette_outlined,
+                'App colour',
+                value: BrandPalette.current.name,
+                onTap: () => showThemePicker(context),
               ),
               row(
                 Icons.history_rounded,

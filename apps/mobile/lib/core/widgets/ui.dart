@@ -128,20 +128,20 @@ class BrandMark extends StatelessWidget {
 
 /// Rounded square icon tile (violet tint) used in lists and quick actions.
 class IconTile extends StatelessWidget {
-  const IconTile(this.icon, {super.key, this.size = 44, this.background = AppColors.violet50, this.foreground = AppColors.violet});
+  const IconTile(this.icon, {super.key, this.size = 44, this.background, this.foreground});
 
   final IconData icon;
   final double size;
-  final Color background;
-  final Color foreground;
+  final Color? background; // default: theme tint
+  final Color? foreground; // default: theme primary
 
   @override
   Widget build(BuildContext context) => Container(
         width: size,
         height: size,
-        decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(size * 0.32)),
+        decoration: BoxDecoration(color: background ?? AppColors.violet50, borderRadius: BorderRadius.circular(size * 0.32)),
         alignment: Alignment.center,
-        child: Icon(icon, color: foreground, size: size * 0.5),
+        child: Icon(icon, color: foreground ?? AppColors.violet, size: size * 0.5),
       );
 }
 
@@ -378,7 +378,7 @@ class InitialsAvatar extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(color: AppColors.violet50, shape: BoxShape.circle),
+      decoration: BoxDecoration(color: AppColors.violet50, shape: BoxShape.circle),
       alignment: Alignment.center,
       child: initials.isEmpty
           ? Icon(Icons.person_rounded, color: AppColors.violet, size: size * 0.5)
