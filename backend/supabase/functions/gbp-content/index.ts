@@ -21,7 +21,7 @@
 
 import { accessTokenFor } from "../_shared/gbp_auth.ts";
 import { addPhoto, createPost, deleteByName, GoogleApiError, listPhotos, listPosts } from "../_shared/google.ts";
-import { db, getUserId, json, str } from "../_shared/http.ts";
+import { db, getUserId, json, str, serveOwner } from "../_shared/http.ts";
 import { signedMediaUrl } from "../_shared/media.ts";
 import { AiUnavailable, generateText } from "../_shared/openai.ts";
 import { buildPostPrompt, ownMediaPath, PHOTO_CATEGORIES, PostInput, postBody, PostType } from "../_shared/post_edit.ts";
@@ -58,7 +58,7 @@ const MIN_LEAD_MS = 10 * 60_000; // schedule at least 10 minutes ahead
 const MAX_LEAD_MS = 90 * 86400_000;
 const MAX_PENDING = 30;
 
-Deno.serve(async (req) => {
+serveOwner(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const userId = await getUserId(req);
   if (!userId) return json({ error: "Please sign in again." }, 401);

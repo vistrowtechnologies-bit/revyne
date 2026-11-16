@@ -22,7 +22,7 @@ import {
   listAccountLocations,
   listAllLocations,
 } from "../_shared/google.ts";
-import { db, getUserId, json, str } from "../_shared/http.ts";
+import { db, getUserId, json, str, serveOwner } from "../_shared/http.ts";
 
 /** Locations plus whether each is already a RevYne business (by this user or someone else). */
 async function describeLocations(userId: string, locations: GbpLocation[]) {
@@ -48,7 +48,7 @@ async function listFor(userId: string, accessToken: string) {
   return json({ status: "ok", locations: await describeLocations(userId, locations) });
 }
 
-Deno.serve(async (req) => {
+serveOwner(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const userId = await getUserId(req);
   if (!userId) return json({ error: "Please sign in again." }, 401);

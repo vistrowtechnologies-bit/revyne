@@ -15,7 +15,7 @@
 import { accessTokenFor } from "../_shared/gbp_auth.ts";
 import { computeGoogleScore } from "../_shared/google_score.ts";
 import { getLocation, GoogleApiError, lastPostTime, listReviews, mediaCount, patchLocation } from "../_shared/google.ts";
-import { db, getUserId, json, str } from "../_shared/http.ts";
+import { db, getUserId, json, str, serveOwner } from "../_shared/http.ts";
 import { AiUnavailable, generateText } from "../_shared/openai.ts";
 import {
   buildDescriptionPrompt,
@@ -147,7 +147,7 @@ function patchFor(field: string, value: unknown, current: Record<string, any>): 
   }
 }
 
-Deno.serve(async (req) => {
+serveOwner(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const userId = await getUserId(req);
   if (!userId) return json({ error: "Please sign in again." }, 401);

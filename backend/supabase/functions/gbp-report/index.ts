@@ -10,7 +10,7 @@
 
 import { accessTokenFor } from "../_shared/gbp_auth.ts";
 import { dailyMetrics, GbpReview, GoogleApiError, listPosts, listReviews, monthlyKeywords } from "../_shared/google.ts";
-import { db, getUserId, json, str } from "../_shared/http.ts";
+import { db, getUserId, json, str, serveOwner } from "../_shared/http.ts";
 import { DAILY_METRICS, dateRange, keywords, seriesByMetric, summarise } from "../_shared/insights.ts";
 import { monthRange, postTally, previousMonth, reviewTally } from "../_shared/report.ts";
 
@@ -47,7 +47,7 @@ async function reviewsSince(account: string, location: string, start: string, to
   return { reviews: all, ...summary };
 }
 
-Deno.serve(async (req) => {
+serveOwner(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const userId = await getUserId(req);
   if (!userId) return json({ error: "Please sign in again." }, 401);

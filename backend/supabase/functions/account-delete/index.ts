@@ -8,9 +8,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { decrypt } from "../_shared/crypto.ts";
-import { db, getUserId, json } from "../_shared/http.ts";
+import { db, getUserId, json, serveOwner } from "../_shared/http.ts";
 
-Deno.serve(async (req) => {
+serveOwner(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const userId = await getUserId(req);
   if (!userId) return json({ error: "Please sign in again." }, 401);

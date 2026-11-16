@@ -14,7 +14,7 @@
 
 import { accessTokenFor } from "../_shared/gbp_auth.ts";
 import { deleteReply, getReview, GoogleApiError, listReviews, putReply } from "../_shared/google.ts";
-import { db, getUserId, json, str } from "../_shared/http.ts";
+import { db, getUserId, json, str, serveOwner } from "../_shared/http.ts";
 import { AiUnavailable, generateText } from "../_shared/openai.ts";
 import { buildReplyPrompt, replyFits } from "../_shared/reply_prompt.ts";
 
@@ -46,7 +46,7 @@ async function draftsToday(businessId: string): Promise<number> {
 
 const REVIEW_ID = /^[A-Za-z0-9_-]{8,200}$/;
 
-Deno.serve(async (req) => {
+serveOwner(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const userId = await getUserId(req);
   if (!userId) return json({ error: "Please sign in again." }, 401);

@@ -12,7 +12,7 @@
 
 import { accessTokenFor } from "../_shared/gbp_auth.ts";
 import { dailyMetrics, GoogleApiError, monthlyKeywords } from "../_shared/google.ts";
-import { db, getUserId, json } from "../_shared/http.ts";
+import { db, getUserId, json, serveOwner } from "../_shared/http.ts";
 import { customPeriods, DAILY_METRICS, dateRange, keywords, periods, seriesByMetric, summarise } from "../_shared/insights.ts";
 
 async function linkedLocation(userId: string): Promise<string | null> {
@@ -30,7 +30,7 @@ function lastThreeMonths(today = new Date()) {
   return { start: m(3), end: m(1) };
 }
 
-Deno.serve(async (req) => {
+serveOwner(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const userId = await getUserId(req);
   if (!userId) return json({ error: "Please sign in again." }, 401);
