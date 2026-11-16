@@ -54,7 +54,7 @@ function Content({ r }: { r: MonthlyReport }) {
     </div>
   );
   const card = (title: string, icon: string, rows: ReactNode[]) => (
-    <Card pad="14px 16px 10px">
+    <Card key={title} pad="14px 16px 10px">
       <div className="row" style={{ gap: 8 }}>
         <Icon name={icon} fill={icon === 'star'} size={20} color="var(--violet)" />
         <span style={{ fontWeight: 800, fontSize: 16 }}>{title}</span>
