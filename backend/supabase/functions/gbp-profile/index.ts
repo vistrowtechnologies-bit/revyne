@@ -7,6 +7,7 @@
 //   get                                profile + score
 //   update { field, value, validateOnly? }   field: description | phone | website | hours | specialHours
 //   draft_description                  AI description draft (owner edits/approves)
+//   google_changes                     details Google changed: owner's vs Google's version (read only)
 //
 // Expected outcomes come back as 200 { status }: ok | not_linked | reconnect |
 // api_not_approved | invalid (with message) | limit.
@@ -14,7 +15,7 @@
 
 import { accessTokenFor } from "../_shared/gbp_auth.ts";
 import { computeGoogleScore } from "../_shared/google_score.ts";
-import { getLocation, GoogleApiError, lastPostTime, listReviews, mediaCount, patchLocation } from "../_shared/google.ts";
+import { getGoogleUpdated, getLocation, GoogleApiError, lastPostTime, listReviews, mediaCount, patchLocation } from "../_shared/google.ts";
 import { db, getUserId, json, str, serveOwner } from "../_shared/http.ts";
 import { AiUnavailable, generateText } from "../_shared/openai.ts";
 import {
@@ -128,6 +129,71 @@ async function view(b: LinkedBusiness, token: string) {
   return { profile, score };
 }
 
+// ── Google's changes (the "Google changed some of your details" banner) ─────
+
+const DAY_SHORT: Record<string, string> = { MONDAY: "Mon", TUESDAY: "Tue", WEDNESDAY: "Wed", THURSDAY: "Thu", FRIDAY: "Fri", SATURDAY: "Sat", SUNDAY: "Sun" };
+
+function hoursText(h: { day: string; open: string; close: string }[]) {
+  if (!h.length) return "Not set";
+  return h.map((x) => `${DAY_SHORT[x.day] ?? x.day} ${x.open}–${x.close}`).join(", ");
+}
+
+function specialText(s: { date: string; closed: boolean; open?: string; close?: string }[]) {
+  if (!s.length) return "None";
+  return s.map((x) => `${x.date}: ${x.closed ? "closed" : `${x.open}–${x.close}`}`).join(", ");
+}
+
+function addressText(loc: Record<string, any>) {
+  const a = loc.storefrontAddress;
+  if (!a) return "Not set";
+  return [...(a.addressLines ?? []), a.locality, a.administrativeArea, a.postalCode].filter(Boolean).join(", ");
+}
+
+type Change = { field: string; label: string; editable: boolean; mine: string; google: string; mineValue?: unknown; googleValue?: unknown };
+
+/** Which details Google changed, with the owner's and Google's versions side by side. */
+async function googleChanges(b: LinkedBusiness, token: string) {
+  const [mineLoc, updated] = await Promise.all([getLocation(b.gbp_location, token), getGoogleUpdated(b.gbp_location, token)]);
+  const googleLoc = (updated.location ?? {}) as Record<string, any>;
+  const mine = profileView(mineLoc);
+  const google = profileView(googleLoc);
+  const mask = String(updated.diffMask ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const touched = (prefix: string) => mask.some((m) => m === prefix || m.startsWith(prefix + "."));
+  const same = (x: unknown, y: unknown) => JSON.stringify(x) === JSON.stringify(y);
+  // Without a diffMask, fall back to comparing the fields we show.
+  const differs = (prefix: string, x: unknown, y: unknown) => (mask.length ? touched(prefix) : !same(x, y));
+
+  const changes: Change[] = [];
+  if (differs("title", mine.title, google.title))
+    changes.push({ field: "title", label: "Business name", editable: false, mine: mine.title || "Not set", google: google.title || "Not set" });
+  if (differs("profile", mine.description, google.description))
+    changes.push({ field: "description", label: "Description", editable: true, mine: mine.description || "Not set", google: google.description || "Not set", mineValue: mine.description, googleValue: google.description });
+  if (differs("phoneNumbers", mine.phone, google.phone))
+    changes.push({ field: "phone", label: "Phone", editable: true, mine: mine.phone || "Not set", google: google.phone || "Not set", mineValue: mine.phone, googleValue: google.phone });
+  if (differs("websiteUri", mine.website, google.website))
+    changes.push({ field: "website", label: "Website", editable: true, mine: mine.website || "Not set", google: google.website || "Not set", mineValue: mine.website, googleValue: google.website });
+  if (differs("regularHours", mine.hours, google.hours))
+    changes.push({ field: "hours", label: "Opening hours", editable: true, mine: hoursText(mine.hours), google: hoursText(google.hours), mineValue: mine.hours, googleValue: google.hours });
+  if (differs("specialHours", mine.specialHours, google.specialHours))
+    changes.push({ field: "specialHours", label: "Holiday hours", editable: true, mine: specialText(mine.specialHours), google: specialText(google.specialHours), mineValue: mine.specialHours, googleValue: google.specialHours });
+  if (differs("categories", [mine.primaryCategory, mine.additionalCategories], [google.primaryCategory, google.additionalCategories]))
+    changes.push({
+      field: "categories",
+      label: "Category",
+      editable: false,
+      mine: [mine.primaryCategory, ...mine.additionalCategories].filter(Boolean).join(", ") || "Not set",
+      google: [google.primaryCategory, ...google.additionalCategories].filter(Boolean).join(", ") || "Not set",
+    });
+  if (touched("storefrontAddress"))
+    changes.push({ field: "address", label: "Address", editable: false, mine: addressText(mineLoc), google: addressText(googleLoc) });
+  // Anything else Google lists that the app doesn't show.
+  const known = ["title", "profile", "phoneNumbers", "websiteUri", "regularHours", "specialHours", "categories", "storefrontAddress"];
+  for (const m of mask) {
+    if (!known.some((k) => m === k || m.startsWith(k + "."))) changes.push({ field: m, label: m, editable: false, mine: "", google: "" });
+  }
+  return { changes, mapsUri: mine.mapsUri };
+}
+
 function patchFor(field: string, value: unknown, current: Record<string, any>): ProfilePatch {
   switch (field) {
     case "description":
@@ -198,6 +264,9 @@ serveOwner(async (req) => {
         }
         return json({ status: "ok", ...(await view(business, token)) });
       }
+
+      case "google_changes":
+        return json({ status: "ok", ...(await googleChanges(business, token)) });
 
       case "draft_description": {
         if (await countToday(business.id, "description_draft") >= DESCRIPTION_DRAFTS_PER_DAY) {

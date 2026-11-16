@@ -280,6 +280,13 @@ export const getProfile = async () => toProfileView(await profileCall({ action: 
 export const updateProfile = async (field: string, value: unknown) => toProfileView(await profileCall({ action: 'update', field, value }));
 export const draftDescription = async () => (await profileCall({ action: 'draft_description' })).draft as string;
 
+/** Details Google changed itself (e.g. from public suggestions): yours vs Google's version. */
+export type GoogleChange = { field: string; label: string; editable: boolean; mine: string; google: string; mineValue?: unknown; googleValue?: unknown };
+export async function googleChanges(): Promise<{ changes: GoogleChange[]; mapsUri?: string | null }> {
+  const j = await profileCall({ action: 'google_changes' });
+  return { changes: (j.changes as GoogleChange[]) ?? [], mapsUri: j.mapsUri };
+}
+
 // ── Posts + photos (content_repository.dart) ───────────────────────────────
 export const POST_TYPES = [
   { api: 'STANDARD', label: 'Update' },

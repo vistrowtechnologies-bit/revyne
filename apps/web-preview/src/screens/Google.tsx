@@ -1,7 +1,7 @@
 // lib/features/google_profile/google_profile_screen.dart + profile_panel.dart + google_content/content_sections.dart
 import { useRef, useState } from 'react';
 import { useBusiness, useGoogleReviews, useInsights, usePhotos, usePosts, useProfile, useScheduled, useStore } from '../store';
-import { invalidate } from '../lib/query';
+import { invalidate, useQuery } from '../lib/query';
 import * as api from '../lib/api';
 import { connectGoogleProfile, GoogleCancelled } from '../lib/google';
 import { timeAgo, timeLabel, whenLabel } from '../lib/format';
@@ -277,6 +277,7 @@ function hoursSummary(h: api.DayHours[]) {
 
 function ProfileDetailsSection({ onEdit }: { onEdit: (k: EditorKind) => void }) {
   const q = useProfile();
+  const [changes, setChanges] = useState(false);
   if (!q.data) return null;
   const p = q.data.profile;
   const rows: [string, string, string, EditorKind, boolean][] = [
@@ -301,7 +302,7 @@ function ProfileDetailsSection({ onEdit }: { onEdit: (k: EditorKind) => void }) 
           <div className="row" style={{ gap: 8, margin: '8px 12px 4px', padding: '10px 4px 10px 12px', background: 'var(--danger-soft)', borderRadius: 14, fontSize: 13.5 }}>
             <Icon name="info" size={18} color="var(--danger)" />
             <span className="grow">Google changed some of your details (often from public suggestions). Check they're right.</span>
-            {p.mapsUri && <button className="tbtn" onClick={() => window.open(p.mapsUri!, '_blank', 'noopener')}>Check</button>}
+            <button className="tbtn" onClick={() => setChanges(true)}>Check</button>
           </div>
         )}
         {rows.map(([icon, label, value, kind, missing], i) => (
@@ -330,7 +331,97 @@ function ProfileDetailsSection({ onEdit }: { onEdit: (k: EditorKind) => void }) 
           </>
         )}
       </Card>
+      {changes && <GoogleChangesSheet onClose={() => setChanges(false)} />}
     </>
+  );
+}
+
+/** "Google changed some of your details": each change side by side; keep yours or take Google's. */
+function GoogleChangesSheet({ onClose }: { onClose: () => void }) {
+  const toast = useToast();
+  const q = useQuery('google-changes', api.googleChanges);
+  const [pick, setPick] = useState<{ c: api.GoogleChange; keep: boolean } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const apply = async () => {
+    const { c, keep } = pick!;
+    setPick(null);
+    setBusy(c.field);
+    try {
+      await api.updateProfile(c.field, keep ? c.mineValue : c.googleValue);
+      toast(keep ? 'Sent your version to Google. It can take a few minutes to show.' : "Using Google's version.");
+      await invalidate('profile', 'activity', 'google-changes');
+    } catch (e) {
+      toast((e as Error).message || 'Could not update right now. Please try again.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Sheet onClose={onClose}>
+      <h2 className="h-small">What Google changed</h2>
+      <div className="muted" style={{ fontSize: 14.5, marginTop: 4 }}>
+        Google sometimes updates your profile itself, often from suggestions by the public. Check each one and keep the right version.
+      </div>
+      <Gap h={16} />
+      {q.error ? (
+        <EmptyState icon="cloud_off" title="Couldn't load Google's changes" body={q.error.message || 'Please try again.'} />
+      ) : !q.data ? (
+        <CardLoading />
+      ) : q.data.changes.length === 0 ? (
+        <EmptyState icon="task_alt" title="Nothing to check" body="Your details on Google match yours. The note can take a little while to disappear." />
+      ) : (
+        <div className="col" style={{ gap: 12 }}>
+          {q.data.changes.map((c) => (
+            <Card key={c.field} pad={16}>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>{c.label}</div>
+              {(c.mine || c.google) && (
+                <div className="changes-grid">
+                  <div className="change-box">
+                    <div className="change-tag">Yours</div>
+                    <div className="change-val">{c.mine}</div>
+                  </div>
+                  <div className="change-box google">
+                    <div className="change-tag">Google's version</div>
+                    <div className="change-val">{c.google}</div>
+                  </div>
+                </div>
+              )}
+              {c.editable ? (
+                <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  <button className="obtn" style={{ flex: 1, minHeight: 44, fontSize: 15 }} disabled={!!busy} onClick={() => setPick({ c, keep: true })}>
+                    {busy === c.field ? <span className="spinner" /> : <Icon name="undo" />}Keep mine
+                  </button>
+                  <button className="obtn" style={{ flex: 1, minHeight: 44, fontSize: 15 }} disabled={!!busy} onClick={() => setPick({ c, keep: false })}>
+                    <Icon name="check" />Use Google's
+                  </button>
+                </div>
+              ) : (
+                <div className="muted" style={{ fontSize: 13.5, marginTop: 10 }}>
+                  This can't be changed from RevYne yet.{' '}
+                  <a href="https://business.google.com/" target="_blank" rel="noopener" style={{ color: 'var(--violet)', fontWeight: 700 }}>Open Google Business Profile</a>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+      {q.data?.mapsUri && (
+        <div style={{ textAlign: 'center', marginTop: 12 }}>
+          <button className="tbtn" onClick={() => window.open(q.data!.mapsUri!, '_blank', 'noopener')}><Icon name="map" />See it on Google Maps</button>
+        </div>
+      )}
+      {pick && (
+        <ConfirmDialog
+          title={pick.keep ? 'Send your version to Google?' : "Use Google's version?"}
+          body={`${pick.c.label}: customers will see "${(pick.keep ? pick.c.mine : pick.c.google).slice(0, 160)}" on Google Search and Maps.`}
+          action={pick.keep ? 'Keep mine' : "Use Google's"}
+          onCancel={() => setPick(null)}
+          onConfirm={apply}
+        />
+      )}
+    </Sheet>
   );
 }
 

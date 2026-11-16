@@ -145,6 +145,11 @@ export function getLocation(location: string, accessToken: string) {
   return gbpGet(`${INFO_API}/${location}?readMask=${PROFILE_FIELDS}`, accessToken);
 }
 
+/** Google's own version of the location (e.g. from public suggestions) and which fields differ (diffMask). */
+export function getGoogleUpdated(location: string, accessToken: string) {
+  return gbpGet(`${INFO_API}/${location}:getGoogleUpdated?readMask=${PROFILE_FIELDS},storefrontAddress`, accessToken);
+}
+
 /** Applies a patch; with validateOnly Google checks it without changing anything. */
 export function patchLocation(location: string, body: Record<string, unknown>, updateMask: string, accessToken: string, validateOnly = false) {
   const qs = new URLSearchParams({ updateMask, ...(validateOnly ? { validateOnly: "true" } : {}) });
