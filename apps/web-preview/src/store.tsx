@@ -22,7 +22,12 @@ function readHash(): { route: Route; query: URLSearchParams } {
 function useStoreState() {
   const [{ route, query }, setLoc] = useState(readHash);
   const [paletteId, setPaletteId] = useState(() => applyPalette(loadPaletteId()).id);
-  const [lastTab, setLastTab] = useState<Route>(() => (TABS.includes(readHash().route) ? readHash().route : 'home'));
+  // Where a pushed screen belongs when opened directly (deep link / reload).
+  const PARENT: Partial<Record<Route, Route>> = { stats: 'google', 'new-post': 'google', report: 'home', activity: 'account', notifications: 'home', templates: 'account' };
+  const [lastTab, setLastTab] = useState<Route>(() => {
+    const r = readHash().route;
+    return TABS.includes(r) ? r : PARENT[r] ?? 'home';
+  });
 
   useEffect(() => {
     const on = () => {
