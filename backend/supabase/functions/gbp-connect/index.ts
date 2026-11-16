@@ -2,7 +2,7 @@
 // gbp-connect — the only way a business enters RevYne (connect-only onboarding).
 //
 // Actions (POST JSON, signed-in users only):
-//   exchange  { serverAuthCode }      store the Google refresh token, then list locations
+//   exchange  { serverAuthCode, redirectUri? }  store the Google refresh token, then list locations
 //   locations {}                      list locations for the stored connection
 //   claim     { account, location }   create the user's verified business from Google data
 //
@@ -66,7 +66,11 @@ Deno.serve(async (req) => {
         const code = str(body.serverAuthCode, 2048);
         if (!code) return json({ error: "serverAuthCode is required" }, 400);
 
-        const tokens = await exchangeServerAuthCode(code);
+        // Only the two redirect URIs Google uses for code exchange: "" (Android) or "postmessage" (web popup).
+        const redirectUri = body.redirectUri === undefined || body.redirectUri === "" ? "" : body.redirectUri === "postmessage" ? "postmessage" : null;
+        if (redirectUri === null) return json({ error: "Invalid redirectUri" }, 400);
+
+        const tokens = await exchangeServerAuthCode(code, redirectUri);
         if (!tokens.scope?.split(" ").includes(BUSINESS_MANAGE)) return json({ status: "missing_scope" });
 
         const existing = await loadConnection(userId);

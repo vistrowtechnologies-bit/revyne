@@ -1,30 +1,27 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import * as data from './data';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from './lib/supabase';
+import { clearAll, useQuery } from './lib/query';
+import * as api from './lib/api';
 import { applyPalette, loadPaletteId } from './theme';
 
-// Tiny hash router: #/home, #/reviews, #/get-reviews, #/google, #/account,
-// plus pushed screens #/stats, #/report, #/new-post, #/activity.
-export type Route = 'home' | 'reviews' | 'get-reviews' | 'google' | 'account' | 'stats' | 'report' | 'new-post' | 'activity';
+// Hash router: #/home, #/reviews?tab=private, #/get-reviews, #/google, #/account,
+// plus pushed screens. Notification routes ("/reviews?tab=private") map 1:1.
+export type Route =
+  | 'home' | 'reviews' | 'get-reviews' | 'google' | 'account'
+  | 'stats' | 'report' | 'new-post' | 'activity' | 'notifications' | 'templates';
 export const TABS: Route[] = ['home', 'reviews', 'get-reviews', 'google', 'account'];
+const ALL: Route[] = [...TABS, 'stats', 'report', 'new-post', 'activity', 'notifications', 'templates'];
 
 function readHash(): { route: Route; query: URLSearchParams } {
   const raw = window.location.hash.replace(/^#\/?/, '');
   const [path, q] = raw.split('?');
-  const all: Route[] = [...TABS, 'stats', 'report', 'new-post', 'activity'];
-  return { route: (all.includes(path as Route) ? path : 'home') as Route, query: new URLSearchParams(q ?? '') };
+  return { route: (ALL.includes(path as Route) ? path : 'home') as Route, query: new URLSearchParams(q ?? '') };
 }
-
-type Store = ReturnType<typeof useStoreState>;
-const Ctx = createContext<Store | null>(null);
 
 function useStoreState() {
   const [{ route, query }, setLoc] = useState(readHash);
   const [paletteId, setPaletteId] = useState(() => applyPalette(loadPaletteId()).id);
-  const [photo, setPhoto] = useState<string | null>(null);
-  const [reviews, setReviews] = useState(data.googleReviews);
-  const [feedback, setFeedback] = useState(data.privateFeedback);
-  const [posts, setPosts] = useState(data.posts);
-  const [scheduled, setScheduled] = useState(data.scheduled);
   const [lastTab, setLastTab] = useState<Route>(() => (TABS.includes(readHash().route) ? readHash().route : 'home'));
 
   useEffect(() => {
@@ -41,30 +38,97 @@ function useStoreState() {
   return {
     route,
     query,
-    /** Highlighted nav item: the tab, or the tab a pushed screen came from. */
     tab: TABS.includes(route) ? route : lastTab,
-    go: (r: Route, q?: string) => {
-      window.location.hash = `/${r}${q ? `?${q}` : ''}`;
+    /** go('reviews', 'tab=private') or go('/reviews?tab=private') */
+    go: (r: string, q?: string) => {
+      const path = r.replace(/^\//, '');
+      window.location.hash = `/${path}${q ? `?${q}` : ''}`;
     },
     back: () => (window.history.length > 1 ? window.history.back() : (window.location.hash = '/home')),
     paletteId,
     setPalette: (id: string) => setPaletteId(applyPalette(id).id),
-    photo,
-    setPhoto,
-    reviews,
-    setReviews,
-    feedback,
-    setFeedback,
-    posts,
-    setPosts,
-    scheduled,
-    setScheduled,
   };
 }
 
+type Store = ReturnType<typeof useStoreState>;
+const Ctx = createContext<Store | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const s = useStoreState();
   return <Ctx.Provider value={s}>{children}</Ctx.Provider>;
 }
-
 export const useStore = () => useContext(Ctx)!;
+
+// ── Session ────────────────────────────────────────────────────────────────
+export function useSession() {
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession((prev) => {
+        if (prev?.user.id !== s?.user.id) clearAll(); // fresh data for each signed-in user
+        return s;
+      });
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+  return session;
+}
+
+export const SessionContext = createContext<Session | null>(null);
+export const useUser = () => useContext(SessionContext)!.user;
+
+// ── Business (the shell only renders with one) ─────────────────────────────
+export const BusinessContext = createContext<api.Business | null>(null);
+export const useBusiness = () => useContext(BusinessContext)!;
+
+const notLinked = () => Promise.reject(new api.BlockedError('Link your Google Business Profile first.', 'not_linked'));
+
+// ── Query hooks (the Dart FutureProviders) ─────────────────────────────────
+export const useDashboard = () => {
+  const b = useBusiness();
+  return useQuery('dashboard', () => api.dashboardStats(b.id));
+};
+export const useFeedback = () => {
+  const b = useBusiness();
+  return useQuery('feedback', () => api.feedback(b.id));
+};
+export const useVisits = () => {
+  const b = useBusiness();
+  return useQuery('visits', () => api.visits(b.id));
+};
+export const useGoogleReviews = () => {
+  const b = useBusiness();
+  return useQuery('greviews', () => (b.isVerified ? api.listReviews() : (notLinked() as Promise<api.ReviewsPage>)));
+};
+export const useProfile = () => {
+  const b = useBusiness();
+  return useQuery('profile', () => (b.isVerified ? api.getProfile() : (notLinked() as Promise<api.ProfileView>)));
+};
+export const usePosts = () => {
+  const b = useBusiness();
+  return useQuery('posts', () => (b.isVerified ? api.listPosts() : (notLinked() as Promise<api.GbpPost[]>)));
+};
+export const useScheduled = () => {
+  const b = useBusiness();
+  return useQuery('scheduled', () => (b.isVerified ? api.scheduledPosts(b.id) : Promise.resolve([])));
+};
+export const usePhotos = () => {
+  const b = useBusiness();
+  return useQuery('photos', () => (b.isVerified ? api.listPhotos() : (notLinked() as Promise<{ photos: api.GbpPhoto[]; total: number }>)));
+};
+export const useInsights = (range: { days: number; start?: Date; end?: Date }) => {
+  const b = useBusiness();
+  const k = range.start && range.end ? `${api.isoDate(range.start)}_${api.isoDate(range.end)}` : `${range.days}`;
+  return useQuery(`insights:${k}`, () => (b.isVerified ? api.insights(range) : (notLinked() as Promise<api.Insights>)));
+};
+export const useReport = (month: Date) => useQuery(`report:${month.getFullYear()}-${month.getMonth() + 1}`, () => api.monthlyReport(month));
+export const useActivity = () => {
+  const b = useBusiness();
+  return useQuery('activity', () => api.activity(b.id));
+};
+export const useNotifications = () => useQuery('notifications', api.notifications);
+export const useTemplates = () => {
+  const b = useBusiness();
+  return useQuery('templates', () => api.templates(b.id));
+};
+export const useMyPhoto = () => useQuery('photo', api.myPhotoUrl);

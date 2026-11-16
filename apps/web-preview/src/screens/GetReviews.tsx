@@ -1,7 +1,10 @@
 // lib/features/get_reviews/get_reviews_screen.dart
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { business, reviewLink, reviewRequestMessage } from '../data';
+import { useBusiness } from '../store';
+import { reviewLink } from '../lib/supabase';
+import { openWhatsApp, reviewRequestMessage } from '../lib/options';
+import { downloadPoster } from '../lib/pdf';
 import { BrandMark, Card, Gap, GradientButton, Icon, SectionHeader, SelectChip, useToast } from '../ui';
 
 export default function GetReviewsScreen() {
@@ -26,7 +29,9 @@ export default function GetReviewsScreen() {
 }
 
 function PosterCard() {
+  const b = useBusiness();
   const toast = useToast();
+  const link = reviewLink(b.publicSlug);
   const [format, setFormat] = useState<'A5' | 'A4'>('A5');
   const [busy, setBusy] = useState(false);
   return (
@@ -34,13 +39,13 @@ function PosterCard() {
       {/* Poster preview — mirrors the printed PDF. */}
       <div style={{ padding: 14, background: 'var(--gradient)', borderRadius: 18 }}>
         <div style={{ padding: '22px 20px', background: '#fff', borderRadius: 14, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ fontSize: 19, fontWeight: 800 }}>{business.name}</div>
-          <div className="muted" style={{ fontSize: 13 }}>{business.city}</div>
+          <div style={{ fontSize: 19, fontWeight: 800 }}>{b.name}</div>
+          {b.city && <div className="muted" style={{ fontSize: 13 }}>{b.city}</div>}
           <Gap h={14} />
           <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--violet)', lineHeight: 1.25 }}>Share your experience<br />on Google</div>
           <Gap h={14} />
           <div style={{ padding: 10, border: '1.5px solid var(--line)', borderRadius: 16 }}>
-            <QRCodeSVG value={reviewLink} size={150} level="M" />
+            <QRCodeSVG value={link} size={150} level="M" />
           </div>
           <Gap h={10} />
           <div style={{ fontWeight: 700, fontSize: 13.5 }}>Scan with your phone camera</div>
@@ -50,18 +55,9 @@ function PosterCard() {
       </div>
       <Gap h={16} />
       <div className="row" style={{ gap: 8 }}>
-        {(['A5', 'A4'] as const).map((f) => (
-          <SelectChip key={f} label={f} selected={format === f} onClick={() => setFormat(f)} />
-        ))}
+        {(['A5', 'A4'] as const).map((f) => <SelectChip key={f} label={f} selected={format === f} onClick={() => setFormat(f)} />)}
         <div className="grow" />
-        <button
-          className="ibtn"
-          title="Copy link"
-          onClick={() => {
-            navigator.clipboard?.writeText(reviewLink).catch(() => {});
-            toast('Review link copied');
-          }}
-        >
+        <button className="ibtn" title="Copy link" onClick={() => { navigator.clipboard?.writeText(link); toast('Review link copied'); }}>
           <Icon name="link" color="var(--violet)" />
         </button>
       </div>
@@ -70,12 +66,15 @@ function PosterCard() {
         label="Download poster PDF"
         icon="download"
         busy={busy}
-        onClick={() => {
+        onClick={async () => {
           setBusy(true);
-          window.setTimeout(() => {
+          try {
+            await downloadPoster(b, link, format);
+          } catch {
+            toast('Could not create the poster. Please try again.');
+          } finally {
             setBusy(false);
-            toast(`Preview only — the app shares revyne-poster-${format}.pdf.`);
-          }, 700);
+          }
         }}
       />
     </Card>
@@ -83,10 +82,12 @@ function PosterCard() {
 }
 
 function WhatsAppForm() {
-  const toast = useToast();
+  const b = useBusiness();
+  const link = reviewLink(b.publicSlug);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const valid = phone.replace(/\D/g, '').length >= 10;
+  const message = reviewRequestMessage(b.name, link, name);
   return (
     <Card>
       <div className="field">
@@ -101,13 +102,13 @@ function WhatsAppForm() {
       <Gap h={16} />
       <div style={{ padding: 14, background: 'var(--violet50)', borderRadius: 14 }}>
         <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--violet700)', letterSpacing: 0.8 }}>MESSAGE PREVIEW</div>
-        <div style={{ marginTop: 6, fontSize: 14.5, lineHeight: 1.45, wordBreak: 'break-word' }}>{reviewRequestMessage(name)}</div>
+        <div style={{ marginTop: 6, fontSize: 14.5, lineHeight: 1.45, wordBreak: 'break-word' }}>{message}</div>
       </div>
       <Gap h={16} />
       <GradientButton
         label="Open in WhatsApp"
         icon="send"
-        onClick={valid ? () => { toast('Preview only — the app opens WhatsApp with this message.'); setName(''); setPhone(''); } : undefined}
+        onClick={valid ? () => { openWhatsApp(message, phone); setName(''); setPhone(''); } : undefined}
       />
       <Gap h={8} />
       <div className="muted" style={{ fontSize: 12.5, textAlign: 'center' }}>You press send in your own WhatsApp. Only message customers who visited you.</div>

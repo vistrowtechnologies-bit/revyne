@@ -36,9 +36,10 @@ async function tokenRequest(params: Record<string, string>): Promise<GoogleToken
   return JSON.parse(body);
 }
 
-/** Exchanges the one-time server auth code from the Android app (redirect_uri is empty for Android). */
-export function exchangeServerAuthCode(code: string) {
-  return tokenRequest({ code, grant_type: "authorization_code", redirect_uri: "" });
+/** Exchanges a one-time server auth code. Android sends an empty redirect_uri;
+ * the web app (Google Identity Services popup code flow) uses "postmessage". */
+export function exchangeServerAuthCode(code: string, redirectUri: "" | "postmessage" = "") {
+  return tokenRequest({ code, grant_type: "authorization_code", redirect_uri: redirectUri });
 }
 
 export function refreshAccessToken(refreshToken: string) {

@@ -1,7 +1,7 @@
 // lib/core/widgets/range_calendar.dart — presets, one month at a time,
 // filled start/end circles joined by a soft band, Clear button.
 import { useState } from 'react';
-import { MONTHS, shortDate } from '../data';
+import { MONTHS, shortDate } from '../lib/format';
 import { Gap, GradientButton, Icon, SelectChip, Sheet } from '../ui';
 
 export type Range = { start: Date; end: Date };
