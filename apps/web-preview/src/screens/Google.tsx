@@ -381,12 +381,12 @@ function GoogleChangesSheet({ onClose }: { onClose: () => void }) {
                   <div className="change-box">
                     <div className="change-tag">Yours</div>
                     <div className="change-val">{c.mine}</div>
-                    {c.field === 'latlng' && c.mine !== 'Not set' && <MapLink q={c.mine} />}
+                    {c.field === 'latlng' && c.mine !== 'Not set' && <PinMap q={c.mine} />}
                   </div>
                   <div className="change-box google">
                     <div className="change-tag">Google's version</div>
                     <div className="change-val">{c.google}</div>
-                    {c.field === 'latlng' && c.google !== 'Not set' && <MapLink q={c.google} />}
+                    {c.field === 'latlng' && c.google !== 'Not set' && <PinMap q={c.google} />}
                   </div>
                 </div>
               )}
@@ -401,7 +401,7 @@ function GoogleChangesSheet({ onClose }: { onClose: () => void }) {
                 </div>
               ) : (
                 <div className="muted" style={{ fontSize: 13.5, marginTop: 10 }}>
-                  {c.field === 'latlng' ? 'Google moved your map pin. If the new spot is wrong, move it back in Google Business Profile.' : "This can't be changed from RevYne yet."}{' '}
+                  {c.field === 'latlng' ? pinNote(c) : "This can't be changed from RevYne yet."}{' '}
                   <a href="https://business.google.com/" target="_blank" rel="noopener" style={{ color: 'var(--violet)', fontWeight: 700 }}>Open Google Business Profile</a>
                 </div>
               )}
@@ -427,10 +427,40 @@ function GoogleChangesSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** "Google moved your pin about 6 m" — haversine distance between the two pins. */
+function pinNote(c: api.GoogleChange) {
+  const a = c.mineValue as { latitude: number; longitude: number } | null;
+  const b = c.googleValue as { latitude: number; longitude: number } | null;
+  if (!a || !b) return 'Google changed your map pin. If the spot is wrong, fix it in Google Business Profile.';
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const h = Math.sin(rad(b.latitude - a.latitude) / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(rad(b.longitude - a.longitude) / 2) ** 2;
+  const m = 2 * 6371000 * Math.asin(Math.sqrt(h));
+  const dist = m < 1000 ? `${Math.max(1, Math.round(m))} m` : `${(m / 1000).toFixed(1)} km`;
+  return m < 30
+    ? `Google moved your map pin by about ${dist} — almost the same spot, so this is usually fine.`
+    : `Google moved your map pin by about ${dist}. If the new spot is wrong, move it back in Google Business Profile.`;
+}
+
+/** A small embedded Google map centred on one pin, with a link to open it full size. */
+function PinMap({ q }: { q: string }) {
+  return (
+    <>
+      <iframe
+        title={`Map at ${q}`}
+        className="pin-map"
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+        src={`https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=17&output=embed`}
+      />
+      <MapLink q={q} />
+    </>
+  );
+}
+
 function MapLink({ q }: { q: string }) {
   return (
     <a href={`https://www.google.com/maps?q=${encodeURIComponent(q)}`} target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, color: 'var(--violet)', fontWeight: 700, fontSize: 13.5 }}>
-      <Icon name="map" size={16} />View on map
+      <Icon name="open_in_new" size={16} />Open in Google Maps
     </a>
   );
 }
