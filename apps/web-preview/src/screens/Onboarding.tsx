@@ -7,6 +7,9 @@ import * as api from '../lib/api';
 import { connectGoogleProfile, GoogleCancelled } from '../lib/google';
 import { MAX_PRODUCTS, MAX_REVIEW_LANGUAGES, openWhatsApp, REPLY_TONES, REVIEW_LANGUAGES, reviewRequestMessage } from '../lib/options';
 import { Card, Gap, GradientButton, Icon, SectionHeader, SelectChip, useToast } from '../ui';
+import { usePalette } from '../store';
+import StatusMark from '../components/reactbits/StatusMark';
+import ShinyText from '../components/reactbits/ShinyText';
 
 type Step = 'connect' | 'choose' | 'preferences' | 'done';
 const STEPS: Step[] = ['connect', 'choose', 'preferences', 'done'];
@@ -22,6 +25,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const [tone, setTone] = useState('friendly');
   const [languages, setLanguages] = useState<string[]>(['en', 'hi']);
   const [error, setError] = useState<string | null>(null);
+  const pal = usePalette();
 
   const apply = (r: api.ConnectResult) => {
     if (r.status === 'already_has_business') {
@@ -143,8 +147,10 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
         )}
         {step === 'done' && business && (
           <>
-            <Icon name="celebration" fill size={40} color="var(--violet)" />
-            <h2 className="h-small" style={{ marginTop: 8 }}>{business.name} is connected!</h2>
+            <StatusMark status="done" size={44} strokeWidth={2.4} color={pal.primary} doneColor={pal.primary} fillOpacity={0.1} label="" />
+            <h2 className="h-small" style={{ marginTop: 8 }}>
+              {business.name} <ShinyText text="is connected!" color={pal.primary} shineColor={pal.shade200} speed={2.4} />
+            </h2>
             <div className="muted" style={{ marginTop: 4 }}>Customers scan this QR code to share their experience and post it on Google themselves.</div>
             <Gap h={16} />
             <ReviewLinkCard business={business} />

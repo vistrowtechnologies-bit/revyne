@@ -8,6 +8,7 @@ import { Card, Gap, GradientCard, Icon, SectionHeader, SelectChip, useToast } fr
 import { Loading, LoadError } from '../widgets';
 import { AppBar } from './AppBar';
 import RangeCalendar, { CLEARED, type Range } from './RangeCalendar';
+import CountUp from '../components/reactbits/CountUp';
 
 export function ChangeBadge({ now, before, onDark }: { now: number; before?: number | null; onDark?: boolean }) {
   const pct = percentChange(now, before);
@@ -88,7 +89,7 @@ function Content({ v }: { v: Insights }) {
         <div style={{ color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>{shortDate(v.start)} – {shortDate(v.end)}</div>
         <Gap h={6} />
         <div className="row" style={{ alignItems: 'flex-end', gap: 8 }}>
-          <span style={{ fontSize: 40, fontWeight: 800, lineHeight: 1 }}>{t.views.toLocaleString('en-IN')}</span>
+          <span style={{ fontSize: 40, fontWeight: 800, lineHeight: 1 }}><CountUp key={`${v.start.getTime()}-${v.end.getTime()}`} to={t.views} separator="," duration={1} trigger="load" /></span>
           <span style={{ fontWeight: 700, fontSize: 15, paddingBottom: 4 }}>people saw your profile</span>
         </div>
         <Gap h={4} />

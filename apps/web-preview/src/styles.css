@@ -258,3 +258,9 @@ button:disabled { cursor: default; }
 .photo-del { position: absolute; top: 4px; right: 4px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; display: grid; place-items: center; opacity: 0; transition: opacity .15s; }
 .photo-tile:hover .photo-del, .photo-del:focus-visible { opacity: 1; }
 @media (hover: none) { .photo-del { opacity: 1; } }
+
+/* React Bits placements */
+.signin-hero { position: relative; overflow: hidden; }
+.signin-hero > *:not(.signin-aurora) { position: relative; z-index: 1; }
+.signin-aurora { position: absolute !important; inset: 0; pointer-events: none; }
+.spotlight-card.qa-spot { flex: 1; text-align: center; padding: 18px 8px; border-radius: var(--r-card); border: 1px solid var(--line); box-shadow: var(--shadow-card); }

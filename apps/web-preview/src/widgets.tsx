@@ -1,6 +1,7 @@
 // Small app-aware widgets (they read the session / server data).
 import { useState } from 'react';
-import { useMyPhoto, useNotifications, useStore, useUser } from './store';
+import { useMyPhoto, useNotifications, usePalette, useStore, useUser } from './store';
+import LatticeLoader from './components/reactbits/LatticeLoader';
 import { Card, EmptyState, Icon, InitialsAvatar } from './ui';
 
 /** Round profile photo with initials as the fallback (user_avatar.dart). */
@@ -34,10 +35,11 @@ export function NotificationBell() {
   );
 }
 
-export function Loading({ pad = 40 }: { pad?: number }) {
+export function Loading({ pad = 40, label = 'Loading' }: { pad?: number; label?: string }) {
+  const p = usePalette();
   return (
-    <div style={{ padding: pad, display: 'grid', placeItems: 'center', color: 'var(--violet)' }}>
-      <span className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
+    <div style={{ padding: pad, display: 'grid', placeItems: 'center' }}>
+      <LatticeLoader label={label} color={p.primary} glowColor={p.shade200} fontSize={14} />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { clearAll, useQuery } from './lib/query';
 import * as api from './lib/api';
-import { applyPalette, loadPaletteId } from './theme';
+import { applyPalette, loadPaletteId, palettes } from './theme';
 
 // Hash router: #/home, #/reviews?tab=private, #/get-reviews, #/google, #/account,
 // plus pushed screens. Notification routes ("/reviews?tab=private") map 1:1.
@@ -57,6 +57,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={s}>{children}</Ctx.Provider>;
 }
 export const useStore = () => useContext(Ctx)!;
+
+/** The active colour palette (hex values, for components that take colour props). */
+export const usePalette = () => {
+  const id = useStore().paletteId;
+  return palettes.find((p) => p.id === id) ?? palettes[0];
+};
 
 // ── Session ────────────────────────────────────────────────────────────────
 export function useSession() {

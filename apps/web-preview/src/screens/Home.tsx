@@ -4,6 +4,9 @@ import { weekDelta, type DashboardStats } from '../lib/api';
 import { firstName, greeting, MONTHS } from '../lib/format';
 import { BrandMark, Card, EmptyState, Gap, GradientButton, GradientCard, Icon, IconTile, SectionHeader, StatusPill } from '../ui';
 import { Loading, NotificationBell, UserAvatar } from '../widgets';
+import { usePalette } from '../store';
+import CountUp from '../components/reactbits/CountUp';
+import SpotlightCard from '../components/reactbits/SpotlightCard';
 
 export default function HomeScreen() {
   const s = useStore();
@@ -133,7 +136,7 @@ function WeekHero({ stats: d }: { stats: DashboardStats }) {
       </div>
       <Gap h={8} />
       <div className="row" style={{ alignItems: 'flex-end', gap: 10 }}>
-        <span style={{ fontSize: 52, fontWeight: 800, lineHeight: 1 }}>{d.google7d}</span>
+        <span style={{ fontSize: 52, fontWeight: 800, lineHeight: 1 }}><CountUp to={d.google7d} duration={1.2} trigger="load" /></span>
         <span style={{ fontSize: 18, fontWeight: 700, paddingBottom: 6 }}>went to Google</span>
       </div>
       <Gap h={24} />
@@ -150,7 +153,7 @@ function WeekHero({ stats: d }: { stats: DashboardStats }) {
       <Gap h={12} />
       <div className="row" style={{ gap: 8, fontWeight: 700 }}>
         <Icon name="visibility" size={18} />
-        <span className="grow">{d.visits7d} review page visits</span>
+        <span className="grow"><CountUp to={d.visits7d} duration={1.2} trigger="load" /> review page visits</span>
         {d.avgRating30d != null && (
           <>
             <Icon name="star" fill size={18} color="var(--star)" />
@@ -164,10 +167,22 @@ function WeekHero({ stats: d }: { stats: DashboardStats }) {
 }
 
 function QuickAction({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  const p = usePalette();
   return (
-    <Card pad="18px 8px" onClick={onClick} style={{ flex: 1, textAlign: 'center' }}>
+    <SpotlightCard
+      theme="light"
+      spotlightColor={p.primary}
+      intensity={0.12}
+      spotlightSize={180}
+      flare={false}
+      className="card tap qa-spot"
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+    >
       <div style={{ display: 'flex', justifyContent: 'center' }}><IconTile icon={icon} size={48} /></div>
       <div style={{ marginTop: 10, fontWeight: 700, fontSize: 14, lineHeight: 1.25, whiteSpace: 'pre-line' }}>{label}</div>
-    </Card>
+    </SpotlightCard>
   );
 }
