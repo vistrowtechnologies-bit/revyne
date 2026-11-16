@@ -264,3 +264,22 @@ button:disabled { cursor: default; }
 .signin-hero > *:not(.signin-aurora) { position: relative; z-index: 1; }
 .signin-aurora { position: absolute !important; inset: 0; pointer-events: none; }
 .spotlight-card.qa-spot { flex: 1; text-align: center; padding: 18px 8px; border-radius: var(--r-card); border: 1px solid var(--line); box-shadow: var(--shadow-card); }
+
+/* Home dashboard */
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.kpi { min-width: 0; }
+.home-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.show-wide-flex { display: none !important; }
+@media (min-width: 900px) {
+  .page.wide { max-width: 1240px; }
+  .page.home { padding-top: 32px; }
+  .show-wide-flex { display: flex !important; }
+  .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .home-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: start; }
+  .home-grid .span-7 { grid-column: span 7; }
+  .home-grid .span-5 { grid-column: span 5; }
+}
+@media (min-width: 900px) and (max-width: 1150px) {
+  .home-grid { grid-template-columns: minmax(0, 1fr); }
+  .home-grid .span-7, .home-grid .span-5 { grid-column: auto; }
+}
