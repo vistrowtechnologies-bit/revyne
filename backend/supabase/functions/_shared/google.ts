@@ -141,13 +141,14 @@ export async function deleteReply(account: string, location: string, reviewId: s
 
 const PROFILE_FIELDS = "name,title,phoneNumbers,categories,websiteUri,regularHours,specialHours,profile,openInfo,metadata";
 
-export function getLocation(location: string, accessToken: string) {
-  return gbpGet(`${INFO_API}/${location}?readMask=${PROFILE_FIELDS}`, accessToken);
+/** extra: more comma-separated fields to read (e.g. "storefrontAddress,latlng"). */
+export function getLocation(location: string, accessToken: string, extra = "") {
+  return gbpGet(`${INFO_API}/${location}?readMask=${PROFILE_FIELDS}${extra ? "," + extra : ""}`, accessToken);
 }
 
 /** Google's own version of the location (e.g. from public suggestions) and which fields differ (diffMask). */
 export function getGoogleUpdated(location: string, accessToken: string) {
-  return gbpGet(`${INFO_API}/${location}:getGoogleUpdated?readMask=${PROFILE_FIELDS},storefrontAddress`, accessToken);
+  return gbpGet(`${INFO_API}/${location}:getGoogleUpdated?readMask=${PROFILE_FIELDS},storefrontAddress,latlng`, accessToken);
 }
 
 /** Applies a patch; with validateOnly Google checks it without changing anything. */

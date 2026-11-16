@@ -381,10 +381,12 @@ function GoogleChangesSheet({ onClose }: { onClose: () => void }) {
                   <div className="change-box">
                     <div className="change-tag">Yours</div>
                     <div className="change-val">{c.mine}</div>
+                    {c.field === 'latlng' && c.mine !== 'Not set' && <MapLink q={c.mine} />}
                   </div>
                   <div className="change-box google">
                     <div className="change-tag">Google's version</div>
                     <div className="change-val">{c.google}</div>
+                    {c.field === 'latlng' && c.google !== 'Not set' && <MapLink q={c.google} />}
                   </div>
                 </div>
               )}
@@ -399,7 +401,7 @@ function GoogleChangesSheet({ onClose }: { onClose: () => void }) {
                 </div>
               ) : (
                 <div className="muted" style={{ fontSize: 13.5, marginTop: 10 }}>
-                  This can't be changed from RevYne yet.{' '}
+                  {c.field === 'latlng' ? 'Google moved your map pin. If the new spot is wrong, move it back in Google Business Profile.' : "This can't be changed from RevYne yet."}{' '}
                   <a href="https://business.google.com/" target="_blank" rel="noopener" style={{ color: 'var(--violet)', fontWeight: 700 }}>Open Google Business Profile</a>
                 </div>
               )}
@@ -422,6 +424,14 @@ function GoogleChangesSheet({ onClose }: { onClose: () => void }) {
         />
       )}
     </Sheet>
+  );
+}
+
+function MapLink({ q }: { q: string }) {
+  return (
+    <a href={`https://www.google.com/maps?q=${encodeURIComponent(q)}`} target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, color: 'var(--violet)', fontWeight: 700, fontSize: 13.5 }}>
+      <Icon name="map" size={16} />View on map
+    </a>
   );
 }
 

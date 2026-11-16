@@ -153,7 +153,7 @@ type Change = { field: string; label: string; editable: boolean; mine: string; g
 
 /** Which details Google changed, with the owner's and Google's versions side by side. */
 async function googleChanges(b: LinkedBusiness, token: string) {
-  const [mineLoc, updated] = await Promise.all([getLocation(b.gbp_location, token), getGoogleUpdated(b.gbp_location, token)]);
+  const [mineLoc, updated] = await Promise.all([getLocation(b.gbp_location, token, "storefrontAddress,latlng"), getGoogleUpdated(b.gbp_location, token)]);
   const googleLoc = (updated.location ?? {}) as Record<string, any>;
   const mine = profileView(mineLoc);
   const google = profileView(googleLoc);
@@ -186,10 +186,29 @@ async function googleChanges(b: LinkedBusiness, token: string) {
     });
   if (touched("storefrontAddress"))
     changes.push({ field: "address", label: "Address", editable: false, mine: addressText(mineLoc), google: addressText(googleLoc) });
-  // Anything else Google lists that the app doesn't show.
-  const known = ["title", "profile", "phoneNumbers", "websiteUri", "regularHours", "specialHours", "categories", "storefrontAddress"];
+  if (touched("latlng")) {
+    const pin = (l: Record<string, any>) => (l.latlng ? `${Number(l.latlng.latitude).toFixed(5)}, ${Number(l.latlng.longitude).toFixed(5)}` : "Not set");
+    changes.push({ field: "latlng", label: "Map pin location", editable: false, mine: pin(mineLoc), google: pin(googleLoc), mineValue: mineLoc.latlng ?? null, googleValue: googleLoc.latlng ?? null });
+  }
+  // Anything else Google lists that the app doesn't show, in plain words.
+  const LABELS: Record<string, string> = {
+    openInfo: "Open or closed status",
+    serviceArea: "Service area",
+    labels: "Labels",
+    attributes: "Attributes",
+    moreHours: "More hours",
+    serviceItems: "Services",
+    adWordsLocationExtensions: "Ads location",
+    relationshipData: "Related locations",
+    languageCode: "Language",
+    storeCode: "Store code",
+  };
+  const known = ["title", "profile", "phoneNumbers", "websiteUri", "regularHours", "specialHours", "categories", "storefrontAddress", "latlng"];
   for (const m of mask) {
-    if (!known.some((k) => m === k || m.startsWith(k + "."))) changes.push({ field: m, label: m, editable: false, mine: "", google: "" });
+    if (known.some((k) => m === k || m.startsWith(k + "."))) continue;
+    const root = m.split(".")[0];
+    if (changes.some((c) => c.field === root)) continue;
+    changes.push({ field: root, label: LABELS[root] ?? root, editable: false, mine: "", google: "" });
   }
   return { changes, mapsUri: mine.mapsUri };
 }
