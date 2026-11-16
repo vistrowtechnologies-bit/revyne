@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // gbp-review-watch — every 10 minutes (cron `gbp-review-watch`, vault secret in
-// `x-scheduler-secret`), checks each linked business whose owner has the app
-// installed for new Google reviews and sends a push. Stores only the newest
-// review time (businesses.review_watch_at), never review content.
+// `x-scheduler-secret`), checks each linked business for new Google reviews,
+// saves an in-app notification (deleted after 30 days) and pushes it to the
+// owner's phones. On the business it stores only the newest review time.
 // Deployed without gateway JWT checks; the secret is the only way in.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { pushToUser } from "../_shared/fcm.ts";
+import { notifyUser } from "../_shared/fcm.ts";
 import { accessTokenFor } from "../_shared/gbp_auth.ts";
 import { listReviews } from "../_shared/google.ts";
 import { db, json } from "../_shared/http.ts";
@@ -25,14 +25,9 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (!(await secretOk(req))) return json({ error: "Forbidden" }, 403);
 
-  // Only owners with at least one registered phone.
-  const tRes = await db("device_tokens?select=user_id");
-  const owners = [...new Set((tRes.ok ? await tRes.json() as { user_id: string }[] : []).map((t) => t.user_id))];
-  if (!owners.length) return json({ ok: true, checked: 0, alerts: 0 });
-
-  const bRes = await db(
-    `businesses?owner_id=in.(${owners.join(",")})&gbp_location=not.is.null&select=id,owner_id,gbp_account,gbp_location,review_watch_at`,
-  );
+  // Every linked business: alerts also go to the in-app notifications list,
+  // so owners without a registered phone still get them.
+  const bRes = await db(`businesses?gbp_location=not.is.null&select=id,owner_id,gbp_account,gbp_location,review_watch_at`);
   const businesses = bRes.ok ? await bRes.json() as Watched[] : [];
   let alerts = 0;
 
@@ -42,7 +37,10 @@ Deno.serve(async (req) => {
       if (!token) continue;
       const page = await listReviews(b.gbp_account, b.gbp_location, token);
       const { fresh, watermark } = newReviews(page.reviews, b.review_watch_at);
-      for (const push of reviewPushes(fresh)) alerts += (await pushToUser(b.owner_id, push)) > 0 ? 1 : 0;
+      for (const push of reviewPushes(fresh)) {
+        await notifyUser(b.owner_id, { ...push, kind: "review" });
+        alerts++;
+      }
       if (watermark !== b.review_watch_at) {
         await db(`businesses?id=eq.${b.id}`, { method: "PATCH", body: JSON.stringify({ review_watch_at: watermark }) });
       }

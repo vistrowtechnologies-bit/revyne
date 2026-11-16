@@ -5,6 +5,7 @@
 // is the only way in.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { notifyUser } from "../_shared/fcm.ts";
 import { accessTokenFor } from "../_shared/gbp_auth.ts";
 import { createPost, GoogleApiError } from "../_shared/google.ts";
 import { db, json } from "../_shared/http.ts";
@@ -41,22 +42,35 @@ Deno.serve(async (req) => {
   let published = 0;
 
   for (const item of due) {
+    let ownerId: string | null = null;
+    // Tell the owner what happened to their scheduled post (list + push).
+    const failed = async (error: string) => {
+      await finish(item.id, { status: "failed", error });
+      if (ownerId) await notifyUser(ownerId, { kind: "post", title: "Scheduled post not published", body: error, route: "/google" });
+    };
     try {
       const bRes = await db(`businesses?id=eq.${item.business_id}&select=id,owner_id,gbp_account,gbp_location`);
       const [b] = bRes.ok ? await bRes.json() as Business[] : [];
+      ownerId = b?.owner_id ?? null;
       if (!b?.gbp_account || !b.gbp_location) {
-        await finish(item.id, { status: "failed", error: "This business is no longer linked to Google." });
+        await failed("This business is no longer linked to Google.");
         continue;
       }
       const token = await accessTokenFor(b.owner_id);
       if (!token) {
-        await finish(item.id, { status: "failed", error: "Google access expired. Connect your Google profile again." });
+        await failed("Google access expired. Connect your Google profile again.");
         continue;
       }
       const body = postBody(item.post, item.media_path ? await signedMediaUrl(item.media_path) : null);
       const post = await createPost(b.gbp_account, b.gbp_location, body, token);
       await finish(item.id, { status: "published", google_name: post.name, published_at: new Date().toISOString(), error: null });
       await db("owner_actions", { method: "POST", body: JSON.stringify({ business_id: b.id, kind: "post_created", detail: `scheduled ${post.type}` }) });
+      await notifyUser(b.owner_id, {
+        kind: "post",
+        title: "Your scheduled post is on Google",
+        body: post.summary.length > 100 ? `${post.summary.slice(0, 97)}…` : post.summary,
+        route: "/google",
+      });
       published++;
     } catch (e) {
       // Never retry automatically: a half-finished attempt could post twice.
@@ -68,7 +82,7 @@ Deno.serve(async (req) => {
         ? "Google didn't accept this post. Check the text, dates and photo."
         : "Couldn't reach Google at the scheduled time.";
       console.error("gbp-scheduler item failed", item.id, e instanceof Error ? e.message.slice(0, 500) : e);
-      await finish(item.id, { status: "failed", error: message });
+      await failed(message);
     }
   }
 

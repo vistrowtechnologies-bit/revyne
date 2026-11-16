@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -20,11 +21,14 @@ Future<void> main() async {
   await Supabase.initialize(url: Env.supabaseUrl, publishableKey: Env.supabasePublishableKey);
   await BrandPalette.load(); // the owner's chosen app colour
   // Push alerts are optional: the app must still start if Firebase can't.
-  try {
-    await Firebase.initializeApp();
-    await PushService.start();
-  } catch (e) {
-    debugPrint('Firebase unavailable, review alerts off: $e');
+  // Firebase is only set up for Android; on the web the in-app list still works.
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+      await PushService.start();
+    } catch (e) {
+      debugPrint('Firebase unavailable, review alerts off: $e');
+    }
   }
   runApp(const ProviderScope(child: RevyneApp()));
 }

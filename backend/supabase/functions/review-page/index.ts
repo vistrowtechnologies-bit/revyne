@@ -12,7 +12,7 @@
 // REVIEW_PAGE_ORIGINS (comma list; defaults to revyneai.com + local dev).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { pushToUser } from "../_shared/fcm.ts";
+import { notifyUser } from "../_shared/fcm.ts";
 import { db, str } from "../_shared/http.ts";
 import { AiUnavailable, generateText } from "../_shared/openai.ts";
 import { buildReviewPrompt, REVIEW_LANGUAGES } from "../_shared/review_prompt.ts";
@@ -191,7 +191,8 @@ Deno.serve(async (req) => {
         if (!res.ok) throw new Error(`feedback write ${res.status} ${await res.text()}`);
         // Tell the owner (never fails the customer's request).
         const who = str(body.contactName, 80) || "A customer";
-        await pushToUser(business.owner_id, {
+        await notifyUser(business.owner_id, {
+          kind: "message",
           title: "New private message",
           body: `${who}: “${message.length > 100 ? `${message.slice(0, 97)}…` : message}”`,
           route: "/reviews?tab=private",

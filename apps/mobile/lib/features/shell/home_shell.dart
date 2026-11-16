@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/ui.dart';
 
 /// Bottom navigation: Home · Reviews · [Get Reviews] · Google · Account.
 /// Get Reviews is the raised gradient button — the app's main action.
@@ -57,8 +58,81 @@ class _HomeShellState extends State<HomeShell> {
       ..showSnackBar(const SnackBar(content: Text('Press back again to exit'), duration: Duration(seconds: 2)));
   }
 
+  /// Desktop / wide browser: left sidebar + centred content column.
+  Widget _wide(BuildContext context) {
+    final current = _shell.currentIndex;
+    Widget nav(int index, IconData icon, IconData activeIcon, String label) {
+      final selected = current == index;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        child: Material(
+          color: selected ? AppColors.violet50 : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => _go(index),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(children: [
+                Icon(selected ? activeIcon : icon, color: selected ? AppColors.violet : AppColors.muted, size: 22),
+                const SizedBox(width: 14),
+                Text(label, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: selected ? AppColors.violet : AppColors.ink)),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: Row(children: [
+        Container(
+          width: 248,
+          decoration: BoxDecoration(color: Colors.white, border: Border(right: BorderSide(color: AppColors.line))),
+          child: SafeArea(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Padding(padding: EdgeInsets.fromLTRB(24, 24, 24, 20), child: Align(alignment: Alignment.centerLeft, child: BrandMark())),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Material(
+                  borderRadius: BorderRadius.circular(999),
+                  child: Ink(
+                    decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(999), boxShadow: AppShadows.glow),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(999),
+                      onTap: () => _go(2),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 13),
+                        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 20),
+                          SizedBox(width: 8),
+                          Text('Get Reviews', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              nav(0, Icons.home_outlined, Icons.home_rounded, 'Home'),
+              nav(1, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Reviews'),
+              nav(3, Icons.storefront_outlined, Icons.storefront_rounded, 'Google'),
+              nav(4, Icons.person_outline_rounded, Icons.person_rounded, 'Account'),
+            ]),
+          ),
+        ),
+        Expanded(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child: _shell),
+          ),
+        ),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width >= 900) return _wide(context);
     final current = _shell.currentIndex;
     final navigationShell = _shell;
 

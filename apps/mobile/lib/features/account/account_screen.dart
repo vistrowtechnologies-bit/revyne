@@ -10,6 +10,7 @@ import '../../core/widgets/ui.dart';
 import '../../core/theme/palettes.dart';
 import '../activity/activity_screen.dart';
 import '../profile/user_avatar.dart';
+import '../templates/reply_templates.dart';
 import 'theme_picker.dart';
 import '../notifications/push_prompt.dart';
 import '../notifications/push_service.dart';
@@ -151,6 +152,11 @@ class AccountScreen extends ConsumerWidget {
                 Icons.description_outlined,
                 'Monthly reports',
                 onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ReportScreen())),
+              ),
+              row(
+                Icons.bookmarks_outlined,
+                'Reply templates',
+                onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ReplyTemplatesScreen())),
               ),
               row(
                 Icons.palette_outlined,

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/format.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../business/business_repository.dart';
+import '../templates/reply_templates.dart';
 import 'google_reviews_repository.dart';
 
 /// Reply to one Google review. AI only drafts; the owner edits, then confirms
@@ -177,6 +179,15 @@ class _ReplySheetState extends ConsumerState<ReplySheet> {
                     ),
                   ],
                 ),
+                TemplateChips(
+                  currentText: _text.text,
+                  onPick: (t) async {
+                    final business = (await ref.read(myBusinessProvider.future))?.name ?? '';
+                    _text.text = fillTemplate(t.body, reviewer: r.reviewer, business: business);
+                    setState(() {});
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: _text,
                   minLines: 4,

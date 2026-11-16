@@ -74,8 +74,31 @@ final routerProvider = Provider<GoRouter>((ref) {
 class _LoadingScreen extends StatelessWidget {
   const _LoadingScreen();
 
+  /// Continues the Android splash (theme gradient + logo) while the account loads.
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
+  Widget build(BuildContext context) => Scaffold(
+        body: Container(
+          decoration: BoxDecoration(gradient: AppColors.brandGradient),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: Image.asset('assets/brand/logo.png', width: 104, height: 104),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const Text('RevYne', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 /// Shown when the business can't be loaded (e.g. offline) — never falls

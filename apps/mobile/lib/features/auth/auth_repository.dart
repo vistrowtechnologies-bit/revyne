@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -14,6 +15,12 @@ class AuthRepository {
   /// Business Profile access (business.manage) is requested separately, when
   /// the owner connects their profile. Throws [GoogleCancelled] on cancel.
   Future<void> signInWithGoogle() async {
+    if (kIsWeb) {
+      // Browser: Supabase's Google sign-in page, then back to this site (the
+      // origin must be in Supabase Auth → URL configuration → Redirect URLs).
+      await _client.auth.signInWithOAuth(OAuthProvider.google, redirectTo: Uri.base.origin);
+      return;
+    }
     final account = await GoogleSignInService.pickAccount();
     final idToken = account.authentication.idToken;
     if (idToken == null) {
@@ -26,6 +33,7 @@ class AuthRepository {
     // While still signed in (RLS): stop review alerts reaching this phone.
     await PushService.unregister(_client);
     await _client.auth.signOut();
+    if (kIsWeb) return;
     try {
       await (await GoogleSignInService.instance()).signOut();
     } catch (_) {

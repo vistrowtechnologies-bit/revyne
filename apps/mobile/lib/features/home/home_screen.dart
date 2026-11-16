@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../notifications/notifications_screen.dart';
 import '../notifications/push_prompt.dart';
 import '../profile/user_avatar.dart';
 import '../reports/report_repository.dart';
@@ -43,6 +44,8 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   const BrandMark(),
                   const Spacer(),
+                  const NotificationBell(),
+                  const SizedBox(width: 4),
                   GestureDetector(
                     onTap: () => context.go(Routes.account),
                     child: const UserAvatar(size: 40),

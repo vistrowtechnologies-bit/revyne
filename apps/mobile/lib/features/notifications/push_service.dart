@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../app/router.dart';
 import '../../core/supabase/supabase_providers.dart';
 import 'alert_notifier.dart';
+import 'notifications_screen.dart';
 
 /// App-wide messenger so a push can show a banner over any screen.
 final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -155,13 +156,16 @@ class _PushBinderState extends ConsumerState<PushBinder> {
   }
 
   void _go(String route) {
-    if (route.startsWith('/') && mounted) ref.read(routerProvider).go(route);
+    if (!route.startsWith('/') || !mounted) return;
+    ref.invalidate(notificationsProvider);
+    ref.read(routerProvider).go(route);
   }
 
   void _open(RemoteMessage m) => _go(m.data['route'] as String? ?? '/home');
 
   /// App on screen: an in-app banner instead of a system alert.
   void _foreground(RemoteMessage m) {
+    ref.invalidate(notificationsProvider); // the bell's count and list
     final title = m.data['title'] as String? ?? m.notification?.title;
     final body = m.data['body'] as String? ?? m.notification?.body;
     if (title == null) return;

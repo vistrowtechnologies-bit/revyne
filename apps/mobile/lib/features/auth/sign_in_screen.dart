@@ -46,9 +46,30 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       (Icons.verified_user_outlined, 'Nothing is posted to Google without your approval'),
     ];
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
+    // On wide screens (browser), show the phone layout as a centred card on the
+    // brand gradient instead of stretching it edge to edge.
+    final wide = MediaQuery.sizeOf(context).width >= 700;
+    Widget page(Widget child) => !wide
+        ? Scaffold(backgroundColor: Colors.white, body: child)
+        : Scaffold(
+            body: Container(
+              decoration: BoxDecoration(gradient: AppColors.brandGradient),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440, maxHeight: 760),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: const [BoxShadow(color: Color(0x44120731), blurRadius: 40, offset: Offset(0, 20))],
+                  ),
+                  child: ClipRRect(borderRadius: BorderRadius.circular(28), child: ColoredBox(color: Colors.white, child: child)),
+                ),
+              ),
+            ),
+          );
+
+    return page(Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(

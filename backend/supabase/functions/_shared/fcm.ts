@@ -13,7 +13,30 @@ export type Push = {
   body: string;
   route?: string; // app screen to open on tap, e.g. "/reviews"
   tag?: string; // same tag replaces an earlier notification
+  kind?: "review" | "message" | "post" | "profile" | "system"; // for the in-app list
 };
+
+/**
+ * Saves the alert to the owner's in-app notifications list, then pushes it to
+ * their phones. The list works even when no phone is registered. Never throws.
+ */
+export async function notifyUser(userId: string, push: Push): Promise<number> {
+  try {
+    await db("notifications", {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: userId,
+        kind: push.kind ?? "system",
+        title: push.title.slice(0, 200),
+        body: push.body.slice(0, 500),
+        route: push.route ?? "/home",
+      }),
+    });
+  } catch (e) {
+    console.error("notification save failed", e instanceof Error ? e.message.slice(0, 200) : e);
+  }
+  return pushToUser(userId, push);
+}
 
 let cached: { token: string; expires: number } | null = null;
 

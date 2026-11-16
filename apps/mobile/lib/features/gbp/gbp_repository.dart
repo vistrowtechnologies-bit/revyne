@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -92,6 +93,11 @@ class GbpRepository {
   /// Account picker → consent for business.manage (offline) → server stores
   /// the refresh token and returns the locations. Throws [GoogleCancelled].
   Future<ConnectResult> connect() async {
+    if (kIsWeb) {
+      // The browser connect flow (Google's popup code with redirect "postmessage")
+      // isn't built yet; a linked profile works on the web either way.
+      throw const GbpException('For now, connect your Google profile from the RevYne Android app. It then works here too.');
+    }
     final account = await GoogleSignInService.pickAccount();
     final auth = await account.authorizationClient.authorizeServer([businessManageScope]);
     if (auth == null) throw const GbpException('Google did not grant access. Please try again.');
