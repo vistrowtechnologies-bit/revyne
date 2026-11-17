@@ -41,7 +41,7 @@ export function db(path: string, init: RequestInit = {}) {
 // Browsers send a preflight OPTIONS and need Access-Control-* headers; the
 // Android app sends no Origin and is unaffected. Only listed origins are allowed.
 const ownerOrigins = (Deno.env.get("OWNER_APP_ORIGINS") ??
-  "https://revyneai.com,https://www.revyneai.com,https://app.revyneai.com,http://localhost:5175,http://localhost:5177")
+  "https://revyneai.com,https://www.revyneai.com,https://app.revyneai.com,https://revyne-app.vercel.app,http://localhost:5175,http://localhost:5177")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
