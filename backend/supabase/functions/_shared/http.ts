@@ -36,3 +36,37 @@ export function db(path: string, init: RequestInit = {}) {
     },
   });
 }
+
+// ── CORS for the owner web app ───────────────────────────────────────────────
+// Browsers send a preflight OPTIONS and need Access-Control-* headers; the
+// Android app sends no Origin and is unaffected. Only listed origins are allowed.
+const ownerOrigins = (Deno.env.get("OWNER_APP_ORIGINS") ??
+  "https://revyneai.com,https://www.revyneai.com,https://app.revyneai.com,https://revyne-app.vercel.app,http://localhost:5175,http://localhost:5177")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+function ownerCors(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  if (!ownerOrigins.includes(origin)) return {};
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+}
+
+/** Deno.serve for owner-facing functions: answers preflight and adds CORS headers. */
+export function serveOwner(handler: (req: Request) => Response | Promise<Response>) {
+  return Deno.serve(async (req) => {
+    const headers = ownerCors(req);
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
+    const res = await handler(req);
+    if (!Object.keys(headers).length) return res;
+    const out = new Response(res.body, res);
+    for (const [k, v] of Object.entries(headers)) out.headers.set(k, v);
+    return out;
+  });
+}
