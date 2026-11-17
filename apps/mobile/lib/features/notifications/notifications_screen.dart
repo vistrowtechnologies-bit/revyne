@@ -6,6 +6,7 @@ import '../../core/format.dart';
 import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
+import '../../core/widgets/skeleton.dart';
 
 /// One saved alert (kept 30 days on the server).
 class AppNotification {
@@ -116,7 +117,7 @@ class NotificationsScreen extends ConsumerWidget {
           } catch (_) {}
         },
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => ListView(padding: const EdgeInsets.all(AppSpacing.md), children: const [ListSkeleton(rows: 4, label: 'Loading notifications')]),
           error: (_, _) => ListView(children: const [
             Padding(
               padding: EdgeInsets.all(AppSpacing.md),

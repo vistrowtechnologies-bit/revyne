@@ -175,6 +175,42 @@ class ProfileRepository {
       ProfileView.fromJson(await _call({'action': 'update', 'field': field, 'value': value}));
 
   Future<String> draftDescription() async => (await _call({'action': 'draft_description'}))['draft'] as String;
+
+  /// Details Google changed itself, each with the owner's and Google's version.
+  Future<GoogleChanges> googleChanges() async => GoogleChanges.fromJson(await _call({'action': 'google_changes'}));
+}
+
+/// One detail Google changed: what the owner set vs what Google shows now.
+class GoogleChange {
+  const GoogleChange({required this.field, required this.label, required this.editable, required this.mine, required this.google, this.mineValue, this.googleValue});
+  final String field;
+  final String label;
+  final bool editable; // RevYne can send either version back to Google
+  final String mine;
+  final String google;
+  final Object? mineValue;
+  final Object? googleValue;
+
+  factory GoogleChange.fromJson(Map<String, dynamic> j) => GoogleChange(
+        field: j['field'] as String,
+        label: j['label'] as String? ?? j['field'] as String,
+        editable: j['editable'] as bool? ?? false,
+        mine: j['mine'] as String? ?? '',
+        google: j['google'] as String? ?? '',
+        mineValue: j['mineValue'],
+        googleValue: j['googleValue'],
+      );
+}
+
+class GoogleChanges {
+  const GoogleChanges(this.changes, this.mapsUri);
+  final List<GoogleChange> changes;
+  final String? mapsUri;
+
+  factory GoogleChanges.fromJson(Map<String, dynamic> j) => GoogleChanges(
+        [for (final c in (j['changes'] as List? ?? const [])) GoogleChange.fromJson(Map<String, dynamic>.from(c as Map))],
+        j['mapsUri'] as String?,
+      );
 }
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) => ProfileRepository(ref.watch(supabaseProvider)));
@@ -185,3 +221,5 @@ final gbpProfileProvider = FutureProvider<ProfileView>(retry: (_, _) => null, (r
   if (business == null || !business.isVerified) throw const ProfileException('Link your Google Business Profile first.', blocked: true);
   return ref.watch(profileRepositoryProvider).get();
 });
+
+final googleChangesProvider = FutureProvider.autoDispose<GoogleChanges>(retry: (_, _) => null, (ref) => ref.watch(profileRepositoryProvider).googleChanges());

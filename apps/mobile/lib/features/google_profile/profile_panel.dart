@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/router.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
 import '../google_content/content_sections.dart';
+import 'google_changes_sheet.dart';
 import 'profile_editors.dart';
 import 'profile_repository.dart';
+import '../../core/widgets/skeleton.dart';
 
 /// Opens the screen that fixes a score task or edits a profile field.
 Future<void> openProfileAction(BuildContext context, WidgetRef ref, ScoreAction action, GbpProfile p) async {
@@ -190,11 +191,7 @@ class ProfileDetails extends ConsumerWidget {
                   child: Text('Google changed some of your details (often from public suggestions). Check they\'re right.',
                       style: TextStyle(fontSize: 13.5, color: AppColors.ink)),
                 ),
-                if (p.mapsUri != null)
-                  TextButton(
-                    onPressed: () => launchUrl(Uri.parse(p.mapsUri!), mode: LaunchMode.externalApplication),
-                    child: const Text('Check'),
-                  ),
+                TextButton(onPressed: () => showGoogleChanges(context), child: const Text('Check')),
               ]),
             ),
           for (final (i, (icon, label, value, action, missing)) in rows.indexed) ...[
@@ -233,7 +230,7 @@ class GoogleProfilePanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(gbpProfileProvider);
     return async.when(
-      loading: () => const AppCard(child: Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))),
+      loading: () => const Column(children: [CardSkeleton(lines: 3, label: 'Loading your profile'), SizedBox(height: AppSpacing.lg), ListSkeleton(rows: 3, avatar: false)]),
       error: (e, _) => EmptyState(
         icon: Icons.cloud_off_rounded,
         title: "Couldn't load your profile",

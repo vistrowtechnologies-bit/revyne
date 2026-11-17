@@ -5,6 +5,7 @@ import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
 import '../business/business_repository.dart';
+import '../../core/widgets/skeleton.dart';
 
 /// A saved reply snippet. {name} → reviewer's first name, {business} → business name.
 class ReplyTemplate {
@@ -169,7 +170,7 @@ class ReplyTemplatesScreen extends ConsumerWidget {
         label: const Text('New template'),
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => ListView(padding: const EdgeInsets.all(AppSpacing.md), children: const [ListSkeleton(rows: 3, avatar: false, label: 'Loading templates')]),
         error: (_, _) => const Padding(
           padding: EdgeInsets.all(AppSpacing.md),
           child: EmptyState(icon: Icons.cloud_off_rounded, title: "Couldn't load templates", body: 'Please try again.'),

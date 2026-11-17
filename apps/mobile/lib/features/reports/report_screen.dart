@@ -8,6 +8,7 @@ import '../insights/insights_repository.dart';
 import '../insights/insights_screen.dart' show ChangeBadge;
 import 'report_pdf.dart';
 import 'report_repository.dart';
+import '../../core/widgets/skeleton.dart';
 
 /// Monthly report: Google stats, reviews, RevYne review page, posts, searches.
 /// Opens on last month (the latest complete one); share as PDF.
@@ -79,7 +80,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             ...async.when(
-              loading: () => [const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))],
+              loading: () => [const StatsSkeleton()],
               error: (e, _) => [EmptyState(icon: Icons.cloud_off_rounded, title: "Couldn't load the report", body: e is InsightsException ? e.message : 'Pull down to try again.')],
               data: (r) => _content(r),
             ),

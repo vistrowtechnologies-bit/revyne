@@ -8,6 +8,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
 import 'google_reviews_repository.dart';
 import 'reply_sheet.dart';
+import '../../core/widgets/skeleton.dart';
 
 /// Google reviews inbox: rating summary, All / Needs reply filter, review cards.
 class GoogleReviewsInbox extends ConsumerStatefulWidget {
@@ -59,7 +60,7 @@ class _GoogleReviewsInboxState extends ConsumerState<GoogleReviewsInbox> {
     return RefreshIndicator(
       onRefresh: _refresh,
       child: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => ListView(padding: const EdgeInsets.all(AppSpacing.md), children: const [ListSkeleton(rows: 4, label: 'Loading Google reviews')]),
         error: (e, _) => _Blocked(error: e),
         data: (first) {
           if (!identical(first, _seenFirst)) {

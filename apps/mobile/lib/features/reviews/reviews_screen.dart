@@ -12,6 +12,7 @@ import '../google_reviews/google_reviews_inbox.dart';
 import '../google_reviews/google_reviews_repository.dart';
 import '../home/dashboard.dart';
 import 'reviews_repository.dart';
+import '../../core/widgets/skeleton.dart';
 
 enum _Tab { google, private, visits }
 
@@ -128,7 +129,7 @@ class _FeedbackList extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () => ref.refresh(privateFeedbackProvider.future),
       child: feedback.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => ListView(padding: const EdgeInsets.all(AppSpacing.md), children: const [ListSkeleton(rows: 3, label: 'Loading private messages')]),
         error: (_, _) => const _LoadError(),
         data: (items) => ListView(
           padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 120),
@@ -304,7 +305,7 @@ class _VisitList extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () => ref.refresh(reviewVisitsProvider.future),
       child: visits.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => ListView(padding: const EdgeInsets.all(AppSpacing.md), children: const [ListSkeleton(rows: 5, label: 'Loading visits')]),
         error: (_, _) => const _LoadError(),
         data: (items) => ListView(
           padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 120),

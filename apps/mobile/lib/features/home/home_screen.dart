@@ -14,7 +14,14 @@ import '../reports/report_repository.dart';
 import '../reports/report_screen.dart';
 import '../business/business_repository.dart';
 import '../reviews/reviews_repository.dart';
+import '../activity/activity_screen.dart';
+import '../google_profile/profile_repository.dart';
+import '../google_reviews/google_reviews_repository.dart';
+import '../insights/insights_repository.dart';
 import 'dashboard.dart';
+import 'home_sections.dart';
+import '../../core/widgets/charts.dart';
+import '../../core/widgets/skeleton.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -29,6 +36,12 @@ class HomeScreen extends ConsumerWidget {
     Future<DashboardStats> refresh() {
       ref.invalidate(privateFeedbackProvider);
       ref.invalidate(reviewVisitsProvider);
+      ref.invalidate(activityProvider);
+      if (business?.isVerified ?? false) {
+        ref.invalidate(googleReviewsProvider);
+        ref.invalidate(gbpProfileProvider);
+        ref.invalidate(insightsProvider(last28Days));
+      }
       return ref.refresh(dashboardStatsProvider.future);
     }
 
@@ -78,7 +91,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
               const SizedBox(height: AppSpacing.lg),
               stats.when(
-                loading: () => const SizedBox(height: 220, child: Center(child: CircularProgressIndicator())),
+                loading: () => const HomeSkeleton(),
                 error: (_, _) => const EmptyState(icon: Icons.cloud_off_rounded, title: "Couldn't load your numbers", body: 'Pull down to try again.'),
                 data: (s) => _Dashboard(stats: s, verified: business?.isVerified ?? false),
               ),
@@ -102,52 +115,12 @@ class _Dashboard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        verified ? const GoogleKpis() : PageKpis(stats: s),
+        const SizedBox(height: AppSpacing.lg),
         _WeekHero(stats: s),
-        if (s.unreadFeedback > 0) ...[
-          const SizedBox(height: AppSpacing.md),
-          AppCard(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            onTap: () => context.go(Routes.reviews),
-            child: Row(
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const IconTile(Icons.mark_email_unread_outlined),
-                    Positioned(
-                      right: -2,
-                      top: -2,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(color: AppColors.magenta, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: AppSpacing.gutter),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${s.unreadFeedback} private message${s.unreadFeedback == 1 ? '' : 's'} waiting',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                      const Text('Only you can see these', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                  decoration: BoxDecoration(color: AppColors.violet50, borderRadius: BorderRadius.circular(AppRadius.chip)),
-                  child: Text('Read', style: TextStyle(color: AppColors.violet, fontWeight: FontWeight.w800)),
-                ),
-              ],
-            ),
-          ),
-        ],
         const PushPromptCard(),
+        if (verified) ...[const NeedsReply(), const ScorePeek()],
+        PrivateMessagesPeek(unread: s.unreadFeedback),
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader(title: 'Customer actions'),
         const SizedBox(height: AppSpacing.sm),
@@ -157,9 +130,10 @@ class _Dashboard extends StatelessWidget {
             const SizedBox(width: AppSpacing.gutter),
             _QuickAction(icon: Icons.send_rounded, label: 'Ask on\nWhatsApp', onTap: () => context.go(Routes.getReviews)),
             const SizedBox(width: AppSpacing.gutter),
-            _QuickAction(icon: Icons.forum_outlined, label: 'Messages', onTap: () => context.go(Routes.reviews)),
+            _QuickAction(icon: Icons.forum_outlined, label: 'Messages', onTap: () => context.go('${Routes.reviews}?tab=private')),
           ],
         ),
+        const RecentActivity(),
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader(title: 'Reports'),
         const SizedBox(height: AppSpacing.sm),
@@ -177,7 +151,7 @@ class _Dashboard extends StatelessWidget {
                     Text('${monthLabel(DateTime(DateTime.now().year, DateTime.now().month - 1))} report',
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                     const SizedBox(height: 2),
-                    const Text('Views, calls, reviews and more — share as PDF', style: TextStyle(color: AppColors.muted, fontSize: 14)),
+                    const Text('Views, calls, reviews and more â€” share as PDF', style: TextStyle(color: AppColors.muted, fontSize: 14)),
                   ],
                 ),
               ),
@@ -214,6 +188,9 @@ class _Dashboard extends StatelessWidget {
   }
 }
 
+const _wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const _mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 /// The gradient hero: who reached Google this week + a 7-day visits chart.
 class _WeekHero extends StatelessWidget {
   const _WeekHero({required this.stats});
@@ -223,12 +200,11 @@ class _WeekHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = stats;
-    final maxVisits = s.daily.fold<int>(0, (m, d) => d.visits > m ? d.visits : m);
     const weekday = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     final delta = s.google7d - s.googlePrev7d;
 
     return GradientCard(
-      onTap: () => context.go(Routes.reviews),
+      onTap: () => context.go('${Routes.reviews}?tab=visits'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -255,7 +231,7 @@ class _WeekHero extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('${s.google7d}', style: const TextStyle(color: Colors.white, fontSize: 52, fontWeight: FontWeight.w800, height: 1)),
+              CountUp(s.google7d, style: const TextStyle(color: Colors.white, fontSize: 52, fontWeight: FontWeight.w800, height: 1)),
               const SizedBox(width: 10),
               const Padding(
                 padding: EdgeInsets.only(bottom: 6),
@@ -263,38 +239,20 @@ class _WeekHero extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            height: 92,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (var i = 0; i < s.daily.length; i++) ...[
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 500),
-                          curve: Curves.easeOutCubic,
-                          height: maxVisits == 0 ? 6 : 6 + 62 * s.daily[i].visits / maxVisits,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: i == s.daily.length - 1 ? 1 : 0.45),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          weekday[s.daily[i].day.weekday - 1],
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12, fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (i != s.daily.length - 1) const SizedBox(width: 10),
-                ],
-              ],
-            ),
+          const SizedBox(height: 4),
+          HeroBars(
+            height: 68,
+            highlightLast: true,
+            semanticLabel: 'Review page visits per day this week',
+            labels: [for (final d in s.daily) weekday[d.day.weekday - 1]],
+            points: [
+              for (final d in s.daily)
+                ChartPoint(
+                  value: d.visits,
+                  title: '${_wd[d.day.weekday - 1]} ${d.day.day} ${_mo[d.day.month - 1]}',
+                  lines: ['${d.visits} review page visit${d.visits == 1 ? '' : 's'}', '${d.google} went to Google'],
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.md),
           Divider(color: Colors.white.withValues(alpha: 0.22), height: 1),

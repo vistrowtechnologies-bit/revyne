@@ -12,6 +12,7 @@ import '../business/business.dart';
 import '../business/business_repository.dart';
 import 'poster_pdf.dart';
 import 'review_link_card.dart';
+import '../../core/widgets/skeleton.dart';
 
 /// Get Reviews: printable counter poster + a WhatsApp request to one customer.
 class GetReviewsScreen extends ConsumerWidget {
@@ -25,7 +26,7 @@ class GetReviewsScreen extends ConsumerWidget {
       body: SafeArea(
         bottom: false,
         child: business == null
-            ? const Center(child: CircularProgressIndicator())
+            ? const Padding(padding: EdgeInsets.all(AppSpacing.md), child: CardSkeleton(lines: 5))
             : ListView(
                 padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 120),
                 children: [

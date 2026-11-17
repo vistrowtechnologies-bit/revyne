@@ -5,6 +5,7 @@ import '../../core/supabase/supabase_providers.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/ui.dart';
 import '../business/business_repository.dart';
+import '../../core/widgets/skeleton.dart';
 
 /// One thing done through RevYne (from `owner_actions`; drafts are left out).
 class ActivityEntry {
@@ -119,7 +120,7 @@ class ActivityScreen extends ConsumerWidget {
           } catch (_) {}
         },
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => ListView(padding: const EdgeInsets.all(AppSpacing.md), children: const [ListSkeleton(rows: 4, label: 'Loading activity')]),
           error: (_, _) => ListView(children: const [
             Padding(
               padding: EdgeInsets.all(AppSpacing.md),

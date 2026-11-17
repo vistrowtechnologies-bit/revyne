@@ -6,9 +6,12 @@ import '../../core/widgets/range_calendar.dart';
 import '../../core/widgets/ui.dart';
 import '../reports/report_screen.dart';
 import 'insights_repository.dart';
+import '../../core/widgets/charts.dart';
+import '../../core/widgets/skeleton.dart';
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 String _short(DateTime d) => '${d.day} ${_months[d.month - 1]}';
+String _day(DateTime d) => '${const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d.weekday - 1]} ${_short(d)}';
 
 /// Small "▲ 12%" / "▼ 5%" badge; nothing when there's no earlier data.
 class ChangeBadge extends StatelessWidget {
@@ -152,7 +155,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             ]),
             const SizedBox(height: AppSpacing.md),
             ...async.when(
-              loading: () => [const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))],
+              loading: () => [const StatsSkeleton()],
               error: (e, _) => [
                 EmptyState(icon: Icons.cloud_off_rounded, title: "Couldn't load stats", body: e is InsightsException ? e.message : 'Pull down to try again.'),
               ],
@@ -191,7 +194,13 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             const SizedBox(height: 4),
             ChangeBadge(now: t.views, before: p.views, onDark: true),
             const SizedBox(height: AppSpacing.md),
-            _Bars(values: [for (final d in v.daily) d.views]),
+            HeroBars(
+              semanticLabel: 'Profile views per day, ${_short(v.start)} to ${_short(v.end)}',
+              points: [
+                for (final d in v.daily)
+                  ChartPoint(value: d.views, title: _day(d.date), lines: ['${d.views} profile view${d.views == 1 ? '' : 's'}', '${d.actions} action${d.actions == 1 ? '' : 's'}']),
+              ],
+            ),
             const SizedBox(height: AppSpacing.md),
             Row(children: [
               Expanded(child: _Split(label: 'Google Search', value: t.searchViews)),
@@ -226,6 +235,23 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               ),
             ),
         ],
+      ),
+      const SizedBox(height: AppSpacing.gutter),
+      AppCard(
+        padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Actions per day', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          const Text('Calls, directions, website & chats', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+          if (v.daily.isNotEmpty)
+            TrendArea(
+              semanticLabel: 'Actions per day on Google',
+              firstLabel: _short(v.daily.first.date),
+              lastLabel: _short(v.daily.last.date),
+              points: [
+                for (final d in v.daily) ChartPoint(value: d.actions, title: _day(d.date), lines: ['${d.actions} action${d.actions == 1 ? '' : 's'} on Google']),
+              ],
+            ),
+        ]),
       ),
       const SizedBox(height: AppSpacing.lg),
       const SectionHeader(title: 'What people searched'),
@@ -268,33 +294,4 @@ class _Split extends StatelessWidget {
         Text('$value', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
         Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
       ]);
-}
-
-/// Daily bars, scaled to the busiest day.
-class _Bars extends StatelessWidget {
-  const _Bars({required this.values});
-  final List<int> values;
-
-  @override
-  Widget build(BuildContext context) {
-    final maxV = values.fold<int>(0, (m, v) => v > m ? v : m);
-    return SizedBox(
-      height: 64,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          for (final v in values)
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: values.length > 40 ? 0.5 : 1.5),
-                child: Container(
-                  height: maxV == 0 ? 3 : 3 + 61 * (v / maxV),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: v == 0 ? 0.25 : 0.85), borderRadius: BorderRadius.circular(3)),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }
