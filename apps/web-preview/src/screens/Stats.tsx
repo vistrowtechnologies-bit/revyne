@@ -9,6 +9,7 @@ import { Loading, LoadError } from '../widgets';
 import { AppBar } from './AppBar';
 import RangeCalendar, { CLEARED, type Range } from './RangeCalendar';
 import CountUp from '../components/reactbits/CountUp';
+import { HeroBars, TrendArea, type Point } from '../charts';
 
 export function ChangeBadge({ now, before, onDark }: { now: number; before?: number | null; onDark?: boolean }) {
   const pct = percentChange(now, before);
@@ -81,8 +82,14 @@ function Content({ v }: { v: Insights }) {
     ['language', 'Website clicks', t.websiteClicks, p.websiteClicks],
     ['chat_bubble', 'Chats', t.chats, p.chats],
   ];
-  const vals = v.daily.map((d) => d.views);
-  const max = Math.max(0, ...vals);
+  const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const views: Point[] = v.daily.map((d) => ({
+    label: shortDate(d.date),
+    title: `${WD[d.date.getDay()]} ${shortDate(d.date)}`,
+    value: d.views,
+    lines: [`${d.views} profile view${d.views === 1 ? '' : 's'}`, `${d.actions} action${d.actions === 1 ? '' : 's'}`],
+  }));
+  const actions: Point[] = v.daily.map((d) => ({ label: shortDate(d.date), title: `${WD[d.date.getDay()]} ${shortDate(d.date)}`, value: d.actions, lines: [`${d.actions} action${d.actions === 1 ? '' : 's'} on Google`] }));
   return (
     <>
       <GradientCard>
@@ -95,13 +102,7 @@ function Content({ v }: { v: Insights }) {
         <Gap h={4} />
         <ChangeBadge now={t.views} before={p.views} onDark />
         <Gap h={16} />
-        <div className="row" style={{ alignItems: 'flex-end', height: 64 }}>
-          {vals.map((x, i) => (
-            <div key={i} style={{ flex: 1, padding: `0 ${vals.length > 40 ? 0.5 : 1.5}px` }}>
-              <div style={{ height: max === 0 ? 3 : 3 + 61 * (x / max), background: `rgba(255,255,255,${x === 0 ? 0.25 : 0.85})`, borderRadius: 3 }} />
-            </div>
-          ))}
-        </div>
+        <HeroBars data={views} height={120} highlightLast={false} ariaLabel={`Profile views per day, ${shortDate(v.start)} to ${shortDate(v.end)}`} />
         <Gap h={16} />
         <div className="row">
           {([['Google Search', t.searchViews], ['Google Maps', t.mapsViews]] as [string, number][]).map(([l, n]) => (
@@ -124,6 +125,14 @@ function Content({ v }: { v: Insights }) {
           </Card>
         ))}
       </div>
+      <Gap h={12} />
+      <Card pad="16px 12px 8px 12px">
+        <div className="row" style={{ padding: '0 6px 6px' }}>
+          <span className="grow" style={{ fontWeight: 800, fontSize: 15 }}>Actions per day</span>
+          <span className="muted" style={{ fontSize: 13 }}>Calls, directions, website & chats</span>
+        </div>
+        <TrendArea data={actions} ariaLabel="Actions per day on Google" />
+      </Card>
       <Gap h={24} />
       <SectionHeader title="What people searched" />
       <Gap h={8} />
