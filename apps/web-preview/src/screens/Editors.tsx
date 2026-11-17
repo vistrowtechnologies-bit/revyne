@@ -1,6 +1,7 @@
 // lib/features/google_profile/profile_editors.dart — each edit is confirmed, then sent to Google.
 import { useState, type ReactNode } from 'react';
 import { invalidate } from '../lib/query';
+import { Switch } from 'react-aria-components';
 import * as api from '../lib/api';
 import { timeLabel } from '../lib/format';
 import { Card, ConfirmDialog, Gap, GradientButton, Icon, SelectChip, Sheet, useToast } from '../ui';
@@ -28,7 +29,7 @@ function Frame({ title, subtitle, field, value, canSave = true, onClose, childre
     }
   };
   return (
-    <Sheet onClose={() => !saving && onClose()}>
+    <Sheet label={title} onClose={() => !saving && onClose()}>
       <h2 className="h-small">{title}</h2>
       {subtitle && <div className="muted" style={{ fontSize: 14.5, marginTop: 4 }}>{subtitle}</div>}
       <Gap h={16} />
@@ -130,7 +131,9 @@ function HoursEditor({ current, split, onClose }: { current: api.DayHours[]; spl
         return (
           <div key={d} className="row" style={{ gap: 8, minHeight: 46 }}>
             <span style={{ width: 96, fontWeight: 700, fontSize: 15 }}>{WEEK_LABEL[d]}</span>
-            <button className={`switch${h ? ' on' : ''}`} aria-label={`${WEEK_LABEL[d]} open`} onClick={() => set(d, h ? null : { day: d, open: '09:00', close: '18:00' })} />
+            <Switch className="switch-wrap" aria-label={`Open on ${WEEK_LABEL[d]}`} isSelected={!!h} onChange={(on) => set(d, on ? { day: d, open: '09:00', close: '18:00' } : null)}>
+              {({ isSelected }) => <span className={`switch${isSelected ? ' on' : ''}`} />}
+            </Switch>
             {!h ? (
               <span className="muted" style={{ fontWeight: 600, marginLeft: 4 }}>Closed</span>
             ) : (

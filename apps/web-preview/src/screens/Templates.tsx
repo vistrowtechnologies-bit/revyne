@@ -27,7 +27,7 @@ export function TemplateEditor({ existing, initialBody, onClose }: { existing?: 
     }
   };
   return (
-    <Sheet onClose={onClose}>
+    <Sheet label="Reply template" onClose={onClose}>
       <h2 className="h-small">{existing ? 'Edit template' : 'New reply template'}</h2>
       <div className="muted" style={{ fontSize: 14, marginTop: 4 }}>Use {'{name}'} for the reviewer's first name and {'{business}'} for your business name.</div>
       <Gap h={16} />

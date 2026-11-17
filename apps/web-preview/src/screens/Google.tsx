@@ -158,7 +158,7 @@ export default function GoogleScreen() {
       )}
 
       {locations && (
-        <Sheet onClose={() => setLocations(null)}>
+        <Sheet label="Choose your business" onClose={() => setLocations(null)}>
           <h2 className="h-small">Choose your business</h2>
           <div className="muted" style={{ fontSize: 14.5, marginTop: 4 }}>Google profiles this account manages. RevYne links one business per account.</div>
           <Gap h={16} />
@@ -359,7 +359,7 @@ function GoogleChangesSheet({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Sheet onClose={onClose}>
+    <Sheet label="What Google changed" onClose={onClose}>
       <h2 className="h-small">What Google changed</h2>
       <div className="muted" style={{ fontSize: 14.5, marginTop: 4 }}>
         Google sometimes updates your profile itself, often from suggestions by the public. Check each one and keep the right version.
@@ -690,7 +690,7 @@ function PhotoAdder({ inputRef }: { inputRef: React.RefObject<HTMLInputElement> 
         }}
       />
       {photo && (
-        <Sheet onClose={() => !busy && setPhoto(null)}>
+        <Sheet label="Add a photo" onClose={() => !busy && setPhoto(null)}>
           <img src={photo.url} alt="" style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 16, display: 'block' }} />
           <Gap h={16} />
           <h2 className="h-small">What does it show?</h2>
