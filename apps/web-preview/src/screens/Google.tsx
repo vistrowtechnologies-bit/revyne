@@ -574,14 +574,39 @@ function PostCard({ post: p, onDelete }: { post: api.GbpPost; onDelete: () => vo
   );
 }
 
+// Google's owner-side photo list can keep showing a deleted photo for a while
+// (it isn't public any more). Remember deletes for a day so they stay hidden.
+const DELETED_KEY = 'revyne-deleted-photos';
+function loadDeleted(): Record<string, number> {
+  try {
+    const all = JSON.parse(localStorage.getItem(DELETED_KEY) ?? '{}') as Record<string, number>;
+    return Object.fromEntries(Object.entries(all).filter(([, t]) => Date.now() - t < 864e5));
+  } catch {
+    return {};
+  }
+}
+function rememberDeleted(name: string) {
+  const all = { ...loadDeleted(), [name]: Date.now() };
+  try {
+    localStorage.setItem(DELETED_KEY, JSON.stringify(all));
+  } catch {
+    /* hidden for this visit only */
+  }
+  return all;
+}
+
 function PhotosSection({ onAdd }: { onAdd: () => void }) {
   const toast = useToast();
   const q = usePhotos();
   const [del, setDel] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState(loadDeleted);
+  const visible = (q.data?.photos ?? []).filter((p) => !deleted[p.name]);
+  const hidden = (q.data?.photos.length ?? 0) - visible.length;
+  const total = q.data ? Math.max(0, q.data.total - hidden) : 0;
   return (
     <Card pad={14}>
       <div className="row">
-        <div className="grow" style={{ fontWeight: 800, fontSize: 16 }}>{q.data ? `${q.data.total} photo${q.data.total === 1 ? '' : 's'} on Google` : 'Photos'}</div>
+        <div className="grow" style={{ fontWeight: 800, fontSize: 16 }}>{q.data ? `${total} photo${total === 1 ? '' : 's'} on Google` : 'Photos'}</div>
         <button className="tbtn" onClick={onAdd}><Icon name="add_a_photo" />Add</button>
       </div>
       <Gap h={8} />
@@ -589,12 +614,12 @@ function PhotosSection({ onAdd }: { onAdd: () => void }) {
         <div className="muted">{q.error.message || "Couldn't load photos."}</div>
       ) : !q.data ? (
         <div style={{ height: 80 }} />
-      ) : q.data.photos.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="muted">Add photos of your shop, work and team — profiles with photos get more calls.</div>
       ) : (
         <>
           <div className="photo-grid">
-            {q.data.photos.slice(0, 9).map((p) => (
+            {visible.slice(0, 9).map((p) => (
               <div key={p.name} className="photo-tile" onContextMenu={(e) => { e.preventDefault(); setDel(p.name); }}>
                 <img src={p.thumbnailUrl ?? p.url} alt="" loading="lazy" />
                 <button className="photo-del" title="Delete photo" onClick={() => setDel(p.name)}><Icon name="delete" size={18} /></button>
@@ -616,6 +641,8 @@ function PhotosSection({ onAdd }: { onAdd: () => void }) {
             setDel(null);
             try {
               await api.deletePhoto(name);
+              setDeleted(rememberDeleted(name));
+              toast('Photo deleted. Google can take a little while to update everywhere.');
               invalidate('photos', 'profile', 'activity');
             } catch (e) {
               toast((e as Error).message);
