@@ -46,8 +46,13 @@ class _Tooltip extends StatelessWidget {
   final double fraction; // 0–1 across the chart
 
   @override
-  Widget build(BuildContext context) => Align(
-        alignment: Alignment(fraction * 2 - 1, -1),
+  Widget build(BuildContext context) => Positioned(
+        left: 0,
+        right: 0,
+        bottom: null,
+        top: -54,
+        child: Align(
+        alignment: Alignment(fraction * 2 - 1, 0),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
@@ -64,6 +69,7 @@ class _Tooltip extends StatelessWidget {
             ],
           ),
         ),
+      ),
       );
 }
 
@@ -95,12 +101,13 @@ class _HeroBarsState extends State<HeroBars> with _Touch {
     final pts = widget.points;
     final maxV = pts.fold<int>(0, (m, p) => math.max(m, p.value));
     final thin = pts.length > 40;
-    final tipSpace = 46.0;
+    const tipSpace = 0.0;
     return Semantics(
       label: widget.semanticLabel,
       child: SizedBox(
         height: widget.height + tipSpace + (widget.labels != null ? 20 : 0),
         child: touch(Stack(
+          clipBehavior: Clip.none,
           children: [
             Positioned.fill(
               top: tipSpace,
@@ -163,13 +170,13 @@ class _TrendAreaState extends State<TrendArea> with _Touch {
 
   @override
   Widget build(BuildContext context) {
-    const tipSpace = 46.0;
+    const tipSpace = 0.0;
     return Semantics(
       label: widget.semanticLabel,
       child: Column(children: [
         SizedBox(
           height: widget.height + tipSpace,
-          child: touch(Stack(children: [
+          child: touch(Stack(clipBehavior: Clip.none, children: [
             Positioned.fill(
               top: tipSpace,
               child: TweenAnimationBuilder<double>(

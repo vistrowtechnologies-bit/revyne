@@ -124,7 +124,9 @@ class _Dashboard extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         const SectionHeader(title: 'Customer actions'),
         const SizedBox(height: AppSpacing.sm),
-        Row(
+        IntrinsicHeight(
+          child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _QuickAction(icon: Icons.qr_code_2_rounded, label: 'Share QR', onTap: () => context.go(Routes.getReviews)),
             const SizedBox(width: AppSpacing.gutter),
@@ -132,6 +134,7 @@ class _Dashboard extends StatelessWidget {
             const SizedBox(width: AppSpacing.gutter),
             _QuickAction(icon: Icons.forum_outlined, label: 'Messages', onTap: () => context.go('${Routes.reviews}?tab=private')),
           ],
+        ),
         ),
         const RecentActivity(),
         const SizedBox(height: AppSpacing.lg),
@@ -151,7 +154,7 @@ class _Dashboard extends StatelessWidget {
                     Text('${monthLabel(DateTime(DateTime.now().year, DateTime.now().month - 1))} report',
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                     const SizedBox(height: 2),
-                    const Text('Views, calls, reviews and more â€” share as PDF', style: TextStyle(color: AppColors.muted, fontSize: 14)),
+                    const Text('Views, calls, reviews and more — share as PDF', style: TextStyle(color: AppColors.muted, fontSize: 14)),
                   ],
                 ),
               ),
@@ -294,6 +297,7 @@ class _QuickAction extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
         onTap: onTap,
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconTile(icon, size: 48),
             const SizedBox(height: 10),

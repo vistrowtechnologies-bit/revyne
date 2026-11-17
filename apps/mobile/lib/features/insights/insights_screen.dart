@@ -242,6 +242,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           const Text('Actions per day', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
           const Text('Calls, directions, website & chats', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+          const SizedBox(height: 16),
           if (v.daily.isNotEmpty)
             TrendArea(
               semanticLabel: 'Actions per day on Google',
