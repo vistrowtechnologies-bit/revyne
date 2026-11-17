@@ -5,7 +5,7 @@ import { useActivity, useBusiness, useDashboard, useFeedback, useGoogleReviews, 
 import { activityDisplay, weekDelta, type DashboardStats } from '../lib/api';
 import { clock, dayLabel, firstName, greeting, MONTHS, timeAgo } from '../lib/format';
 import { BrandMark, Card, EmptyState, Gap, GradientButton, GradientCard, Icon, IconTile, InitialsAvatar, ScoreRing, StatusPill, Stars } from '../ui';
-import { Loading, NotificationBell, UserAvatar } from '../widgets';
+import { HomeSkeleton, ListSkeleton, NotificationBell, Sk, UserAvatar } from '../widgets';
 import { ChangeBadge } from '../widgets';
 import CountUp from '../components/reactbits/CountUp';
 import { lazy, Suspense } from 'react';
@@ -73,7 +73,7 @@ export default function HomeScreen() {
           <div style={{ textAlign: 'center' }}><button className="tbtn" onClick={stats.reload}><Icon name="refresh" />Try again</button></div>
         </div>
       ) : (
-        <Loading pad={80} />
+        <HomeSkeleton />
       )}
     </div>
   );
@@ -220,7 +220,7 @@ function NeedsReply() {
       {gr.error ? (
         <EmptyState icon="reviews" title="Reviews aren't available right now" body={gr.error.message} />
       ) : !gr.data ? (
-        <Card><Loading pad={8} /></Card>
+        <ListSkeleton rows={2} />
       ) : waiting.length === 0 ? (
         <Card pad={18}>
           <div className="row" style={{ gap: 14 }}>
@@ -268,7 +268,10 @@ function ScorePeek() {
     <Section title="Google Score" action="Improve" onAction={() => s.go('google')}>
       <Card pad={18} onClick={() => s.go('google')}>
         {!v ? (
-          <Loading pad={8} />
+          <div className="row" style={{ gap: 16 }}>
+            <Sk w={64} h={64} r={32} />
+            <div className="grow col" style={{ gap: 8 }}><Sk w="70%" h={15} /><Sk w="40%" h={12} /></div>
+          </div>
         ) : (
           <>
             <div className="row" style={{ gap: 16 }}>

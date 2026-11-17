@@ -4,7 +4,7 @@ import { useQuery } from './lib/query';
 import { fetchMyBusiness } from './lib/api';
 import { configMissing } from './lib/supabase';
 import { BrandMark, GradientButton, Icon, ToastContext } from './ui';
-import { Loading, UserAvatar } from './widgets';
+import { PageSkeleton, UserAvatar } from './widgets';
 // Screens load on first use (code splitting): the first visit downloads the
 // shell and the current screen only; charts, PDF and calendar code come later.
 const SignInScreen = lazy(() => import('./screens/SignIn'));
@@ -74,7 +74,7 @@ function Shell() {
       </aside>
 
       <main key={s.route}>
-        <Suspense fallback={<Loading pad={80} />}>{screen}</Suspense>
+        <Suspense fallback={<PageSkeleton />}>{screen}</Suspense>
       </main>
 
       {/* Pushed screens cover the bar on phones, like Flutter's root navigator. */}

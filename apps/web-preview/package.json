@@ -6,9 +6,10 @@
   "description": "Design preview of the RevYne owner app (React). Sample data only, no backend.",
   "scripts": {
     "dev": "vite --port 5175 --strictPort",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/check-icons.mjs && tsc -b && vite build",
     "preview": "vite preview --port 5175",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "check-icons": "node scripts/check-icons.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.46.1",

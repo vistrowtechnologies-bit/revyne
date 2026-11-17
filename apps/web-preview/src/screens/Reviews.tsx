@@ -6,7 +6,7 @@ import * as api from '../lib/api';
 import { timeAgo } from '../lib/format';
 import { openWhatsApp } from '../lib/options';
 import { Card, ConfirmDialog, EmptyState, Gap, GradientButton, GradientCard, Icon, InitialsAvatar, SectionHeader, SelectChip, Sheet, Stars, StatusPill, useToast } from '../ui';
-import { Loading, LoadError } from '../widgets';
+import { HeroSkeleton, ListSkeleton, LoadError } from '../widgets';
 import { TemplateEditor } from './Templates';
 import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 
@@ -93,7 +93,12 @@ function GoogleInbox() {
       </div>
     );
   }
-  if (!first.data) return <Loading />;
+  if (!first.data) return (
+    <div className="col" style={{ gap: 16 }}>
+      <HeroSkeleton height={96} />
+      <ListSkeleton rows={3} label="Loading Google reviews" />
+    </div>
+  );
 
   const page = first.data;
   const all = [...page.reviews, ...more];
@@ -327,7 +332,7 @@ function FeedbackList() {
   const [del, setDel] = useState<string | null>(null);
 
   if (fb.error) return <LoadError error={fb.error} onRetry={fb.reload} />;
-  if (!fb.data) return <Loading />;
+  if (!fb.data) return <ListSkeleton rows={3} label="Loading private messages" />;
 
   const markRead = async (f: api.Feedback) => {
     if (!f.unread) return;
@@ -396,7 +401,7 @@ function FeedbackList() {
 function VisitList() {
   const v = useVisits();
   if (v.error) return <LoadError error={v.error} onRetry={v.reload} />;
-  if (!v.data) return <Loading />;
+  if (!v.data) return <ListSkeleton rows={3} avatar={false} label="Loading visits" />;
   return (
     <div className="col" style={{ gap: 12 }}>
       {v.data.length === 0 && <EmptyState icon="qr_code_2" title="No visits yet" body="When customers open your review link or scan your QR code, their visits show up here." />}

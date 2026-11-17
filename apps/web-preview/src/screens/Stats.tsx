@@ -6,7 +6,7 @@ import { type Insights } from '../lib/api';
 import { ChangeBadge } from '../widgets';
 import { shortDate } from '../lib/format';
 import { Card, Gap, GradientCard, Icon, SectionHeader, SelectChip, useToast } from '../ui';
-import { Loading, LoadError } from '../widgets';
+import { LoadError, StatsSkeleton } from '../widgets';
 import { AppBar } from './AppBar';
 import RangeCalendar, { CLEARED, type Range } from './RangeCalendar';
 import CountUp from '../components/reactbits/CountUp';
@@ -47,7 +47,7 @@ export default function StatsScreen() {
           <button className="ibtn" title="Refresh" onClick={() => invalidate('insights')}><Icon name="refresh" color="var(--muted)" /></button>
         </div>
         <Gap h={16} />
-        {q.data ? <Content v={q.data} /> : q.error ? <LoadError title="Couldn't load stats" error={q.error} onRetry={q.reload} /> : <Loading />}
+        {q.data ? <Content v={q.data} /> : q.error ? <LoadError title="Couldn't load stats" error={q.error} onRetry={q.reload} /> : <StatsSkeleton />}
       </div>
       {picking && (
         <RangeCalendar

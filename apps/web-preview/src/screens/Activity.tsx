@@ -3,7 +3,7 @@ import { useActivity } from '../store';
 import { activityDisplay } from '../lib/api';
 import { clock, dayLabel } from '../lib/format';
 import { Card, EmptyState, Gap, IconTile, SectionHeader } from '../ui';
-import { Loading, LoadError } from '../widgets';
+import { ListSkeleton, LoadError } from '../widgets';
 import { AppBar } from './AppBar';
 
 export default function ActivityScreen() {
@@ -17,7 +17,7 @@ export default function ActivityScreen() {
         {q.error ? (
           <LoadError title="Couldn't load activity" error={q.error} onRetry={q.reload} />
         ) : !q.data ? (
-          <Loading />
+          <ListSkeleton rows={4} label="Loading activity" />
         ) : q.data.length === 0 ? (
           <EmptyState icon="history" title="Nothing yet" body="Replies, profile edits, posts and photos you make through RevYne will be listed here." />
         ) : (
