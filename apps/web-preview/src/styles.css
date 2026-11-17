@@ -1,4 +1,11 @@
-@import 'material-symbols/rounded.css';
+/* Material Symbols Rounded, cut down to the icons in icon-names.txt (npm run icons). */
+@font-face {
+  font-family: 'Material Symbols Rounded';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/material-symbols-rounded-subset.woff2') format('woff2');
+}
 
 @font-face { font-family: 'Plus Jakarta Sans'; src: url('/fonts/PlusJakartaSans-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
 @font-face { font-family: 'Plus Jakarta Sans'; src: url('/fonts/PlusJakartaSans-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
