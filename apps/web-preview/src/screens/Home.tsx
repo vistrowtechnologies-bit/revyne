@@ -8,6 +8,7 @@ import { BrandMark, Card, EmptyState, Gap, GradientButton, GradientCard, Icon, I
 import { Loading, NotificationBell, UserAvatar } from '../widgets';
 import { ChangeBadge } from './Stats';
 import CountUp from '../components/reactbits/CountUp';
+import { HeroBars } from '../charts';
 import SpotlightCard from '../components/reactbits/SpotlightCard';
 
 export default function HomeScreen() {
@@ -351,7 +352,6 @@ function RecentActivity() {
 
 function WeekHero({ stats: d }: { stats: DashboardStats }) {
   const s = useStore();
-  const max = Math.max(0, ...d.daily.map((x) => x.visits));
   const wd = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const up = d.google7d >= d.googlePrev7d;
   return (
@@ -372,14 +372,16 @@ function WeekHero({ stats: d }: { stats: DashboardStats }) {
         <span style={{ fontSize: 18, fontWeight: 700, paddingBottom: 6 }}>went to Google</span>
       </div>
       <Gap h={24} />
-      <div className="bars">
-        {d.daily.map((x, i) => (
-          <div key={i} className={`bar-col${i === d.daily.length - 1 ? ' last' : ''}`}>
-            <div className="bar" style={{ height: max === 0 ? 6 : 6 + (62 * x.visits) / max }} />
-            <span>{wd[x.day.getDay()]}</span>
-          </div>
-        ))}
-      </div>
+      <HeroBars
+        height={96}
+        ariaLabel="Review page visits per day this week"
+        data={d.daily.map((x) => ({
+          label: wd[x.day.getDay()],
+          title: `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][x.day.getDay()]} ${x.day.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][x.day.getMonth()]}`,
+          value: x.visits,
+          lines: [`${x.visits} review page visit${x.visits === 1 ? '' : 's'}`, `${x.google} went to Google`],
+        }))}
+      />
       <Gap h={16} />
       <div style={{ height: 1, background: 'rgba(255,255,255,.22)' }} />
       <Gap h={12} />
