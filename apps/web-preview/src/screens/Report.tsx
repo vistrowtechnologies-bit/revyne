@@ -7,7 +7,7 @@ import { downloadReport } from '../lib/pdf';
 import { Card, EmptyState, Gap, GradientButton, GradientCard, Icon, useToast } from '../ui';
 import { Loading, LoadError } from '../widgets';
 import { AppBar } from './AppBar';
-import { ChangeBadge } from './Stats';
+import { ChangeBadge } from '../widgets';
 
 export default function ReportScreen() {
   const now = new Date();

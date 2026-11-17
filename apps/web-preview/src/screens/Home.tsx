@@ -6,9 +6,27 @@ import { activityDisplay, weekDelta, type DashboardStats } from '../lib/api';
 import { clock, dayLabel, firstName, greeting, MONTHS, timeAgo } from '../lib/format';
 import { BrandMark, Card, EmptyState, Gap, GradientButton, GradientCard, Icon, IconTile, InitialsAvatar, ScoreRing, StatusPill, Stars } from '../ui';
 import { Loading, NotificationBell, UserAvatar } from '../widgets';
-import { ChangeBadge } from './Stats';
+import { ChangeBadge } from '../widgets';
 import CountUp from '../components/reactbits/CountUp';
-import { HeroBars } from '../charts';
+import { lazy, Suspense } from 'react';
+import type { Point } from '../charts';
+
+// The chart library loads after Home has drawn; simple bars show until then.
+const HeroBars = lazy(() => import('../charts').then((m) => ({ default: m.HeroBars })));
+
+function PlainBars({ data, height }: { data: Point[]; height: number }) {
+  const max = Math.max(1, ...data.map((d) => d.value));
+  return (
+    <div className="bars" style={{ height }}>
+      {data.map((x, i) => (
+        <div key={i} className={`bar-col${i === data.length - 1 ? ' last' : ''}`}>
+          <div className="bar" style={{ height: 6 + (54 * x.value) / max }} />
+          <span>{x.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 import SpotlightCard from '../components/reactbits/SpotlightCard';
 
 export default function HomeScreen() {
@@ -372,16 +390,19 @@ function WeekHero({ stats: d }: { stats: DashboardStats }) {
         <span style={{ fontSize: 18, fontWeight: 700, paddingBottom: 6 }}>went to Google</span>
       </div>
       <Gap h={24} />
-      <HeroBars
-        height={96}
-        ariaLabel="Review page visits per day this week"
-        data={d.daily.map((x) => ({
+      {(() => {
+        const week: Point[] = d.daily.map((x) => ({
           label: wd[x.day.getDay()],
           title: `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][x.day.getDay()]} ${x.day.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][x.day.getMonth()]}`,
           value: x.visits,
           lines: [`${x.visits} review page visit${x.visits === 1 ? '' : 's'}`, `${x.google} went to Google`],
-        }))}
-      />
+        }));
+        return (
+          <Suspense fallback={<PlainBars data={week} height={96} />}>
+            <HeroBars height={96} ariaLabel="Review page visits per day this week" data={week} />
+          </Suspense>
+        );
+      })()}
       <Gap h={16} />
       <div style={{ height: 1, background: 'rgba(255,255,255,.22)' }} />
       <Gap h={12} />

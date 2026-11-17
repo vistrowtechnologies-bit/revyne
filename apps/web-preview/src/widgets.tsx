@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useMyPhoto, useNotifications, usePalette, useStore, useUser } from './store';
 import LatticeLoader from './components/reactbits/LatticeLoader';
+import { percentChange } from './lib/api';
 import { Card, EmptyState, Icon, InitialsAvatar } from './ui';
 
 /** Round profile photo with initials as the fallback (user_avatar.dart). */
@@ -64,4 +65,12 @@ export function CardLoading() {
       <Loading pad={12} />
     </Card>
   );
+}
+
+/** Small "▲ 12%" / "▼ 5%" badge; nothing when there's no earlier data. */
+export function ChangeBadge({ now, before, onDark }: { now: number; before?: number | null; onDark?: boolean }) {
+  const pct = percentChange(now, before);
+  if (pct == null) return null;
+  const up = pct >= 0;
+  return <span style={{ color: onDark ? '#fff' : up ? 'var(--success)' : 'var(--danger)', fontWeight: 800, fontSize: 12.5 }}>{up ? '▲' : '▼'} {Math.abs(pct)}%</span>;
 }
