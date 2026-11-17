@@ -1,23 +1,25 @@
-import { useCallback, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { BusinessContext, SessionContext, StoreProvider, TABS, useSession, useStore, useUser, type Route } from './store';
 import { useQuery } from './lib/query';
 import { fetchMyBusiness } from './lib/api';
 import { configMissing } from './lib/supabase';
 import { BrandMark, GradientButton, Icon, ToastContext } from './ui';
-import { UserAvatar } from './widgets';
-import SignInScreen from './screens/SignIn';
-import OnboardingScreen from './screens/Onboarding';
-import HomeScreen from './screens/Home';
-import ReviewsScreen from './screens/Reviews';
-import GetReviewsScreen from './screens/GetReviews';
-import GoogleScreen from './screens/Google';
-import StatsScreen from './screens/Stats';
-import ReportScreen from './screens/Report';
-import CreatePostScreen from './screens/CreatePost';
-import AccountScreen from './screens/Account';
-import ActivityScreen from './screens/Activity';
-import NotificationsScreen from './screens/Notifications';
-import TemplatesScreen from './screens/Templates';
+import { PageSkeleton, UserAvatar } from './widgets';
+// Screens load on first use (code splitting): the first visit downloads the
+// shell and the current screen only; charts, PDF and calendar code come later.
+const SignInScreen = lazy(() => import('./screens/SignIn'));
+const OnboardingScreen = lazy(() => import('./screens/Onboarding'));
+const HomeScreen = lazy(() => import('./screens/Home'));
+const ReviewsScreen = lazy(() => import('./screens/Reviews'));
+const GetReviewsScreen = lazy(() => import('./screens/GetReviews'));
+const GoogleScreen = lazy(() => import('./screens/Google'));
+const StatsScreen = lazy(() => import('./screens/Stats'));
+const ReportScreen = lazy(() => import('./screens/Report'));
+const CreatePostScreen = lazy(() => import('./screens/CreatePost'));
+const AccountScreen = lazy(() => import('./screens/Account'));
+const ActivityScreen = lazy(() => import('./screens/Activity'));
+const NotificationsScreen = lazy(() => import('./screens/Notifications'));
+const TemplatesScreen = lazy(() => import('./screens/Templates'));
 
 // lib/features/shell/home_shell.dart — Home · Reviews · [Get Reviews] · Google · Account.
 const NAV: { route: Route; icon: string; label: string }[] = [
@@ -71,7 +73,9 @@ function Shell() {
         </button>
       </aside>
 
-      <main key={s.route}>{screen}</main>
+      <main key={s.route}>
+        <Suspense fallback={<PageSkeleton />}>{screen}</Suspense>
+      </main>
 
       {/* Pushed screens cover the bar on phones, like Flutter's root navigator. */}
       {TABS.includes(s.route) && (
@@ -126,7 +130,7 @@ function Gate() {
     );
   }
   if (session === undefined) return <Splash />;
-  if (!session) return <SignInScreen />;
+  if (!session) return <Suspense fallback={<Splash />}><SignInScreen /></Suspense>;
 
   return (
     <SessionContext.Provider value={session}>
@@ -140,7 +144,7 @@ function Gate() {
       ) : business.data === undefined ? (
         <Splash />
       ) : business.data === null ? (
-        <OnboardingScreen onDone={business.reload} />
+        <Suspense fallback={<Splash />}><OnboardingScreen onDone={business.reload} /></Suspense>
       ) : (
         <BusinessContext.Provider value={business.data}>
           <Shell />

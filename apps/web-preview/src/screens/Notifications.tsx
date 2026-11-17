@@ -4,7 +4,7 @@ import { invalidate } from '../lib/query';
 import * as api from '../lib/api';
 import { timeAgo } from '../lib/format';
 import { Card, EmptyState, Gap, IconTile } from '../ui';
-import { Loading, LoadError } from '../widgets';
+import { ListSkeleton, LoadError } from '../widgets';
 import { AppBar } from './AppBar';
 
 export default function NotificationsScreen() {
@@ -44,7 +44,7 @@ export default function NotificationsScreen() {
         {q.error ? (
           <LoadError title="Couldn't load notifications" error={q.error} onRetry={q.reload} />
         ) : !q.data ? (
-          <Loading />
+          <ListSkeleton rows={4} label="Loading notifications" />
         ) : q.data.length === 0 ? (
           <EmptyState icon="notifications" title="No notifications yet" body="New Google reviews, private messages and scheduled posts will show up here." />
         ) : (

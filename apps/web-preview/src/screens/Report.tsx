@@ -5,9 +5,9 @@ import type { MonthlyReport } from '../lib/api';
 import { MONTHS, monthLabel } from '../lib/format';
 import { downloadReport } from '../lib/pdf';
 import { Card, EmptyState, Gap, GradientButton, GradientCard, Icon, useToast } from '../ui';
-import { Loading, LoadError } from '../widgets';
+import { LoadError, StatsSkeleton } from '../widgets';
 import { AppBar } from './AppBar';
-import { ChangeBadge } from './Stats';
+import { ChangeBadge } from '../widgets';
 
 export default function ReportScreen() {
   const now = new Date();
@@ -34,7 +34,7 @@ export default function ReportScreen() {
           </div>
         </Card>
         <Gap h={16} />
-        {q.data ? <Content r={q.data} /> : q.error ? <LoadError title="Couldn't load the report" error={q.error} onRetry={q.reload} /> : <Loading />}
+        {q.data ? <Content r={q.data} /> : q.error ? <LoadError title="Couldn't load the report" error={q.error} onRetry={q.reload} /> : <StatsSkeleton />}
       </div>
     </>
   );

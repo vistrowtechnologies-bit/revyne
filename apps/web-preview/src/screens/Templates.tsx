@@ -4,7 +4,7 @@ import { useBusiness, useTemplates } from '../store';
 import { invalidate } from '../lib/query';
 import * as api from '../lib/api';
 import { Card, ConfirmDialog, EmptyState, Gap, GradientButton, Icon, Sheet, useToast } from '../ui';
-import { Loading, LoadError } from '../widgets';
+import { ListSkeleton, LoadError } from '../widgets';
 import { AppBar } from './AppBar';
 
 /** Add or edit one template. */
@@ -58,7 +58,7 @@ export default function TemplatesScreen() {
         {t.error ? (
           <LoadError title="Couldn't load templates" error={t.error} onRetry={t.reload} />
         ) : !t.data ? (
-          <Loading />
+          <ListSkeleton rows={4} label="Loading templates" />
         ) : (
           <>
             {t.data.length === 0 && (

@@ -2,21 +2,16 @@
 import { useState } from 'react';
 import { useInsights, useStore } from '../store';
 import { invalidate } from '../lib/query';
-import { percentChange, type Insights } from '../lib/api';
+import { type Insights } from '../lib/api';
+import { ChangeBadge } from '../widgets';
 import { shortDate } from '../lib/format';
 import { Card, Gap, GradientCard, Icon, SectionHeader, SelectChip, useToast } from '../ui';
-import { Loading, LoadError } from '../widgets';
+import { LoadError, StatsSkeleton } from '../widgets';
 import { AppBar } from './AppBar';
 import RangeCalendar, { CLEARED, type Range } from './RangeCalendar';
 import CountUp from '../components/reactbits/CountUp';
 import { HeroBars, TrendArea, type Point } from '../charts';
 
-export function ChangeBadge({ now, before, onDark }: { now: number; before?: number | null; onDark?: boolean }) {
-  const pct = percentChange(now, before);
-  if (pct == null) return null;
-  const up = pct >= 0;
-  return <span style={{ color: onDark ? '#fff' : up ? 'var(--success)' : 'var(--danger)', fontWeight: 800, fontSize: 12.5 }}>{up ? '▲' : '▼'} {Math.abs(pct)}%</span>;
-}
 
 const DAY = 864e5;
 
@@ -52,7 +47,7 @@ export default function StatsScreen() {
           <button className="ibtn" title="Refresh" onClick={() => invalidate('insights')}><Icon name="refresh" color="var(--muted)" /></button>
         </div>
         <Gap h={16} />
-        {q.data ? <Content v={q.data} /> : q.error ? <LoadError title="Couldn't load stats" error={q.error} onRetry={q.reload} /> : <Loading />}
+        {q.data ? <Content v={q.data} /> : q.error ? <LoadError title="Couldn't load stats" error={q.error} onRetry={q.reload} /> : <StatsSkeleton />}
       </div>
       {picking && (
         <RangeCalendar
