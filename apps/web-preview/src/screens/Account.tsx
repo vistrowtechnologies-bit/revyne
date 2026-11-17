@@ -130,7 +130,7 @@ export default function AccountScreen() {
       />
 
       {sheet === 'photo' && (
-        <Sheet onClose={() => setSheet(null)}>
+        <Sheet label="Profile photo" onClose={() => setSheet(null)}>
           <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Profile photo</div>
           <Row icon="photo_library" label="Choose a photo" onClick={() => { setSheet(null); file.current?.click(); }} />
           {google && usingOwn && <Row icon="account_circle" label="Use my Google photo" onClick={() => { setSheet(null); changePhoto('google'); }} />}
@@ -140,7 +140,7 @@ export default function AccountScreen() {
       {sheet === 'settings' && <SettingsSheet onClose={() => setSheet(null)} />}
 
       {sheet === 'theme' && (
-        <Sheet onClose={() => setSheet(null)}>
+        <Sheet label="App colour" onClose={() => setSheet(null)}>
           <h2 className="h-small">App colour</h2>
           <div className="muted" style={{ fontSize: 14.5, marginTop: 2 }}>Choose the look of your RevYne. Only changes this browser.</div>
           <Gap h={16} />
@@ -199,7 +199,7 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
   const [languages, setLanguages] = useState(b.reviewLanguages);
   const [busy, setBusy] = useState(false);
   return (
-    <Sheet onClose={() => !busy && onClose()}>
+    <Sheet label="Business settings" onClose={() => !busy && onClose()}>
       <h2 className="h-small">Business settings</h2>
       <Gap h={24} />
       <Preferences

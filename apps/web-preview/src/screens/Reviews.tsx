@@ -8,8 +8,9 @@ import { openWhatsApp } from '../lib/options';
 import { Card, ConfirmDialog, EmptyState, Gap, GradientButton, GradientCard, Icon, InitialsAvatar, SectionHeader, SelectChip, Sheet, Stars, StatusPill, useToast } from '../ui';
 import { Loading, LoadError } from '../widgets';
 import { TemplateEditor } from './Templates';
+import { Tab, TabList, TabPanel, Tabs } from 'react-aria-components';
 
-type Tab = 'google' | 'private' | 'visits';
+type ReviewTab = 'google' | 'private' | 'visits';
 
 export default function ReviewsScreen() {
   const s = useStore();
@@ -17,36 +18,39 @@ export default function ReviewsScreen() {
   const fb = useFeedback();
   const gr = useGoogleReviews();
   const linked = b.isVerified;
-  const [picked, setPicked] = useState<Tab | null>(null);
-  const qTab = s.query.get('tab') as Tab | null;
+  const [picked, setPicked] = useState<ReviewTab | null>(null);
+  const qTab = s.query.get('tab') as ReviewTab | null;
   useEffect(() => {
     if (qTab === 'private' || qTab === 'google' || qTab === 'visits') setPicked(qTab);
   }, [qTab]);
-  const tab: Tab = picked ?? (linked ? 'google' : 'private');
+  const tab: ReviewTab = picked ?? (linked ? 'google' : 'private');
   const unread = fb.data?.filter((f) => f.unread).length ?? 0;
   const waiting = linked ? gr.data?.reviews.filter((r) => r.needsReply).length : undefined;
 
-  const seg = (t: Tab, icon: string, label: string, badge?: number) => (
-    <button className={`seg${tab === t ? ' on' : ''}`} onClick={() => setPicked(t)}>
+  const seg = (t: ReviewTab, icon: string, label: string, badge?: number) => (
+    <Tab id={t} className={({ isSelected }) => `seg${isSelected ? ' on' : ''}`}>
       <Icon name={icon} fill={t === 'google' && linked} />
       {label}
-      {!!badge && <span className="badge">{badge}</span>}
-    </button>
+      {!!badge && <span className="badge" aria-label={`${badge} new`}>{badge}</span>}
+    </Tab>
   );
 
   return (
     <div className="page narrow">
       <h1 className="h-medium">Reviews</h1>
       <Gap h={16} />
-      <div className="segmented">
-        {seg('google', linked ? 'star' : 'lock', 'Google', waiting)}
-        {seg('private', 'forum', 'Private', unread)}
-        {seg('visits', 'visibility', 'Visits')}
-      </div>
-      <Gap h={16} />
-      {tab === 'google' && <GoogleInbox />}
-      {tab === 'private' && <FeedbackList />}
-      {tab === 'visits' && <VisitList />}
+      {/* React Aria tabs: arrow keys move between them, screen readers hear "tab, 1 of 3". */}
+      <Tabs selectedKey={tab} onSelectionChange={(k) => setPicked(k as ReviewTab)}>
+        <TabList aria-label="Review type" className="segmented">
+          {seg('google', linked ? 'star' : 'lock', 'Google', waiting)}
+          {seg('private', 'forum', 'Private', unread)}
+          {seg('visits', 'visibility', 'Visits')}
+        </TabList>
+        <Gap h={16} />
+        <TabPanel id="google" className="tab-panel"><GoogleInbox /></TabPanel>
+        <TabPanel id="private" className="tab-panel"><FeedbackList /></TabPanel>
+        <TabPanel id="visits" className="tab-panel"><VisitList /></TabPanel>
+      </Tabs>
     </div>
   );
 }
@@ -249,7 +253,7 @@ function ReplySheet({ review: r, onClose }: { review: api.GoogleReview; onClose:
   };
 
   return (
-    <Sheet onClose={() => !posting && onClose(false)}>
+    <Sheet label="Reply to review" onClose={() => !posting && onClose(false)}>
       <div className="row" style={{ gap: 12 }}>
         <InitialsAvatar name={r.reviewer ?? undefined} />
         <div className="grow">

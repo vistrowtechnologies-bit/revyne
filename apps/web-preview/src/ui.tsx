@@ -1,5 +1,6 @@
 // React versions of lib/core/widgets/ui.dart.
-import { createContext, useContext, useEffect, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, type CSSProperties, type ReactNode } from 'react';
+import { Button, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 
 export function Icon({ name, fill, size, color, style }: { name: string; fill?: boolean; size?: number; color?: string; style?: CSSProperties }) {
   return (
@@ -131,38 +132,38 @@ export function Gap({ h = 16 }: { h?: number }) {
 
 // ── Sheets, dialogs, toasts ────────────────────────────────────────────────
 
-export function Sheet({ onClose, children }: { onClose: () => void; children: ReactNode }) {
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', k);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', k);
-      document.body.style.overflow = '';
-    };
-  }, [onClose]);
+/**
+ * Bottom sheet (a centred card on wide screens). React Aria handles focus
+ * trapping, Escape, outside-click, scroll lock and screen-reader semantics.
+ */
+export function Sheet({ onClose, children, label = 'Details' }: { onClose: () => void; children: ReactNode; label?: string }) {
   return (
-    <div className="scrim" onClick={onClose}>
-      <div className="sheet" role="dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="handle" />
-        {children}
-      </div>
-    </div>
+    <ModalOverlay className="scrim" isOpen isDismissable onOpenChange={(open) => !open && onClose()}>
+      <Modal className="sheet-modal">
+        <Dialog className="sheet" aria-label={label}>
+          <div className="handle" />
+          {children}
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
   );
 }
 
 export function ConfirmDialog({ title, body, action, danger, onCancel, onConfirm }: { title: string; body: string; action: string; danger?: boolean; onCancel: () => void; onConfirm: () => void }) {
   return (
-    <div className="scrim" style={{ alignItems: 'center', zIndex: 55 }} onClick={onCancel}>
-      <div className="dialog" role="alertdialog" onClick={(e) => e.stopPropagation()}>
-        <h3>{title}</h3>
-        <p>{body}</p>
-        <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
-          <button className="tbtn" onClick={onCancel}>Cancel</button>
-          <button className={`tbtn${danger ? ' danger' : ''}`} onClick={onConfirm}>{action}</button>
-        </div>
-      </div>
-    </div>
+    <ModalOverlay className="scrim scrim-center" isOpen isDismissable onOpenChange={(open) => !open && onCancel()}>
+      <Modal className="dialog-modal">
+        <Dialog className="dialog" role="alertdialog">
+          <Heading slot="title">{title}</Heading>
+          <p>{body}</p>
+          <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
+            {/* Focus starts on Cancel so a stray Enter never posts or deletes. */}
+            <Button className="tbtn" onPress={onCancel} autoFocus>Cancel</Button>
+            <Button className={`tbtn${danger ? ' danger' : ''}`} onPress={onConfirm}>{action}</Button>
+          </div>
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
   );
 }
 
