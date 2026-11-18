@@ -125,57 +125,20 @@ p { margin: 0 0 1em; }
 .hero-points li { display: inline-flex; align-items: center; gap: 7px; }
 .hero-points svg { width: 18px; height: 18px; }
 .hero-copy { padding-bottom: 8px; }
+.hero-copy { text-align: center; display: flex; flex-direction: column; align-items: center; padding-bottom: 0; }
+.hero h1 { max-width: 16ch; }
+.hero .lede { max-width: 54ch; }
+.hero-ctas, .hero-points { justify-content: center; }
 @media (min-width: 900px) {
-  .hero-card { grid-template-columns: 1.08fr .92fr; padding: 72px 64px 0; gap: 24px; }
-  .hero-copy { padding-bottom: 72px; }
+  .hero-card { padding: 80px 64px 0; gap: 36px; }
 }
 
-/* Phone mock-up in the hero (pure HTML/CSS) */
-.phone-stage { position: relative; display: flex; justify-content: center; align-items: flex-end; min-height: 420px; }
-.phone {
-  width: 300px; max-width: 86%;
-  background: #fff; color: var(--ink);
-  border-radius: 38px 38px 0 0; padding: 14px 14px 0;
-  box-shadow: 0 30px 80px rgba(18, 7, 49, .45), inset 0 0 0 1px rgba(255,255,255,.6);
-  border: 8px solid #1b1238; border-bottom: 0;
-}
-.phone-notch { width: 90px; height: 22px; background: #1b1238; border-radius: 0 0 14px 14px; margin: -14px auto 12px; }
-.phone-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.phone-top b { font-size: 15px; }
-.phone-top { gap: 8px; }
-.phone-top span { white-space: nowrap; font-size: 11px; font-weight: 700; color: var(--success); background: #e7f5ef; padding: 4px 8px; border-radius: 999px; }
-.mini-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-.mini-stat { background: var(--bg); border-radius: 14px; padding: 10px 12px; }
-.mini-stat small { display: block; color: var(--muted); font-size: 11px; font-weight: 600; }
-.mini-stat strong { font-size: 20px; letter-spacing: -.02em; }
-.mini-stat .up { color: var(--success); font-size: 11px; font-weight: 700; margin-left: 4px; }
-.review-card { border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin-bottom: 10px; }
-.review-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 12px; color: #fff; background: var(--grad); flex: none; }
-.review-head b { font-size: 13px; display: block; line-height: 1.2; }
-.stars { color: var(--star); letter-spacing: 1px; font-size: 12px; line-height: 1; }
-.review-card p { font-size: 12.5px; line-height: 1.5; margin: 0; color: var(--ink); }
-.draft { background: var(--primary-50); border-radius: 14px; padding: 10px 12px; margin-top: 10px; }
-.draft small { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--primary-600); margin-bottom: 4px; }
-.draft p { font-size: 12px; color: var(--muted); }
-.draft-actions { display: flex; gap: 6px; margin-top: 8px; }
-.draft-actions span { font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 999px; }
-.draft-actions .ok { background: var(--primary); color: #fff; }
-.draft-actions .edit { background: #fff; color: var(--primary-600); box-shadow: inset 0 0 0 1px var(--primary-100); }
-.float-chip {
-  position: absolute; background: #fff; color: var(--ink); border-radius: 16px; padding: 10px 14px;
-  font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 10px;
-  box-shadow: 0 18px 40px rgba(18, 7, 49, .3);
-}
-.float-chip .ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex: none; }
-.float-chip small { display: block; font-weight: 600; color: var(--muted); font-size: 11px; }
-.chip-a { left: 0; top: 40px; }
-.chip-a .ic { background: #fff4e0; color: #b36b00; }
-.chip-b { right: 0; top: 190px; }
-.chip-b .ic { background: #e7f5ef; color: var(--success); }
-@media (max-width: 520px) {
-  .float-chip { display: none; }
-  .phone-stage { min-height: 0; }
+/* Hero product shot (generated from real app screenshots) */
+.hero-shot { margin: 0 auto; width: 100%; max-width: 900px; position: relative; }
+.hero-shot img { width: 100%; height: auto; margin-bottom: -6%; }
+@media (max-width: 640px) {
+  /* Bigger centre phone on small screens; side phones crop at the card edges. */
+  .hero-shot { width: 165%; max-width: none; margin-left: -32.5%; }
 }
 
 /* ---------- Sections ---------- */
