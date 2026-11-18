@@ -122,9 +122,9 @@ function Content({ v }: { v: Insights }) {
       </div>
       <Gap h={12} />
       <Card pad="16px 12px 8px 12px">
-        <div className="row" style={{ padding: '0 6px 6px' }}>
-          <span className="grow" style={{ fontWeight: 800, fontSize: 15 }}>Actions per day</span>
-          <span className="muted" style={{ fontSize: 13 }}>Calls, directions, website & chats</span>
+        <div style={{ padding: '0 6px 10px' }}>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>Actions per day</div>
+          <div className="muted" style={{ fontSize: 13 }}>Calls, directions, website & chats</div>
         </div>
         <TrendArea data={actions} ariaLabel="Actions per day on Google" />
       </Card>
