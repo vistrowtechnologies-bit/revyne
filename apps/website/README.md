@@ -52,9 +52,27 @@ node apps/website/tools/apply-config.mjs
 The Play Store URL is a placeholder until the listing is live; `site.js` applies
 it to every `[data-play]` link.
 
-## Deploying later (Cloudflare Pages)
+## Deploying (Vercel)
 
-- Build command: none. Output directory: `apps/website`.
-- `_redirects` and `_headers` are picked up automatically.
-- `dev-server.mjs`, `tools/` and this README are harmless if uploaded, but can be
-  excluded.
+`revyneai.com` and `www` belong to the Vercel project `revyne` (account
+revyneai-4419). Git-push deploys are blocked on that Hobby account, so deploy
+with the CLI from this folder, logged in as revyneai-4419:
+
+```bash
+cd apps/website
+npx vercel link --project revyne
+npx vercel deploy
+npx vercel deploy --prod
+```
+
+`npx vercel deploy` gives a preview URL to check first; `--prod` replaces the old
+repo-root site. `vercel.json` here sets clean URLs, the `/r/:code` rewrite, a
+few redirects and security headers (the CSP allows only the Supabase project and
+Google Fonts). `.vercelignore` keeps the dev server and tools out of the upload.
+`dev-server.mjs` sends the same headers, so CSP problems show up locally.
+
+The domain still needs its DNS pointed at Vercel at the registrar
+(`npx vercel domains inspect revyneai.com` shows the records).
+
+`_redirects` / `_headers` are the equivalent config for Cloudflare Pages, kept in
+case hosting moves there.

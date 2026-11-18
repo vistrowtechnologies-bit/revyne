@@ -28,8 +28,14 @@ const types = {
   ".xml": "application/xml; charset=utf-8",
 };
 
+// Send the same site-wide headers (CSP etc.) as vercel.json, so problems show up locally.
+const vercel = JSON.parse(await readFile(join(root, "vercel.json"), "utf8"));
+const siteHeaders = Object.fromEntries(
+  (vercel.headers.find((h) => h.source === "/(.*)")?.headers ?? []).map((h) => [h.key, h.value]),
+);
+
 // Files that exist for hosting/tooling only and are never served.
-const hidden = /^\/(dev-server\.mjs|tools\/|_headers$|_redirects$|README\.md$)/;
+const hidden = /^\/(dev-server\.mjs|tools\/|_headers$|_redirects$|README\.md$|vercel\.json$|\.vercelignore$)/;
 
 async function isFile(p) {
   try { return (await stat(p)).isFile(); } catch { return false; }
@@ -56,6 +62,7 @@ createServer(async (req, res) => {
   try {
     const body = await readFile(file);
     res.writeHead(status, {
+      ...siteHeaders,
       "Content-Type": types[extname(file)] || "application/octet-stream",
       "Cache-Control": "no-store",
     });
