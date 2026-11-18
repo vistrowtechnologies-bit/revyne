@@ -2,4 +2,4 @@ User-agent: *
 Disallow: /r/
 Disallow: /review/
 
-Sitemap: https://revyneai.com/sitemap.xml
+Sitemap: https://revyne-pied.vercel.app/sitemap.xml

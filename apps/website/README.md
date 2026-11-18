@@ -42,15 +42,18 @@ in its `REVIEW_PAGE_ORIGINS` secret (default: revyneai.com, www, and
 ## Config
 
 `site.config.js` is the one place for the domain, Play Store link and contact
-email. Links are relative, so the domain only appears in canonical/OG tags,
-`sitemap.xml` and `robots.txt`; after changing `origin`, run:
+email. `origin` is currently `https://revyne-pied.vercel.app` because
+`revyneai.com` doesn't resolve yet. Links are relative, so the origin only
+appears in canonical/OG tags, structured data, `sitemap.xml`, `robots.txt` and
+the review page's share card; after changing `origin`, run:
 
 ```bash
 node apps/website/tools/apply-config.mjs
 ```
 
-The Play Store URL is a placeholder until the listing is live; `site.js` applies
-it to every `[data-play]` link.
+`playStoreUrl` is empty until the Play listing is live, so every `[data-play]`
+button reads "Get early access" and opens an email. Set it and `site.js` turns
+them all into "Get the app" links (and hides `[data-prelaunch]` notes).
 
 ## Deploying (Vercel)
 

@@ -4,20 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>RevYne — More genuine Google reviews for your local business</title>
-  <meta name="description" content="RevYne helps Indian local businesses get genuine Google reviews with a QR poster and WhatsApp links, reply to reviews with AI drafts you approve, and manage their Google Business Profile.">
+  <meta name="description" content="Get genuine Google reviews with a QR poster and WhatsApp links, reply with AI drafts you approve, and manage your Google profile. Made for India.">
   <meta name="theme-color" content="#6334E2">
-  <link rel="canonical" href="https://revyneai.com/">
+  <link rel="canonical" href="https://revyne-pied.vercel.app/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="RevYne">
   <meta property="og:title" content="RevYne — More genuine Google reviews. Less work.">
   <meta property="og:description" content="QR posters, WhatsApp links and AI review replies for Indian local businesses. Nothing goes to Google without your OK.">
-  <meta property="og:url" content="https://revyneai.com/">
-  <meta property="og:image" content="https://revyneai.com/assets/og.png">
+  <meta property="og:url" content="https://revyne-pied.vercel.app/">
+  <meta property="og:image" content="https://revyne-pied.vercel.app/assets/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:locale" content="en_IN">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="/assets/favicon-32.png" sizes="32x32">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="manifest" href="/site.webmanifest">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,12 +28,34 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "RevYne",
-    "operatingSystem": "Android",
-    "applicationCategory": "BusinessApplication",
-    "description": "Get genuine Google reviews, reply with AI drafts you approve, and manage your Google Business Profile.",
-    "publisher": { "@type": "Organization", "name": "Vistrow Technologies", "email": "hello@vistrow.com" }
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://revyne-pied.vercel.app/#org",
+        "name": "Vistrow Technologies",
+        "brand": { "@type": "Brand", "name": "RevYne" },
+        "url": "https://revyne-pied.vercel.app/",
+        "logo": "https://revyne-pied.vercel.app/assets/logo-192.png",
+        "email": "hello@vistrow.com",
+        "areaServed": "IN"
+      },
+      {
+        "@type": "WebSite",
+        "name": "RevYne",
+        "url": "https://revyne-pied.vercel.app/",
+        "inLanguage": "en-IN",
+        "publisher": { "@id": "https://revyne-pied.vercel.app/#org" }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "Does RevYne write fake reviews?", "acceptedAnswer": { "@type": "Answer", "text": "No. Every review is written by a real customer, in their own words, and posted by them on Google from their own account. AI can only help tidy up what the customer typed." } },
+          { "@type": "Question", "name": "Do unhappy customers get blocked from Google?", "acceptedAnswer": { "@type": "Answer", "text": "Never. Every customer sees the Post on Google button whatever rating they choose. They can also choose to send you a private message instead." } },
+          { "@type": "Question", "name": "Can RevYne post on my Google profile by itself?", "acceptedAnswer": { "@type": "Answer", "text": "No. Replies, posts, photos and profile edits are always shown to you first. Nothing is sent to Google until you approve it." } },
+          { "@type": "Question", "name": "Do my customers need to install anything?", "acceptedAnswer": { "@type": "Answer", "text": "No. Your QR poster and WhatsApp link open a simple web page in their phone's browser." } }
+        ]
+      }
+    ]
   }
   </script>
 </head>
@@ -47,7 +71,7 @@
       <a href="/#features">Features</a>
       <a href="/#promises">Our promises</a>
       <a href="/pricing">Pricing</a>
-      <a class="btn btn-primary btn-sm" data-play href="https://play.google.com/store/apps/details?id=com.revyne.revyne_app">Get the app</a>
+      <a class="btn btn-primary btn-sm" data-play href="mailto:hello@vistrow.com?subject=RevYne%20early%20access&amp;body=Business%20name%3A%20%0ACity%3A%20%0APhone%20or%20WhatsApp%3A%20">Get early access</a>
     </nav>
   </div>
 </header>
@@ -62,7 +86,7 @@
           <h1>More genuine Google reviews. Less work.</h1>
           <p class="lede">Happy customers scan your QR poster or tap your WhatsApp link, write a few words, and post the review on Google themselves. RevYne handles the rest — replies, posts, photos and stats — with your OK on every step.</p>
           <div class="hero-ctas">
-            <a class="btn btn-white" data-play href="https://play.google.com/store/apps/details?id=com.revyne.revyne_app"><svg aria-hidden="true"><use href="/assets/icons.svg#i-play"/></svg>Get the app</a>
+            <a class="btn btn-white" data-play href="mailto:hello@vistrow.com?subject=RevYne%20early%20access&amp;body=Business%20name%3A%20%0ACity%3A%20%0APhone%20or%20WhatsApp%3A%20"><svg aria-hidden="true"><use href="/assets/icons.svg#i-play"/></svg>Get early access</a>
             <a class="btn btn-ghost" href="#how">See how it works</a>
           </div>
           <ul class="hero-points">
@@ -96,16 +120,6 @@
     </div>
   </div>
 
-  <div class="trust-strip">
-    <div class="wrap">
-      <ul aria-label="Highlights">
-        <li>Customers post in their own words</li>
-        <li>Nothing goes to Google without your OK</li>
-        <li>Every customer sees the Google button</li>
-        <li>Data hosted in India</li>
-      </ul>
-    </div>
-  </div>
 
   <section id="how" aria-labelledby="how-title">
     <div class="wrap">
@@ -131,7 +145,7 @@
     </div>
   </section>
 
-  <section id="features" aria-labelledby="features-title" style="padding-top:0">
+  <section id="features" aria-labelledby="features-title" class="tight">
     <div class="wrap">
       <div class="section-head reveal">
         <span class="kicker">Everything in one app</span>
@@ -203,7 +217,7 @@
     </div>
   </section>
 
-  <section id="faq" aria-labelledby="faq-title" style="padding-top:0">
+  <section id="faq" aria-labelledby="faq-title" class="tight">
     <div class="wrap">
       <div class="section-head center reveal">
         <span class="kicker">Questions</span>
@@ -220,18 +234,22 @@
     </div>
   </section>
 
-  <section aria-labelledby="cta-title" style="padding-top:0">
+  <section aria-labelledby="cta-title" class="tight">
     <div class="wrap">
       <div class="cta-card reveal">
         <img src="/assets/logo-192.png" alt="" width="64" height="64">
         <h2 id="cta-title">Start getting genuine reviews this week.</h2>
-        <p>Download RevYne, link your Google profile, and print your QR poster. It takes about five minutes.</p>
-        <a class="btn btn-primary" data-play href="https://play.google.com/store/apps/details?id=com.revyne.revyne_app"><svg aria-hidden="true"><use href="/assets/icons.svg#i-play"/></svg>Get the app on Google Play</a>
-        <p class="note">Android app · Coming soon to Google Play</p>
+        <p>RevYne's Android app is launching soon. Email us your business name and city for early access — once you're in, setup takes about five minutes.</p>
+        <a class="btn btn-primary" data-play href="mailto:hello@vistrow.com?subject=RevYne%20early%20access&amp;body=Business%20name%3A%20%0ACity%3A%20%0APhone%20or%20WhatsApp%3A%20"><svg aria-hidden="true"><use href="/assets/icons.svg#i-play"/></svg>Get early access</a>
+        <p class="note" data-prelaunch>Android app · Coming soon to Google Play</p>
       </div>
     </div>
   </section>
 </main>
+
+<div class="cta-bar" aria-hidden="true">
+  <a class="btn btn-primary" data-play tabindex="-1" href="mailto:hello@vistrow.com?subject=RevYne%20early%20access&amp;body=Business%20name%3A%20%0ACity%3A%20%0APhone%20or%20WhatsApp%3A%20"><svg aria-hidden="true"><use href="/assets/icons.svg#i-play"/></svg>Get early access</a>
+</div>
 
 <footer class="site-footer">
   <div class="wrap">
@@ -241,16 +259,16 @@
         <p>Genuine Google reviews and a well-kept Google profile for Indian local businesses.</p>
       </div>
       <nav aria-label="Product">
-        <h2>Product</h2>
+        <p class="footer-title">Product</p>
         <ul>
           <li><a href="/#how">How it works</a></li>
           <li><a href="/#features">Features</a></li>
           <li><a href="/pricing">Pricing</a></li>
-          <li><a data-play href="https://play.google.com/store/apps/details?id=com.revyne.revyne_app">Get the app</a></li>
+          <li><a data-play href="mailto:hello@vistrow.com?subject=RevYne%20early%20access&amp;body=Business%20name%3A%20%0ACity%3A%20%0APhone%20or%20WhatsApp%3A%20">Get early access</a></li>
         </ul>
       </nav>
       <nav aria-label="Legal and support">
-        <h2>Legal &amp; support</h2>
+        <p class="footer-title">Legal &amp; support</p>
         <ul>
           <li><a href="/privacy">Privacy policy</a></li>
           <li><a href="/terms">Terms of service</a></li>

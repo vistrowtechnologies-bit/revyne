@@ -24,12 +24,40 @@ for (const name of assets) {
   if (name.endsWith(".js") || name.endsWith(".css")) {
     const text = await readFile(src + name, "utf8");
     await writeFile(site + "review/" + name, `/* ${stamp} */\n` + rewrite(text));
+  } else if (name === "logo.png") {
+    // The source logo is 512px / ~270 KB but shows at 32px. Customers open this
+    // page on mobile data, so use the website's 96px copy (~12 KB).
+    await copyFile(site + "assets/logo-96.png", site + "review/logo.png");
   } else {
     await copyFile(src + name, site + "review/" + name);
   }
 }
 
+// Link preview for WhatsApp / social shares of /r/<code> (the most-shared URL).
+// The page title changes to the business name once app.js loads, but link
+// crawlers don't run JS, so they see this generic card.
+const cfg = await readFile(site + "site.config.js", "utf8");
+const origin = cfg.match(/origin:\s*"([^"]+)"/)[1].replace(/\/$/, "");
+const share = `
+  <meta name="description" content="Rate your visit and share a few words. It takes less than a minute, and you post the review on Google yourself.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="RevYne">
+  <meta property="og:title" content="How was your visit? Leave a quick review">
+  <meta property="og:description" content="Rate your visit and share a few words. It takes less than a minute, and you post it on Google yourself.">
+  <meta property="og:image" content="${origin}/assets/og-review.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+`;
+
 const html = await readFile(src + "index.html", "utf8");
-await writeFile(site + "r/index.html", rewrite(html).replace("<!doctype html>", `<!doctype html>\n<!-- ${stamp} -->`));
+await writeFile(
+  site + "r/index.html",
+  rewrite(html)
+    .replace("<!doctype html>", `<!doctype html>\n<!-- ${stamp} -->`)
+    .replace('<html lang="en">', '<html lang="en-IN">')
+    .replace("<title>Share your experience</title>", "<title>How was your visit? · RevYne</title>")
+    .replace("</head>", share + "</head>"),
+);
 
 console.log("Synced apps/review-web -> apps/website/r/ and apps/website/review/");

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://revyneai.com/</loc></url>
-  <url><loc>https://revyneai.com/pricing</loc></url>
-  <url><loc>https://revyneai.com/privacy</loc></url>
-  <url><loc>https://revyneai.com/terms</loc></url>
-  <url><loc>https://revyneai.com/delete-account</loc></url>
+  <url><loc>https://revyne-pied.vercel.app/</loc></url>
+  <url><loc>https://revyne-pied.vercel.app/pricing</loc></url>
+  <url><loc>https://revyne-pied.vercel.app/privacy</loc></url>
+  <url><loc>https://revyne-pied.vercel.app/terms</loc></url>
+  <url><loc>https://revyne-pied.vercel.app/delete-account</loc></url>
 </urlset>
