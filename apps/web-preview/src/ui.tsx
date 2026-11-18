@@ -141,8 +141,10 @@ export function Sheet({ onClose, children, label = 'Details' }: { onClose: () =>
     <ModalOverlay className="scrim" isOpen isDismissable onOpenChange={(open) => !open && onClose()}>
       <Modal className="sheet-modal">
         <Dialog className="sheet" aria-label={label}>
+          {/* The body scrolls inside the rounded card, so the scrollbar and
+              content never run into the corners. */}
           <div className="handle" />
-          {children}
+          <div className="sheet-body">{children}</div>
         </Dialog>
       </Modal>
     </ModalOverlay>
