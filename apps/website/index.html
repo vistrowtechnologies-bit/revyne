@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/site.css?v=5">
+  <link rel="stylesheet" href="/assets/site.css?v=10">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -134,41 +134,45 @@
   <section id="features" aria-labelledby="features-title" class="tight">
     <div class="wrap">
       <div class="section-head reveal">
-        <span class="kicker">Everything in one app</span>
+        <span class="kicker">See it in action</span>
         <h2 id="features-title">Run your Google profile from your phone.</h2>
         <p>Connect your Google Business Profile once. RevYne drafts the work, you approve it with a tap.</p>
       </div>
-      <div class="grid grid-3">
-        <article class="card reveal">
-          <div class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-qr"/></svg></div>
-          <h3>QR poster &amp; WhatsApp links</h3>
-          <p>A ready-to-print poster and a shareable link that open your review page. Works on any phone.</p>
-        </article>
-        <article class="card reveal">
-          <div class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-reply"/></svg></div>
-          <h3>AI replies you approve</h3>
-          <p>Get a polite, personal draft for every Google review. Edit it or approve it — it posts only when you say so.</p>
-        </article>
-        <article class="card reveal">
-          <div class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-store"/></svg></div>
-          <h3>Edit your Google profile</h3>
-          <p>Update hours, description, phone and more. RevYne suggests changes; nothing is saved to Google until you approve.</p>
-        </article>
-        <article class="card reveal">
-          <div class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-image"/></svg></div>
-          <h3>Posts &amp; photos</h3>
-          <p>Create offers and updates with AI help, add photos, and schedule them. Every post waits for your OK.</p>
-        </article>
-        <article class="card reveal">
-          <div class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-chart"/></svg></div>
-          <h3>Google stats &amp; monthly PDF</h3>
-          <p>See calls, direction requests, website clicks and profile views — plus a clean monthly report you can share.</p>
-        </article>
-        <article class="card reveal">
-          <div class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-bell"/></svg></div>
-          <h3>Instant alerts</h3>
-          <p>Get a notification for every new Google review and every private message, so you can respond quickly.</p>
-        </article>
+      <div class="showcase reveal">
+        <div class="show-tabs" role="tablist" aria-label="App features">
+          <button class="show-tab" type="button" role="tab" id="tab-qr-poster" aria-controls="screen-qr-poster" aria-selected="true">
+            <span class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-qr"/></svg></span>
+            <span><b>Get reviews</b><span class="show-desc">Print your QR poster or share your link on WhatsApp. Customers rate, write a few words and post on Google themselves.</span></span>
+          </button>
+          <button class="show-tab" type="button" role="tab" id="tab-review-reply" aria-controls="screen-review-reply" aria-selected="false" tabindex="-1">
+            <span class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-reply"/></svg></span>
+            <span><b>Reply with AI</b><span class="show-desc">Every Google review gets a polite, personal draft. Edit it, then post — nothing goes out until you tap.</span></span>
+          </button>
+          <button class="show-tab" type="button" role="tab" id="tab-post-create" aria-controls="screen-post-create" aria-selected="false" tabindex="-1">
+            <span class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-image"/></svg></span>
+            <span><b>Posts, photos &amp; profile</b><span class="show-desc">Write offers and updates with AI, add photos and update your Google profile — each one waits for your OK.</span></span>
+          </button>
+          <button class="show-tab" type="button" role="tab" id="tab-google-stats" aria-controls="screen-google-stats" aria-selected="false" tabindex="-1">
+            <span class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-chart"/></svg></span>
+            <span><b>Stats &amp; monthly reports</b><span class="show-desc">See profile views, calls, directions and website clicks, and get a clean monthly PDF report.</span></span>
+          </button>
+          <button class="show-tab" type="button" role="tab" id="tab-private-messages" aria-controls="screen-private-messages" aria-selected="false" tabindex="-1">
+            <span class="icon"><svg aria-hidden="true"><use href="/assets/icons.svg#i-bell"/></svg></span>
+            <span><b>Alerts &amp; private messages</b><span class="show-desc">Get notified about new reviews. Customers with a concern can message you privately instead.</span></span>
+          </button>
+        </div>
+        <div class="show-stage-wrap">
+        <div class="show-stage">
+          <div class="device">
+            <img id="screen-qr-poster" role="tabpanel" aria-labelledby="tab-qr-poster" src="/assets/screens/qr-poster-780.webp" srcset="/assets/screens/qr-poster-390.webp 390w, /assets/screens/qr-poster-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="The Get Reviews screen with a printable QR poster for Sharma Dental Clinic">
+            <img id="screen-review-reply" role="tabpanel" aria-labelledby="tab-review-reply" src="/assets/screens/review-reply-780.webp" srcset="/assets/screens/review-reply-390.webp 390w, /assets/screens/review-reply-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="A 5 star review from Priya with an AI-drafted reply and a Post reply on Google button" hidden>
+            <img id="screen-post-create" role="tabpanel" aria-labelledby="tab-post-create" src="/assets/screens/post-create-780.webp" srcset="/assets/screens/post-create-390.webp 390w, /assets/screens/post-create-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Creating a Diwali offer post for Google with AI-written text" hidden>
+            <img id="screen-google-stats" role="tabpanel" aria-labelledby="tab-google-stats" src="/assets/screens/google-stats-780.webp" srcset="/assets/screens/google-stats-390.webp 390w, /assets/screens/google-stats-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Google stats showing 2,920 profile views, 86 calls and 142 directions in 28 days" hidden>
+            <img id="screen-private-messages" role="tabpanel" aria-labelledby="tab-private-messages" src="/assets/screens/private-messages-780.webp" srcset="/assets/screens/private-messages-390.webp 390w, /assets/screens/private-messages-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Private messages from three customers about their visit" hidden>
+          </div>
+        </div>
+        <p class="show-caption" aria-hidden="true">Print your QR poster or share your link on WhatsApp. Customers rate, write a few words and post on Google themselves.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -270,7 +274,7 @@
   </div>
 </footer>
 
-<script src="/site.config.js?v=5"></script>
-<script src="/assets/site.js?v=5" defer></script>
+<script src="/site.config.js?v=10"></script>
+<script src="/assets/site.js?v=10" defer></script>
 </body>
 </html>
