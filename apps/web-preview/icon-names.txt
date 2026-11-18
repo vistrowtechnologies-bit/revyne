@@ -37,6 +37,7 @@ edit_note
 event
 event_available
 event_busy
+expand_more
 feedback
 forum
 hide_image

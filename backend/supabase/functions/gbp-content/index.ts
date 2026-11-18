@@ -52,6 +52,15 @@ async function countToday(businessId: string, kind: string): Promise<number> {
   return res.ok ? Number(res.headers.get("content-range")?.split("/")[1] ?? 999) : 999;
 }
 
+async function deletedPhotoNames(businessId: string): Promise<Set<string>> {
+  const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const res = await db(
+    `owner_actions?business_id=eq.${businessId}&kind=eq.photo_deleted&detail=not.is.null&created_at=gte.${since}&select=detail`,
+  );
+  const rows = res.ok ? await res.json() as { detail: string }[] : [];
+  return new Set(rows.map((r) => r.detail));
+}
+
 const signedUrl = signedMediaUrl;
 
 const MIN_LEAD_MS = 10 * 60_000; // schedule at least 10 minutes ahead
@@ -167,13 +176,28 @@ serveOwner(async (req) => {
         if (!name.startsWith(prefix) || !new RegExp(`^${prefix}${kind}/[A-Za-z0-9_-]+$`).test(name)) {
           return json({ error: "Invalid item" }, 400);
         }
-        await deleteByName(name, token);
-        await record(b.id, kind === "localPosts" ? "post_deleted" : "photo_deleted");
+        try {
+          await deleteByName(name, token);
+        } catch (e) {
+          // Already gone on Google's side: treat as deleted so the app can hide it.
+          if (!(kind === "media" && e instanceof GoogleApiError && /^404\b/.test(e.message))) throw e;
+        }
+        // Photos keep the item name so the list can hide them while Google catches up.
+        await record(b.id, kind === "localPosts" ? "post_deleted" : "photo_deleted", kind === "media" ? name : null);
         return json({ status: "ok" });
       }
 
-      case "photos":
-        return json({ status: "ok", ...(await listPhotos(b.gbp_account, b.gbp_location, token)) });
+      case "photos": {
+        // Google's owner-side list keeps showing a deleted photo for days, so
+        // drop anything deleted through RevYne in the last 30 days.
+        const [page, gone] = await Promise.all([
+          listPhotos(b.gbp_account, b.gbp_location, token, str(body.pageToken, 500)),
+          deletedPhotoNames(b.id),
+        ]);
+        const photos = page.photos.filter((p) => !gone.has(p.name));
+        const hidden = page.photos.length - photos.length;
+        return json({ status: "ok", photos, total: Math.max(0, page.total - hidden), nextPageToken: page.nextPageToken });
+      }
 
       case "photo_add": {
         const mediaPath = str(body.mediaPath, 200);

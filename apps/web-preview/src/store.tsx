@@ -125,7 +125,7 @@ export const useScheduled = () => {
 };
 export const usePhotos = () => {
   const b = useBusiness();
-  return useQuery('photos', () => (b.isVerified ? api.listPhotos() : (notLinked() as Promise<{ photos: api.GbpPhoto[]; total: number }>)));
+  return useQuery('photos', () => (b.isVerified ? api.listPhotos() : (notLinked() as Promise<api.PhotoPage>)));
 };
 export const useInsights = (range: { days: number; start?: Date; end?: Date }) => {
   const b = useBusiness();

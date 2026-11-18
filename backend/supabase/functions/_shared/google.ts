@@ -215,8 +215,9 @@ export async function deleteByName(name: string, accessToken: string) {
 
 export type GbpPhoto = { name: string; url: string; thumbnailUrl: string | null; category: string | null; createdAt: string };
 
-export async function listPhotos(account: string, location: string, accessToken: string) {
-  const data = await gbpGet(`${v4(account, location)}/media?pageSize=24`, accessToken);
+export async function listPhotos(account: string, location: string, accessToken: string, pageToken = "") {
+  const qs = new URLSearchParams({ pageSize: "24", ...(pageToken ? { pageToken } : {}) });
+  const data = await gbpGet(`${v4(account, location)}/media?${qs}`, accessToken);
   const photos: GbpPhoto[] = ((data.mediaItems ?? []) as Record<string, any>[])
     .filter((m) => m.mediaFormat === "PHOTO" && m.googleUrl)
     .map((m) => ({
@@ -226,7 +227,11 @@ export async function listPhotos(account: string, location: string, accessToken:
       category: m.locationAssociation?.category ?? null,
       createdAt: m.createTime,
     }));
-  return { photos, total: typeof data.totalMediaItemCount === "number" ? data.totalMediaItemCount : photos.length };
+  return {
+    photos,
+    total: typeof data.totalMediaItemCount === "number" ? data.totalMediaItemCount : photos.length,
+    nextPageToken: (data.nextPageToken as string | undefined) ?? null,
+  };
 }
 
 export async function addPhoto(account: string, location: string, sourceUrl: string, category: string, accessToken: string) {

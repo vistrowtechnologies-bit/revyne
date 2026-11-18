@@ -110,9 +110,10 @@ class GbpPhoto {
 }
 
 class PhotoPage {
-  const PhotoPage(this.photos, this.total);
+  const PhotoPage(this.photos, this.total, [this.nextPageToken]);
   final List<GbpPhoto> photos;
   final int total;
+  final String? nextPageToken; // more photos after this page
 }
 
 /// What the owner fills in on the create-post screen.
@@ -201,9 +202,14 @@ class ContentRepository {
     return rows.map(ScheduledPost.fromJson).toList();
   }
 
-  Future<PhotoPage> photos() async {
-    final d = await _call({'action': 'photos'});
-    return PhotoPage([for (final p in d['photos'] as List) GbpPhoto.fromJson(Map<String, dynamic>.from(p as Map))], (d['total'] as num).toInt());
+  /// One page of photos (24). Photos deleted through RevYne are already left out.
+  Future<PhotoPage> photos({String? pageToken}) async {
+    final d = await _call({'action': 'photos', 'pageToken': ?pageToken});
+    return PhotoPage(
+      [for (final p in d['photos'] as List) GbpPhoto.fromJson(Map<String, dynamic>.from(p as Map))],
+      (d['total'] as num).toInt(),
+      d['nextPageToken'] as String?,
+    );
   }
 
   Future<void> addPhoto(String mediaPath, PhotoCategory category) => _call({'action': 'photo_add', 'mediaPath': mediaPath, 'category': category.api});

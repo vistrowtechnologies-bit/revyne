@@ -378,9 +378,11 @@ export async function scheduledPosts(businessId: string): Promise<ScheduledPost[
   }));
 }
 
-export async function listPhotos(): Promise<{ photos: GbpPhoto[]; total: number }> {
-  const j = await contentCall({ action: 'photos' });
-  return { photos: j.photos ?? [], total: Number(j.total ?? 0) };
+export type PhotoPage = { photos: GbpPhoto[]; total: number; nextPageToken: string | null };
+/** One page of photos (24). Photos deleted through RevYne are already left out. */
+export async function listPhotos(pageToken?: string): Promise<PhotoPage> {
+  const j = await contentCall({ action: 'photos', ...(pageToken ? { pageToken } : {}) });
+  return { photos: j.photos ?? [], total: Number(j.total ?? 0), nextPageToken: (j.nextPageToken as string | null) ?? null };
 }
 export const addPhoto = (mediaPath: string, category: string) => contentCall({ action: 'photo_add', mediaPath, category });
 export const deletePhoto = (name: string) => contentCall({ action: 'photo_delete', name });

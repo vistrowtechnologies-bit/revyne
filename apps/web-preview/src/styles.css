@@ -269,6 +269,9 @@ button:disabled { cursor: default; }
 .fab-wide { position: fixed; right: 24px; bottom: 24px; z-index: 15; display: inline-flex; align-items: center; gap: 8px; padding: 16px 20px; border-radius: 16px; background: var(--violet); color: #fff; font-weight: 700; box-shadow: var(--shadow-glow); }
 .photo-tile { aspect-ratio: 1; border-radius: 12px; overflow: hidden; position: relative; background: var(--violet50); }
 .photo-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-open { display: block; width: 100%; height: 100%; padding: 0; cursor: zoom-in; }
+.photo-view { border-radius: 16px; overflow: hidden; background: #111; display: grid; place-items: center; max-height: 70vh; }
+.photo-view img { max-width: 100%; max-height: 70vh; object-fit: contain; display: block; }
 .photo-del { position: absolute; top: 4px; right: 4px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; display: grid; place-items: center; opacity: 0; transition: opacity .15s; }
 .photo-tile:hover .photo-del, .photo-del:focus-visible { opacity: 1; }
 @media (hover: none) { .photo-del { opacity: 1; } }

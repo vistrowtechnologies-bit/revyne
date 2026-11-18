@@ -1,8 +1,5 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/format.dart';
@@ -12,6 +9,7 @@ import '../business/business_repository.dart';
 import '../google_profile/profile_repository.dart';
 import 'content_repository.dart';
 import 'create_post_screen.dart';
+import 'photo_screens.dart';
 import '../../core/widgets/skeleton.dart';
 
 Future<bool> _confirm(BuildContext context, String title, String body, String action, {bool danger = false}) async =>
@@ -242,62 +240,13 @@ class _PostCard extends StatelessWidget {
   }
 }
 
-// Google's owner-side photo list can keep showing a deleted photo for a while
-// (it isn't public any more). Remember deletes for a day so they stay hidden.
-const _deletedKey = 'revyne-deleted-photos';
-
-class DeletedPhotos extends Notifier<Map<String, int>> {
-  @override
-  Map<String, int> build() {
-    _load();
-    return const {};
-  }
-
-  Future<void> _load() async {
-    try {
-      final raw = (await SharedPreferences.getInstance()).getString(_deletedKey);
-      if (raw == null) return;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final all = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-      state = {for (final e in all.entries) if (now - (e.value as num).toInt() < 86400000) e.key: (e.value as num).toInt()};
-    } catch (_) {}
-  }
-
-  Future<void> remember(String name) async {
-    state = {...state, name: DateTime.now().millisecondsSinceEpoch};
-    try {
-      (await SharedPreferences.getInstance()).setString(_deletedKey, jsonEncode(state));
-    } catch (_) {}
-  }
-}
-
-final deletedPhotosProvider = NotifierProvider<DeletedPhotos, Map<String, int>>(DeletedPhotos.new);
-
 class PhotosSection extends ConsumerWidget {
   const PhotosSection({super.key});
-
-  Future<void> _delete(BuildContext context, WidgetRef ref, GbpPhoto p) async {
-    if (!await _confirm(context, 'Delete this photo?', 'It will be removed from your Google profile.', 'Delete', danger: true)) return;
-    try {
-      await ref.read(contentRepositoryProvider).deletePhoto(p.name);
-      await ref.read(deletedPhotosProvider.notifier).remember(p.name);
-      ref.invalidate(gbpPhotosProvider);
-      ref.invalidate(gbpProfileProvider);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo deleted. Google can take a little while to update everywhere.')));
-      }
-    } on ContentException catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final page = ref.watch(gbpPhotosProvider);
-    final deleted = ref.watch(deletedPhotosProvider);
-    final visible = (page.value?.photos ?? const <GbpPhoto>[]).where((p) => !deleted.containsKey(p.name)).toList();
-    final hidden = (page.value?.photos.length ?? 0) - visible.length;
-    final total = page.value == null ? 0 : (page.value!.total - hidden).clamp(0, 1 << 30);
+    final total = page.value?.total ?? 0;
     return AppCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -316,57 +265,21 @@ class PhotosSection extends ConsumerWidget {
           page.when(
             loading: () => const _PhotosSkeleton(),
             error: (e, _) => Text(e is ContentException ? e.message : "Couldn't load photos.", style: const TextStyle(color: AppColors.muted)),
-            data: (_) => visible.isEmpty
+            data: (p) => p.photos.isEmpty
                 ? const Text('Add photos of your shop, work and team — profiles with photos get more calls.', style: TextStyle(color: AppColors.muted))
-                : GridView.count(
-                    crossAxisCount: 3,
-                    shrinkWrap: true,
-                    padding: EdgeInsets.zero, // no system bottom inset inside a card
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 6,
-                    crossAxisSpacing: 6,
-                    children: [
-                      for (final photo in visible.take(9))
-                        GestureDetector(
-                          onLongPress: () => _delete(context, ref, photo),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  photo.thumbnailUrl ?? photo.url,
-                                  fit: BoxFit.cover,
-                                  loadingBuilder: (_, child, progress) => progress == null ? child : Container(color: AppColors.violet100),
-                                  errorBuilder: (_, _, _) => Container(color: AppColors.violet50, child: const Icon(Icons.image_outlined, color: AppColors.muted)),
-                                ),
-                              ),
-                              Positioned(
-                                top: 4,
-                                right: 4,
-                                child: Material(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  shape: const CircleBorder(),
-                                  child: InkWell(
-                                    customBorder: const CircleBorder(),
-                                    onTap: () => _delete(context, ref, photo),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(6),
-                                      child: Icon(Icons.delete_outline_rounded, size: 17, color: Colors.white, semanticLabel: 'Delete photo'),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
+                : PhotoGrid(photos: p.photos.take(9).toList()),
           ),
-          if (visible.isNotEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 6),
-              child: Text('Use the bin on a photo to delete it.', style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          if ((page.value?.photos.length ?? 0) > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(children: [
+                const Expanded(child: Text('Tap a photo to see it full size.', style: TextStyle(color: AppColors.muted, fontSize: 12.5))),
+                if (total > 9)
+                  TextButton(
+                    onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const AllPhotosScreen())),
+                    child: Text('See all $total'),
+                  ),
+              ]),
             ),
         ],
       ),

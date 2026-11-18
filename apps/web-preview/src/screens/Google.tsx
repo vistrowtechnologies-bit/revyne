@@ -574,35 +574,13 @@ function PostCard({ post: p, onDelete }: { post: api.GbpPost; onDelete: () => vo
   );
 }
 
-// Google's owner-side photo list can keep showing a deleted photo for a while
-// (it isn't public any more). Remember deletes for a day so they stay hidden.
-const DELETED_KEY = 'revyne-deleted-photos';
-function loadDeleted(): Record<string, number> {
-  try {
-    const all = JSON.parse(localStorage.getItem(DELETED_KEY) ?? '{}') as Record<string, number>;
-    return Object.fromEntries(Object.entries(all).filter(([, t]) => Date.now() - t < 864e5));
-  } catch {
-    return {};
-  }
-}
-function rememberDeleted(name: string) {
-  const all = { ...loadDeleted(), [name]: Date.now() };
-  try {
-    localStorage.setItem(DELETED_KEY, JSON.stringify(all));
-  } catch {
-    /* hidden for this visit only */
-  }
-  return all;
-}
-
 function PhotosSection({ onAdd }: { onAdd: () => void }) {
-  const toast = useToast();
   const q = usePhotos();
   const [del, setDel] = useState<string | null>(null);
-  const [deleted, setDeleted] = useState(loadDeleted);
-  const visible = (q.data?.photos ?? []).filter((p) => !deleted[p.name]);
-  const hidden = (q.data?.photos.length ?? 0) - visible.length;
-  const total = q.data ? Math.max(0, q.data.total - hidden) : 0;
+  const [all, setAll] = useState(false);
+  const [view, setView] = useState<api.GbpPhoto | null>(null);
+  const photos = q.data?.photos ?? [];
+  const total = q.data?.total ?? 0;
   return (
     <Card pad={14}>
       <div className="row">
@@ -613,44 +591,117 @@ function PhotosSection({ onAdd }: { onAdd: () => void }) {
       {q.error ? (
         <div className="muted">{q.error.message || "Couldn't load photos."}</div>
       ) : !q.data ? (
-        <div style={{ height: 80 }} />
-      ) : visible.length === 0 ? (
+        <div className="photo-grid">{Array.from({ length: 6 }, (_, i) => <div key={i} className="photo-tile sk" />)}</div>
+      ) : photos.length === 0 ? (
         <div className="muted">Add photos of your shop, work and team — profiles with photos get more calls.</div>
       ) : (
         <>
-          <div className="photo-grid">
-            {visible.slice(0, 9).map((p) => (
-              <div key={p.name} className="photo-tile" onContextMenu={(e) => { e.preventDefault(); setDel(p.name); }}>
-                <img src={p.thumbnailUrl ?? p.url} alt="" loading="lazy" />
-                <button className="photo-del" title="Delete photo" onClick={() => setDel(p.name)}><Icon name="delete" size={18} /></button>
-              </div>
-            ))}
+          <PhotoGrid photos={photos.slice(0, 9)} onOpen={setView} onDelete={setDel} />
+          <div className="row" style={{ paddingTop: 8 }}>
+            <span className="grow muted" style={{ fontSize: 12.5 }}>Tap a photo to see it full size.</span>
+            {total > 9 && (
+              <button className="tbtn" onClick={() => setAll(true)}>See all {total}<Icon name="chevron_right" /></button>
+            )}
           </div>
-          <div className="muted" style={{ fontSize: 12.5, paddingTop: 6 }}>Use the bin on a photo to delete it.</div>
         </>
       )}
-      {del && (
-        <ConfirmDialog
-          title="Delete this photo?"
-          body="It will be removed from your Google profile."
-          action="Delete"
-          danger
-          onCancel={() => setDel(null)}
-          onConfirm={async () => {
-            const name = del;
-            setDel(null);
-            try {
-              await api.deletePhoto(name);
-              setDeleted(rememberDeleted(name));
-              toast('Photo deleted. Google can take a little while to update everywhere.');
-              invalidate('photos', 'profile', 'activity');
-            } catch (e) {
-              toast((e as Error).message);
-            }
-          }}
-        />
-      )}
+      {all && <AllPhotosSheet first={q.data!} onClose={() => setAll(false)} onOpen={setView} onDelete={setDel} />}
+      {view && <PhotoViewer photo={view} onClose={() => setView(null)} onDelete={() => setDel(view.name)} />}
+      {del && <DeletePhoto name={del} onDone={(gone) => { setDel(null); if (gone) setView(null); }} />}
     </Card>
+  );
+}
+
+function PhotoGrid({ photos, onOpen, onDelete }: { photos: api.GbpPhoto[]; onOpen: (p: api.GbpPhoto) => void; onDelete: (name: string) => void }) {
+  return (
+    <div className="photo-grid">
+      {photos.map((p) => (
+        <div key={p.name} className="photo-tile">
+          <button className="photo-open" aria-label="See photo full size" onClick={() => onOpen(p)}>
+            <img src={p.thumbnailUrl ?? p.url} alt="" loading="lazy" />
+          </button>
+          <button className="photo-del" title="Delete photo" aria-label="Delete photo" onClick={() => onDelete(p.name)}><Icon name="delete" size={18} /></button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Every photo on the profile, 24 at a time. */
+function AllPhotosSheet({ first, onClose, onOpen, onDelete }: { first: api.PhotoPage; onClose: () => void; onOpen: (p: api.GbpPhoto) => void; onDelete: (name: string) => void }) {
+  const toast = useToast();
+  const latest = usePhotos().data ?? first; // refreshed after a delete
+  const [more, setMore] = useState<api.GbpPhoto[]>([]);
+  const [next, setNext] = useState<string | null>(first.nextPageToken);
+  const [busy, setBusy] = useState(false);
+  const seen = new Set(latest.photos.map((p) => p.name));
+  const photos = [...latest.photos, ...more.filter((p) => !seen.has(p.name))];
+  const loadMore = async () => {
+    if (!next) return;
+    setBusy(true);
+    try {
+      const page = await api.listPhotos(next);
+      setMore((m) => [...m, ...page.photos]);
+      setNext(page.nextPageToken);
+    } catch (e) {
+      toast((e as Error).message || "Couldn't load more photos.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet label="All photos" onClose={onClose}>
+      <h2 className="h-small">{latest.total} photo{latest.total === 1 ? '' : 's'} on Google</h2>
+      <div className="muted" style={{ fontSize: 14.5, marginTop: 4 }}>Newest first. Tap a photo to see it full size.</div>
+      <Gap h={14} />
+      <PhotoGrid photos={photos} onOpen={onOpen} onDelete={onDelete} />
+      {next && (
+        <div style={{ textAlign: 'center', marginTop: 14 }}>
+          <button className="obtn" style={{ width: 'auto', padding: '0 22px', minHeight: 44 }} disabled={busy} onClick={loadMore}>
+            {busy ? <span className="spinner" /> : <Icon name="expand_more" />}Show more
+          </button>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+function PhotoViewer({ photo, onClose, onDelete }: { photo: api.GbpPhoto; onClose: () => void; onDelete: () => void }) {
+  const cat = api.PHOTO_CATEGORIES.find((c) => c.api === photo.category)?.label;
+  return (
+    <Sheet label="Photo" onClose={onClose}>
+      <div className="photo-view"><img src={photo.url} alt={cat ? `${cat} photo` : 'Photo on Google'} /></div>
+      <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        {cat && <StatusPill label={cat} bg="var(--violet50)" fg="var(--violet700)" />}
+        <span className="grow" />
+        <a className="tbtn" href={photo.url} target="_blank" rel="noopener"><Icon name="open_in_new" />Open</a>
+        <button className="tbtn" style={{ color: 'var(--danger)' }} onClick={onDelete}><Icon name="delete" />Delete</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function DeletePhoto({ name, onDone }: { name: string; onDone: (gone: boolean) => void }) {
+  const toast = useToast();
+  return (
+    <ConfirmDialog
+      title="Delete this photo?"
+      body="It will be removed from your Google profile."
+      action="Delete"
+      danger
+      onCancel={() => onDone(false)}
+      onConfirm={async () => {
+        try {
+          await api.deletePhoto(name);
+          toast('Photo deleted. Google can take a little while to update everywhere.');
+          invalidate('photos', 'profile', 'activity');
+          onDone(true);
+        } catch (e) {
+          toast((e as Error).message);
+          onDone(false);
+        }
+      }}
+    />
   );
 }
 
