@@ -3,3 +3,5 @@ tools
 README.md
 _redirects
 _headers
+.env*
+.vercel

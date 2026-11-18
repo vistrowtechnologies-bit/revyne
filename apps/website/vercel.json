@@ -3,7 +3,7 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/r/:code", "destination": "/r/index.html" }
+    { "source": "/r/:code", "destination": "/r" }
   ],
   "redirects": [
     { "source": "/privacy-policy", "destination": "/privacy", "permanent": true },
