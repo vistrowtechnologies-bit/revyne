@@ -276,9 +276,11 @@ section.tight { padding-top: 0; }
 /* Realistic Android phone: metal rim, side buttons, status bar, flush screen.
    Sized in em, so one font-size scales the whole phone (showcase vs hero). */
 .device {
+  /* Real-phone proportions (iPhone 15 / Pixel 8 class): body ~2.1:1,
+     screen 19.5:9 with status bar and gesture bar INSIDE it, bezel ~2.5%,
+     corner radius ~14% of width. */
   position: relative; z-index: 1; width: 16.5em; font-size: 16px;
-  padding: .36em; border-radius: 2.6em;
-  /* titanium rim: light catches the top-left and bottom-right edges */
+  padding: .42em; border-radius: 2.35em;
   background: linear-gradient(145deg, #6c6c78 0%, #24242b 14%, #111115 50%, #24242b 86%, #5d5d68 100%);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, .22),
@@ -288,25 +290,31 @@ section.tight { padding-top: 0; }
     0 2.4em 4em -2em rgba(var(--glow), .45);
 }
 .device-btn { position: absolute; width: .17em; border-radius: .1em; background: linear-gradient(90deg, #1d1d23, #5a5a66); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15); }
-.device-btn-power { right: -.15em; top: 8.25em; height: 3.25em; }
-.device-btn-vol { right: -.15em; top: 4.4em; height: 2.75em; }
-.screen { position: relative; overflow: hidden; border-radius: 2.25em; isolation: isolate; background: var(--bg); box-shadow: 0 0 0 1px rgba(0, 0, 0, .6); }
+.device-btn-power { right: -.15em; top: 8em; height: 3em; }
+.device-btn-vol { right: -.15em; top: 4.3em; height: 2.5em; }
+.screen {
+  position: relative; overflow: hidden; isolation: isolate; border-radius: 1.95em;
+  aspect-ratio: 390 / 844; display: flex; flex-direction: column;
+  background: var(--bg); box-shadow: 0 0 0 1px rgba(0, 0, 0, .6);
+}
 .screen::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; z-index: 3;
   background: linear-gradient(115deg, rgba(255, 255, 255, .16) 0%, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, .06) 100%);
 }
+/* 28px status bar and 20px gesture strip out of 844: the app area is 390 x 796 */
 .status-bar {
-  display: flex; align-items: center; justify-content: space-between; height: 1.875em; padding: .375em 1.25em 0 1.375em;
-  background: var(--sb, var(--bg)); color: #16112e; font-size: 1em; font-weight: 600; position: relative; transition: background .3s;
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  height: 1.124em; padding: .12em 1.15em 0 1.3em;
+  background: var(--sb, var(--bg)); color: #16112e; font-weight: 600; position: relative; transition: background .3s;
 }
-.sb-time { font-size: .78em; letter-spacing: .01em; font-feature-settings: "tnum"; }
-.sb-icons { display: inline-flex; align-items: center; gap: .25em; }
-.sb-icons svg { height: .69em; width: auto; }
-.sb-cam { position: absolute; left: 50%; top: .56em; width: .69em; height: .69em; margin-left: -.345em; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #3b3f4a 0 18%, #0a0a0c 30%); box-shadow: 0 0 0 .09em #000; }
-.device img { display: block; width: 100%; height: auto; aspect-ratio: 390 / 844; background: var(--bg); }
+.sb-time { font-size: .62em; letter-spacing: .01em; font-feature-settings: "tnum"; }
+.sb-icons { display: inline-flex; align-items: center; gap: .2em; }
+.sb-icons svg { height: .56em; width: auto; }
+.sb-cam { position: absolute; left: 50%; top: .26em; width: .6em; height: .6em; margin-left: -.3em; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #3b3f4a 0 18%, #0a0a0c 30%); box-shadow: 0 0 0 .08em #000; }
+.device img { display: block; flex: 1 1 0; min-height: 0; width: 100%; object-fit: cover; object-position: top; background: var(--bg); }
 .device img[hidden] { display: none; }
-.nav-strip { position: relative; height: 1.125em; background: var(--nb, #fff); transition: background .3s; }
-.home-bar { position: absolute; left: 50%; top: .44em; width: 5.75em; height: .25em; margin-left: -2.875em; border-radius: .25em; background: rgba(22, 17, 46, .5); }
+.nav-strip { flex: none; position: relative; height: .803em; background: var(--nb, #fff); transition: background .3s; }
+.home-bar { position: absolute; left: 50%; top: .3em; width: 5.2em; height: .2em; margin-left: -2.6em; border-radius: .2em; background: rgba(22, 17, 46, .5); }
 .show-stage .device { max-width: 70vw; font-size: clamp(12px, 1.8vh, 13.5px); }
 @media (max-width: 899px) { .show-stage .device { font-size: 12.5px; } }
 
