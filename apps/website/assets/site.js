@@ -153,35 +153,64 @@
   var swatches = [].slice.call(document.querySelectorAll(".theme-picker .sw"));
 
   function imagesFor(theme) { return THEME_IMAGES[theme] ? theme : "royal"; }
+  function heroSet(t) {
+    return {
+      src: "/assets/hero/" + t + "-1200.webp",
+      srcset: "/assets/hero/" + t + "-600.webp 600w, /assets/hero/" + t + "-1200.webp 1200w"
+    };
+  }
+  // After the page has loaded, quietly fetch the other colours' hero pictures
+  // (the same size the browser chose), so switching colour has no wait.
+  window.addEventListener("load", function () {
+    var hero = document.querySelector("img[data-hero]");
+    if (!hero || !swatches.length) return;
+    var later = window.requestIdleCallback || function (f) { setTimeout(f, 1200); };
+    later(function () {
+      var size = /-1200\.webp/.test(hero.currentSrc || "") ? "1200" : "600";
+      Object.keys(THEME_COLOURS).forEach(function (t) {
+        var i = new Image();
+        i.src = "/assets/hero/" + t + "-" + size + ".webp";
+      });
+    });
+  });
 
   function swapImages(theme) {
     var t = imagesFor(theme);
-    // Hero picture: download and decode the new one first, then a quick
-    // fade-out / swap / fade-in, so the phones are never left faded.
+    // Hero picture: cross-fade a second copy over the current one. The other
+    // colours are preloaded after page load, so this is normally instant.
     var hero = document.querySelector("img[data-hero]");
     var shot = hero && hero.closest(".hero-shot");
-    if (hero && hero.getAttribute("src").indexOf("/hero/" + t + "-") === -1) {
-      var big = "/assets/hero/" + t + "-1200.webp";
-      var set = "/assets/hero/" + t + "-600.webp 600w, " + big + " 1200w";
-      var pre = new Image();
-      pre.sizes = hero.sizes; pre.srcset = set; pre.src = big;
+    if (hero && shot && hero.getAttribute("src").indexOf("/hero/" + t + "-") === -1) {
+      var set = heroSet(t);
       var token = (swapImages.token = (swapImages.token || 0) + 1);
-      var swap = function () {
-        if (token !== swapImages.token) return; // a newer choice won
-        if (shot) shot.classList.add("is-swapping");
+      var old = shot.querySelector(".hero-next");
+      if (old) old.remove();
+      var next = new Image();
+      next.className = "hero-next";
+      next.alt = "";
+      next.setAttribute("aria-hidden", "true");
+      next.sizes = hero.sizes;
+      next.srcset = set.srcset;
+      next.src = set.src;
+      shot.appendChild(next);
+      var fade = function () {
+        if (token !== swapImages.token) return;
+        void next.offsetWidth; // commit opacity 0 first so the fade runs
+        next.classList.add("show");
+        shot.classList.add("is-swapping");
         setTimeout(function () {
-          hero.srcset = set; hero.src = big;
-          var reveal = function () { if (shot && token === swapImages.token) shot.classList.remove("is-swapping"); };
-          if (hero.complete && hero.naturalWidth) setTimeout(reveal, 30);
-          else { hero.addEventListener("load", reveal, { once: true }); setTimeout(reveal, 1200); } // never leave it faded
-        }, 200);
+          if (token !== swapImages.token) return;
+          hero.srcset = set.srcset; hero.src = set.src;
+          var settle = function () {
+            if (token !== swapImages.token) return;
+            shot.classList.remove("is-swapping");
+            setTimeout(function () { if (next.parentNode) next.remove(); }, 460);
+          };
+          if (hero.complete && hero.naturalWidth) settle(); else { hero.addEventListener("load", settle, { once: true }); setTimeout(settle, 1500); }
+        }, 470);
       };
-      // Wait for the download (decode can be deferred in background tabs),
-      // with a safety timeout so a slow network never blocks the switch.
-      var fired = false;
-      var go = function () { if (!fired) { fired = true; swap(); } };
-      if (pre.complete && pre.naturalWidth) go();
-      else { pre.onload = go; pre.onerror = go; setTimeout(go, 2500); }
+      if (next.complete && next.naturalWidth) fade();
+      else { next.onload = fade; next.onerror = fade; }
     }
     // Showcase screenshots.
     document.querySelectorAll("img[data-screen]").forEach(function (img) {
