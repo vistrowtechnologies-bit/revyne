@@ -11,8 +11,8 @@
   // so returning visitors never see the Royal ones first.
   function retarget(img) {
     if (img.hasAttribute("data-hero")) {
-      img.srcset = "/assets/hero/" + t + "-720.webp 720w, /assets/hero/" + t + "-1448.webp 1448w";
-      img.src = "/assets/hero/" + t + "-1448.webp";
+      img.srcset = "/assets/hero/" + t + "-600.webp 600w, /assets/hero/" + t + "-1200.webp 1200w";
+      img.src = "/assets/hero/" + t + "-1200.webp";
     } else if (img.hasAttribute("data-screen")) {
       var base = "/assets/screens/" + t + "/" + img.getAttribute("data-screen");
       img.srcset = base + "-390.webp 390w, " + base + "-780.webp 780w";

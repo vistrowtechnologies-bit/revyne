@@ -161,8 +161,8 @@
     var hero = document.querySelector("img[data-hero]");
     var shot = hero && hero.closest(".hero-shot");
     if (hero && hero.getAttribute("src").indexOf("/hero/" + t + "-") === -1) {
-      var big = "/assets/hero/" + t + "-1448.webp";
-      var set = "/assets/hero/" + t + "-720.webp 720w, " + big + " 1448w";
+      var big = "/assets/hero/" + t + "-1200.webp";
+      var set = "/assets/hero/" + t + "-600.webp 600w, " + big + " 1200w";
       var pre = new Image();
       pre.sizes = hero.sizes; pre.srcset = set; pre.src = big;
       var token = (swapImages.token = (swapImages.token || 0) + 1);

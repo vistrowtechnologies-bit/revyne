@@ -198,22 +198,16 @@ p { margin: 0 0 1em; }
 
 /* Hero product shot (generated from real app screenshots); always fully inside the card */
 .hero-shot { margin: 0 auto; width: 100%; max-width: 640px; position: relative; }
-/* Soft light behind the phones so they look lit, not pasted on. */
-.hero-shot::before {
-  content: ""; position: absolute; z-index: 0; left: 8%; right: 8%; top: 4%; bottom: 0;
-  background: radial-gradient(ellipse at 50% 55%, rgba(255, 255, 255, .30), rgba(255, 255, 255, .08) 45%, transparent 70%);
-  filter: blur(8px); pointer-events: none;
-}
 .hero-shot img { position: relative; z-index: 1; display: block; width: 100%; height: auto; }
 
 /* Laptops and up: copy left, phones right, all on one screen */
 @media (min-width: 1024px) {
   .hero-card {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px;
-    padding: clamp(40px, 7vh, 72px) 40px clamp(40px, 7vh, 72px) 64px;
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 20px;
+    padding: clamp(40px, 7vh, 72px) 24px clamp(40px, 7vh, 72px) 56px;
   }
   .hero-copy { text-align: left; align-items: flex-start; }
-  .hero h1 { font-size: clamp(38px, min(3.6vw, 8vh), 52px); max-width: 13ch; }
+  .hero h1 { font-size: clamp(38px, min(3.4vw, 7.6vh), 50px); max-width: 13ch; }
   .hero .lede { max-width: 40ch; }
   .hero-ctas { justify-content: flex-start; }
   .hero-shot { max-width: none; }
@@ -298,8 +292,8 @@ section.tight { padding-top: 0; }
 .device img[hidden] { display: none; }
 .nav-strip { position: relative; height: 1.125em; background: var(--nb, #fff); transition: background .3s; }
 .home-bar { position: absolute; left: 50%; top: .44em; width: 5.75em; height: .25em; margin-left: -2.875em; border-radius: .25em; background: rgba(22, 17, 46, .5); }
-.show-stage .device { max-width: 70vw; }
-@media (max-width: 899px) { .show-stage .device { font-size: 14.3px; } }
+.show-stage .device { max-width: 70vw; font-size: clamp(12px, 1.8vh, 13.5px); }
+@media (max-width: 899px) { .show-stage .device { font-size: 12.5px; } }
 
 
 .show-caption { display: none; }
@@ -549,9 +543,8 @@ section.tight { padding-top: 0; }
 .reveal.pre.in { opacity: 1; transform: none; }
 
 /* Hero: phones float gently and cross-fade when the colour changes */
-.hero-shot { animation: float 7s ease-in-out infinite; }
-.hero-shot img { transition: opacity .22s ease, transform .3s var(--ease-out); }
-.hero-shot.is-swapping img { opacity: 0; transform: scale(.97); }
+.hero-shot img { transition: opacity .22s ease; filter: drop-shadow(0 22px 26px rgba(0, 0, 0, .26)) drop-shadow(0 4px 6px rgba(0, 0, 0, .16)); }
+.hero-shot.is-swapping img { opacity: 0; }
 .hero-card { transition: background .5s; }
 
 /* Hero colour picker */
@@ -576,7 +569,11 @@ section.tight { padding-top: 0; }
 .sw-coral { background: linear-gradient(135deg, #f97316, #be123c, #881337); }
 .sw-midnight { background: linear-gradient(135deg, #475569, #1e293b, #0b1120); }
 @media (min-width: 1024px) {
-  .theme-picker { position: absolute; top: 24px; right: 24px; z-index: 2; }
+  /* Picker sits in its own row above the phones, never on top of them */
+  .hero-card { grid-template-areas: "copy picker" "copy shot"; grid-template-rows: auto 1fr; row-gap: 8px; }
+  .hero-copy { grid-area: copy; }
+  .theme-picker { grid-area: picker; justify-self: end; align-self: start; margin: -16px 0 0; }
+  .hero-shot { grid-area: shot; align-self: center; }
 }
 
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
@@ -584,7 +581,6 @@ section.tight { padding-top: 0; }
 @keyframes screen-in { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-shot { animation: none; }
   .card, .step, .chips li, .promise-list li, .belief-list li, .soon-list li, .btn-primary, .sw { transition: none; }
   .card:hover, .step:hover, .chips li:hover, .promise-list li:hover, .belief-list li:hover, .soon-list li:hover { transform: none; }
   .device img:not([hidden]), .faq details[open] > p { animation: none; }
@@ -605,4 +601,5 @@ section.tight { padding-top: 0; }
   .hero-ctas .btn { min-height: 46px; }
   .theme-picker { padding: 5px 6px 5px 12px; gap: 6px; }
   .sw { width: 24px; height: 24px; }
+  .hero-shot { max-width: 300px; }
 }
