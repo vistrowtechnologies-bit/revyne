@@ -24,7 +24,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/site.css?v=17">
+  <link rel="stylesheet" href="/assets/site.css?v=27">
+  <script src="/assets/theme.js?v=27"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -100,9 +101,17 @@
           </div>
         </div>
 
+        <div class="theme-picker" role="radiogroup" aria-label="See RevYne in another app colour">
+          <span class="theme-label" aria-hidden="true">App colour</span>
+          <button type="button" class="sw sw-royal" role="radio" aria-checked="true" data-theme-id="royal" title="Royal"><span class="sr-only">Royal</span></button>
+          <button type="button" class="sw sw-ocean" role="radio" aria-checked="false" tabindex="-1" data-theme-id="ocean" title="Ocean"><span class="sr-only">Ocean</span></button>
+          <button type="button" class="sw sw-emerald" role="radio" aria-checked="false" tabindex="-1" data-theme-id="emerald" title="Emerald"><span class="sr-only">Emerald</span></button>
+          <button type="button" class="sw sw-coral" role="radio" aria-checked="false" tabindex="-1" data-theme-id="coral" title="Coral"><span class="sr-only">Coral</span></button>
+          <button type="button" class="sw sw-midnight" role="radio" aria-checked="false" tabindex="-1" data-theme-id="midnight" title="Midnight"><span class="sr-only">Midnight</span></button>
+        </div>
         <figure class="hero-shot">
-          <img src="/assets/hero-phones-1448.webp"
-               srcset="/assets/hero-phones-720.webp 720w, /assets/hero-phones-1448.webp 1448w"
+          <img data-hero src="/assets/hero/royal-1448.webp"
+               srcset="/assets/hero/royal-720.webp 720w, /assets/hero/royal-1448.webp 1448w"
                sizes="(min-width: 1024px) 560px, (max-width: 700px) 92vw, 640px"
                width="1448" height="1086" fetchpriority="high"
                alt="The RevYne app on three phones: the home dashboard with a 4.7 star Google rating, an AI-drafted reply to a 5 star review ready to post, and Google profile stats showing 2,920 profile views">
@@ -168,12 +177,26 @@
         </div>
         <div class="show-stage-wrap">
         <div class="show-stage">
-          <div class="device">
-            <img id="screen-qr-poster" role="tabpanel" aria-labelledby="tab-qr-poster" src="/assets/screens/qr-poster-780.webp" srcset="/assets/screens/qr-poster-390.webp 390w, /assets/screens/qr-poster-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="The Get Reviews screen with a printable QR poster for Sharma Dental Clinic">
-            <img id="screen-review-reply" role="tabpanel" aria-labelledby="tab-review-reply" src="/assets/screens/review-reply-780.webp" srcset="/assets/screens/review-reply-390.webp 390w, /assets/screens/review-reply-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="A 5 star review from Priya with an AI-drafted reply and a Post reply on Google button" hidden>
-            <img id="screen-post-create" role="tabpanel" aria-labelledby="tab-post-create" src="/assets/screens/post-create-780.webp" srcset="/assets/screens/post-create-390.webp 390w, /assets/screens/post-create-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Creating a Diwali offer post for Google with AI-written text" hidden>
-            <img id="screen-google-stats" role="tabpanel" aria-labelledby="tab-google-stats" src="/assets/screens/google-stats-780.webp" srcset="/assets/screens/google-stats-390.webp 390w, /assets/screens/google-stats-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Google stats showing 2,920 profile views, 86 calls and 142 directions in 28 days" hidden>
-            <img id="screen-private-messages" role="tabpanel" aria-labelledby="tab-private-messages" src="/assets/screens/private-messages-780.webp" srcset="/assets/screens/private-messages-390.webp 390w, /assets/screens/private-messages-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Private messages from three customers about their visit" hidden>
+          <div class="device" aria-label="RevYne app on an Android phone" role="group">
+            <span class="device-btn device-btn-power" aria-hidden="true"></span>
+            <span class="device-btn device-btn-vol" aria-hidden="true"></span>
+            <div class="screen">
+              <div class="status-bar" aria-hidden="true">
+                <span class="sb-time">9:41</span>
+                <span class="sb-cam"></span>
+                <span class="sb-icons">
+                  <svg viewBox="0 0 18 12" width="16" height="11"><path d="M1 11h2V8H1zM5 11h2V6H5zM9 11h2V3.5H9zM13 11h2V1h-2z" fill="currentColor"/></svg>
+                  <svg viewBox="0 0 16 12" width="15" height="11"><path d="M8 11.2 5.6 8.6a3.4 3.4 0 0 1 4.8 0zM3.3 6.3a6.6 6.6 0 0 1 9.4 0l-1.4 1.4a4.6 4.6 0 0 0-6.6 0zM1 4a9.9 9.9 0 0 1 14 0l-1.4 1.4a7.9 7.9 0 0 0-11.2 0z" fill="currentColor"/></svg>
+                  <svg viewBox="0 0 26 12" width="23" height="11"><rect x=".5" y=".5" width="21" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="15" height="8" rx="1.6" fill="currentColor"/><rect x="23" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".45"/></svg>
+                </span>
+              </div>
+              <img id="screen-qr-poster" data-screen="qr-poster" role="tabpanel" aria-labelledby="tab-qr-poster" src="/assets/screens/royal/qr-poster-780.webp" srcset="/assets/screens/royal/qr-poster-390.webp 390w, /assets/screens/royal/qr-poster-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="The Get Reviews screen with a printable QR poster for Sharma Dental Clinic">
+              <img id="screen-review-reply" data-screen="review-reply" role="tabpanel" aria-labelledby="tab-review-reply" src="/assets/screens/royal/review-reply-780.webp" srcset="/assets/screens/royal/review-reply-390.webp 390w, /assets/screens/royal/review-reply-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="A 5 star review from Priya with an AI-drafted reply and a Post reply on Google button" hidden>
+              <img id="screen-post-create" data-screen="post-create" role="tabpanel" aria-labelledby="tab-post-create" src="/assets/screens/royal/post-create-780.webp" srcset="/assets/screens/royal/post-create-390.webp 390w, /assets/screens/royal/post-create-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Creating a Diwali offer post for Google with AI-written text" hidden>
+              <img id="screen-google-stats" data-screen="google-stats" role="tabpanel" aria-labelledby="tab-google-stats" src="/assets/screens/royal/google-stats-780.webp" srcset="/assets/screens/royal/google-stats-390.webp 390w, /assets/screens/royal/google-stats-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Google stats showing 2,920 profile views, 86 calls and 142 directions in 28 days" hidden>
+              <img id="screen-private-messages" data-screen="private-messages" role="tabpanel" aria-labelledby="tab-private-messages" src="/assets/screens/royal/private-messages-780.webp" srcset="/assets/screens/royal/private-messages-390.webp 390w, /assets/screens/royal/private-messages-780.webp 780w" sizes="300px" width="390" height="844" loading="lazy" decoding="async" alt="Private messages from three customers about their visit" hidden>
+              <div class="nav-strip" aria-hidden="true"><span class="home-bar"></span></div>
+            </div>
           </div>
         </div>
         <p class="show-caption" aria-hidden="true">Print your QR poster or share your link on WhatsApp. Customers rate, write a few words and post on Google themselves.</p>
@@ -207,7 +230,7 @@
         <h2 id="who-title">For every business customers search on Google.</h2>
       </div>
       <ul class="chips reveal" style="justify-content:center">
-        <li>Clinics &amp; dentists</li><li>Salons &amp; spas</li><li>Restaurants &amp; cafés</li><li>Retail shops</li><li>Gyms &amp; yoga studios</li><li>Coaching centres</li><li>Hotels &amp; homestays</li><li>Car &amp; bike service</li><li>Opticians &amp; pharmacies</li>
+        <li><span class="chip-ic"><svg aria-hidden="true"><use href="/assets/icons.svg#b-clinic"/></svg></span>Clinics &amp; dentists</li><li><span class="chip-ic"><svg aria-hidden="true"><use href="/assets/icons.svg#b-salon"/></svg></span>Salons &amp; spas</li><li><span class="chip-ic"><svg aria-hidden="true"><use href="/assets/icons.svg#b-cafe"/></svg></span>Restaurants &amp; cafés</li><li><span class="chip-ic"><svg aria-hidden="true"><use href="/assets/icons.svg#b-shop"/></svg></span>Retail shops</li><li><span class="chip-ic"><svg aria-hidden="true"><use href="/assets/icons.svg#b-gym"/></svg></span>Gyms &amp; yoga studios</li><li><span class="chip-ic"><svg aria-hidden="true"><use href="/assets/icons.svg#b-class"/></svg></span>Coaching centres</li><li><span class="chip-ic"><svg aria-hidden="true"><use href="/assets/icons.svg#b-hotel"/></svg></span>Hotels &amp; homestays</li><li><span class="chip-ic"><svg aria-hidden="true"><use href="/assets/icons.svg#b-car"/></svg></span>Car &amp; bike service</li><li><span class="chip-ic"><svg aria-hidden="true"><use href="/assets/icons.svg#b-optic"/></svg></span>Opticians &amp; pharmacies</li>
       </ul>
     </div>
   </section>
@@ -287,7 +310,7 @@
   </div>
 </footer>
 
-<script src="/site.config.js?v=17"></script>
-<script src="/assets/site.js?v=17" defer></script>
+<script src="/site.config.js?v=27"></script>
+<script src="/assets/site.js?v=27" defer></script>
 </body>
 </html>
