@@ -1,0 +1,12 @@
+# Cloudflare Pages redirects/rewrites. https://developers.cloudflare.com/pages/configuration/redirects/
+# Customer review page: QR posters and WhatsApp links point to /r/<code>.
+# 200 = rewrite (URL stays /r/<code>); review/app.js reads the code from the path.
+# Its assets live under /review/, so this rule never catches JS/CSS requests.
+/r/*  /r/index.html  200
+
+# Old/alternate paths
+/privacy-policy  /privacy  301
+/terms-of-service  /terms  301
+/delete  /delete-account  301
+/about-us  /about  301
+/contact-us  /contact  301

@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /r/
+Disallow: /review/
+
+Sitemap: https://revyne-pied.vercel.app/sitemap.xml
