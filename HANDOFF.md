@@ -43,8 +43,11 @@ more genuine Google reviews and run their Google Business Profile (GBP).
 ## 2. Repository map
 
 GitHub: `vistrowtechnologies-bit/revyne` (private), remote `origin`.
-**Active branch: `rebuild`.** It is pushed: `origin/rebuild` is at `7c945d2`.
-`main` and `master` still hold the old static app. Don't build on them.
+**Active branch: `main`.** On 26 Nov `main` was fast-forwarded to `rebuild`,
+so the two are identical. Work on `main` from now on; `rebuild` can be deleted
+later. `master` still holds the old static app. Don't build on it.
+Vercel blocks deploys from git pushes on this repo, so pushing doesn't change
+the live sites. Deploy with the Vercel CLI (section 5).
 `old-origin` (`prophuntllp-bit/revyne`) is the previous remote, kept for history.
 
 | Path | What it is | State |
@@ -236,7 +239,7 @@ deno test supabase/functions/_shared
 
 ---
 
-## 6. What is built (all on `rebuild`, all against revyne-dev)
+## 6. What is built (all on `main`, all against revyne-dev)
 
 - **Sign-in:** Google sign-in. Native on Android; Supabase OAuth with PKCE on web.
 - **Onboarding:** connect-only. Connect GBP, choose a location, set preferences.
@@ -304,6 +307,7 @@ deno test supabase/functions/_shared
 
 1. [x] Website branch merged into `rebuild` (21 Nov).
 2. [x] `HANDOFF.md` and `CLAUDE.md` committed and `rebuild` pushed (21 Nov).
+3. [x] `main` fast-forwarded to `rebuild` and pushed (26 Nov). `main` is now the working branch.
 3. [ ] Give the new Claude account access: GitHub push access, and Vercel /
    Supabase CLI logins done by the owner.
 4. [ ] Copy the gitignored local files in section 4 to the new machine. If
@@ -385,7 +389,7 @@ deno test supabase/functions/_shared
 ## 9. Suggested first session on the new account
 
 1. Read `CLAUDE.md`, this file and `IMPLEMENTATION_PLAN.md`.
-2. `git fetch` and check out `rebuild`. Confirm `apps/website` is present.
+2. `git fetch` and check out `main`. Confirm `apps/website` is present.
 3. Run the checks:
    - `flutter analyze` and `flutter test` in `apps/mobile`;
    - `npm run build` in `apps/web-preview`;

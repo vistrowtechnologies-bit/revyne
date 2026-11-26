@@ -1,7 +1,8 @@
 # RevYne: working rules for Claude
 
 Start with `HANDOFF.md`: project map, accounts, commands and the open checklist.
-Work on branch `rebuild`. `main` and `master` hold the old app.
+Work on branch `main` (since 26 Nov it is the same as `rebuild`, the rebuild
+branch). `master` still holds the old July app.
 
 ## Owner's rules (always)
 
